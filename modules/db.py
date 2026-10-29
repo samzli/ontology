@@ -1,7 +1,7 @@
 """SQLite persistence layer for the Onti insurance ontology platform.
 
-Single-file database at ``data/onti.db`` using only the Python standard
-library. This module owns:
+Single-file database at ``data/onti.db`` (``ONTI_DATA_DIR`` / ``/tmp/onti-data``
+on read-only hosts) using only the Python standard library. This module owns:
 
   * schema creation / migration (``init_db``)
   * a small connection helper (``get_conn``)
@@ -22,6 +22,7 @@ import hmac
 import json
 import os
 import secrets
+import shutil
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -29,9 +30,53 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
+BUNDLED_DATA_DIR = BASE_DIR / "data"
+
+
+def _resolve_data_dir() -> Path:
+    """Return the writable data directory for the current host.
+
+    Local runs keep everything in ``data/`` (next to the code). Serverless
+    hosts such as Vercel mount the deployment read-only, so SQLite (and the
+    ``-wal`` sidecar it creates) can only live on the writable ``/tmp``
+    volume. ``ONTI_DATA_DIR`` overrides both defaults.
+    """
+    override = os.environ.get("ONTI_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    if os.environ.get("VERCEL") and os.name != "nt":
+        return Path("/tmp/onti-data")
+    return BUNDLED_DATA_DIR
+
+
+DATA_DIR = _resolve_data_dir()
 DB_PATH = DATA_DIR / "onti.db"
-KEY_PATH = DATA_DIR / ".onti.key"
+# The machine key stays next to the bundled data when available so encrypted
+# model API keys remain decryptable across instances (``/tmp`` is per-instance).
+KEY_PATH = BUNDLED_DATA_DIR / ".onti.key"
+_BUNDLED_DB_PATH = BUNDLED_DATA_DIR / "onti.db"
+_READY = False
+
+
+def _prepare_data_dir() -> None:
+    """Create the writable data directory and seed it from the bundle once."""
+    global _READY
+    if _READY:
+        return
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if (
+        DB_PATH != _BUNDLED_DB_PATH
+        and not DB_PATH.exists()
+        and _BUNDLED_DB_PATH.exists()
+    ):
+        # Ship the pre-seeded database with the deployment so every cold start
+        # exposes the same packs, accounts and reports.
+        shutil.copy2(_BUNDLED_DB_PATH, DB_PATH)
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(DB_PATH) + suffix)
+            if side.exists():
+                side.unlink()
+    _READY = True
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +87,7 @@ KEY_PATH = DATA_DIR / ".onti.key"
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
     """Yield a SQLite connection with Row factory and foreign keys enabled."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _prepare_data_dir()
     conn = sqlite3.connect(str(DB_PATH), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -142,24 +187,42 @@ def audit(
 # ---------------------------------------------------------------------------
 
 
+def _read_master_key(path: Path) -> Optional[bytes]:
+    if not path.exists():
+        return None
+    raw = path.read_bytes().strip()
+    try:
+        key = base64.urlsafe_b64decode(raw)
+    except Exception:  # noqa: BLE001 - corrupt key file -> fall through
+        return None
+    return key if len(key) == 32 else None
+
+
 def _machine_key() -> bytes:
     """Load (or create) the 32-byte machine-local master key."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if KEY_PATH.exists():
-        raw = KEY_PATH.read_bytes().strip()
-        try:
-            key = base64.urlsafe_b64decode(raw)
-            if len(key) == 32:
-                return key
-        except Exception:  # noqa: BLE001 - corrupt key file -> regenerate
-            pass
+    for candidate in (KEY_PATH, DATA_DIR / ".onti.key"):
+        key = _read_master_key(candidate)
+        if key is not None:
+            return key
     key = secrets.token_bytes(32)
-    KEY_PATH.write_bytes(base64.urlsafe_b64encode(key))
+    _prepare_data_dir()
+    key_file = DATA_DIR / ".onti.key"
+    key_file.write_bytes(base64.urlsafe_b64encode(key))
     try:
-        os.chmod(KEY_PATH, 0o600)
+        os.chmod(key_file, 0o600)
     except OSError:
         pass
     return key
+
+
+def session_signing_key() -> bytes:
+    """Key used to sign stateless session tokens (HMAC-SHA256).
+
+    Derived from the same machine key, so every instance of the deployment
+    validates the same cookies even though the SQLite session table on
+    ``/tmp`` is per-instance.
+    """
+    return hashlib.sha256(_machine_key() + b"session").digest()
 
 
 def _keystream(mac_key: bytes, nonce: bytes, length: int) -> bytes:
@@ -553,7 +616,7 @@ CREATE INDEX IF NOT EXISTS idx_studio_history_user
 
 def init_db(seed: bool = True) -> None:
     """Create all tables (idempotent) and run first-run seed migration."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _prepare_data_dir()
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
         for key, value in DEFAULT_SETTINGS.items():
