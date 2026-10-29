@@ -941,12 +941,10 @@ directory named by `ONTI_DATA_DIR`).
 ### Deploying to Vercel (serverless)
 
 The repository is linked to Vercel, so every push to the connected
-branch triggers a deployment. Vercel detects the FastAPI `app` in
-`main.py` and deploys the whole site as **one function** (Fluid compute);
-`vercel.json` sets `maxDuration` to 60 s, 1 GB memory and the files the
-function reads at runtime (`data/`, `templates/`, `static/`, `config/`,
-`modules/`, `common/`). No separate static build is involved: FastAPI
-serves the Jinja pages and `/static` assets itself.
+branch triggers a deployment. `vercel.json` builds `main.py` with
+`@vercel/python` and routes **every** path to it — FastAPI serves the
+Jinja pages and the `/static` assets itself, so no separate static build
+is involved.
 
 **Why the deployment used to fail.** Vercel mounts the deployment
 read-only, so SQLite could not create its `-wal` sidecar next to
