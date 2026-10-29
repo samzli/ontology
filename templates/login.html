@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in · {{ system_name }}</title>
+    <link rel="stylesheet" href="/static/css/app.css?v=17">
+    <link rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ED1B2E'/><text x='16' y='22' font-size='17' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>O</text></svg>">
+  </head>
+  <body>
+    <div class="auth-screen">
+      <aside class="auth-aside">
+        <div class="brand"><span class="logo">O</span> {{ system_name }}</div>
+        <div class="hero">
+          <h2>Your insurance ontology,<br>ready to answer.</h2>
+          <p>Ask business questions in plain language. Every answer is traced to
+            an
+            auditable impact chain across metrics, drivers and data — and can be
+            exported as a board-ready analytics report.</p>
+          <ul>
+            <li>Deterministic rules engine plus any OpenAI-compatible model</li>
+            <li>Import your own data and question lists to grow the knowledge
+              graph</li>
+            <li>One-click reports in HTML, PDF and Markdown</li>
+          </ul>
+        </div>
+        <div class="ver">{{ system_name }} platform v{{ version }}</div>
+      </aside>
+      <main class="auth-main">
+        <div class="auth-card">
+          <h1 id="authTitle">Welcome back</h1>
+          <div class="sub" id="authSub">Sign in to your workspace.</div>
+          <div class="firstrun-banner" id="firstRun" style="display:none">
+            First-time setup: the account you create now becomes the platform
+            administrator.
+          </div>
+          <div class="auth-error" id="authError"></div>
+          <form id="authForm" autocomplete="off">
+            <label class="fld" id="fNameWrap" style="display:none">
+              <span>Display name</span>
+              <input type="text" id="fName" placeholder="e.g. Alex Lee">
+            </label>
+            <label class="fld">
+              <span>Username</span>
+              <input type="text" id="fUser" required minlength="3"
+                maxlength="64"
+                placeholder="3–64 chars: letters, digits, _ . -" autofocus>
+            </label>
+            <label class="fld">
+              <span>Password</span>
+              <input type="password" id="fPass" required minlength="8"
+                maxlength="256"
+                placeholder="At least 8 characters">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="authBtn">Sign in</button>
+          </form>
+          <div class="auth-switch">
+            <span id="switchText">No account yet?</span>
+            <button class="btn-link" id="switchBtn" type="button">Create
+              one</button>
+          </div>
+          <div
+            style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid #eef0f4;font-size:12.5px;color:#7a8496">
+            Administrator? <a href="/admin/login"
+              style="color:var(--navy);font-weight:600">Open the admin console
+              →</a>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="/static/js/common.js?v=17"></script>
+    <script>
+    (function () {
+      const { api, toast } = Onti;
+      let mode = 'login';
+      const errBox = document.getElementById('authError');
+      const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
+
+      api.get('/api/auth/status').then((s) => {
+        if (s.first_run) {
+          mode = 'register';
+          document.getElementById('firstRun').style.display = 'block';
+          document.getElementById('fNameWrap').style.display = 'block';
+          document.getElementById('authTitle').textContent = 'Create the administrator account';
+          document.getElementById('authSub').textContent = 'Initialise your Onti workspace.';
+          document.getElementById('authBtn').textContent = 'Create admin & continue';
+          document.getElementById('switchText').textContent = 'You are setting up a new workspace.';
+          document.getElementById('switchBtn').style.display = 'none';
+        } else {
+          if (!s.allow_registration) {
+            document.getElementById('switchBtn').style.display = 'none';
+            document.getElementById('switchText').textContent =
+              'Self-registration is closed — please contact an administrator.';
+          }
+        }
+      }).catch(() => {});
+
+      document.getElementById('switchBtn').addEventListener('click', () => {
+        errBox.classList.remove('show');
+        if (mode === 'login') {
+          mode = 'register';
+          document.getElementById('fNameWrap').style.display = 'block';
+          document.getElementById('authTitle').textContent = 'Create your account';
+          document.getElementById('authSub').textContent = 'Join the Onti workspace.';
+          document.getElementById('authBtn').textContent = 'Create account';
+          document.getElementById('switchText').textContent = 'Already have an account?';
+          document.getElementById('switchBtn').textContent = 'Sign in';
+        } else {
+          mode = 'login';
+          document.getElementById('fNameWrap').style.display = 'none';
+          document.getElementById('authTitle').textContent = 'Welcome back';
+          document.getElementById('authSub').textContent = 'Sign in to your workspace.';
+          document.getElementById('authBtn').textContent = 'Sign in';
+          document.getElementById('switchText').textContent = 'No account yet?';
+          document.getElementById('switchBtn').textContent = 'Create one';
+        }
+      });
+
+      document.getElementById('authForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.classList.remove('show');
+        const btn = document.getElementById('authBtn');
+        const body = {
+          username: document.getElementById('fUser').value.trim(),
+          password: document.getElementById('fPass').value,
+          display_name: document.getElementById('fName').value.trim(),
+        };
+        btn.disabled = true;
+        try {
+          await api.post(mode === 'login' ? '/api/auth/login' : '/api/auth/register', body);
+          location.href = '/app';
+        } catch (ex) {
+          showErr(ex.message);
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+  </body>
+</html>
