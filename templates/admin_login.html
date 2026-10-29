@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin console sign in · {{ system_name }}</title>
+    <link rel="stylesheet" href="/static/css/app.css?v=17">
+    <link rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230E2A47'/><text x='16' y='22' font-size='17' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>O</text></svg>">
+    <style>
+    .admin-auth { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(150deg, #0E2A47 0%, #12233d 55%, #0a1c33 100%); padding: 24px; }
+    .admin-card { width: 100%; max-width: 420px; background: #fff; border-radius: 14px;
+      box-shadow: 0 30px 70px -20px rgba(0,0,0,.55); overflow: hidden; }
+    .admin-head { background: linear-gradient(135deg,#0E2A47,#16395f); color: #fff; padding: 28px 30px 24px; }
+    .admin-head .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+    .admin-head .logo { width: 34px; height: 34px; border-radius: 8px; background: #ED1B2E;
+      display: inline-flex; align-items: center; justify-content: center; font-weight: 800; }
+    .admin-head h1 { font-size: 20px; margin: 18px 0 4px; }
+    .admin-head .sub { color: #aec4dd; font-size: 13px; }
+    .admin-body { padding: 26px 30px 30px; }
+    .admin-foot { text-align: center; padding: 0 30px 26px; font-size: 12.5px; color: #7a8496; }
+  </style>
+  </head>
+  <body>
+    <div class="admin-auth">
+      <div class="admin-card">
+        <div class="admin-head">
+          <div class="brand"><span class="logo">O</span> {{ system_name }}</div>
+          <h1>⚙️ Admin console</h1>
+          <div class="sub">Restricted area — administrators only.</div>
+        </div>
+        <div class="admin-body">
+          <div class="auth-error" id="errBox"></div>
+          <form id="adminForm" autocomplete="off">
+            <label class="fld">
+              <span>Admin username</span>
+              <input type="text" id="fUser" required minlength="3"
+                maxlength="64"
+                placeholder="Administrator username" autofocus>
+            </label>
+            <label class="fld">
+              <span>Password</span>
+              <input type="password" id="fPass" required minlength="8"
+                maxlength="256"
+                placeholder="Your password">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="signBtn">Sign in to admin console</button>
+          </form>
+        </div>
+        <div class="admin-foot">
+          Looking for the user portal? <a href="/app"
+            style="color:var(--navy);font-weight:600">Go to /app →</a>
+        </div>
+      </div>
+    </div>
+    <script src="/static/js/common.js?v=17"></script>
+    <script>
+    (function () {
+      const { api } = Onti;
+      const errBox = document.getElementById('errBox');
+      const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
+      const qs = new URLSearchParams(location.search);
+      if (qs.get('expired')) showErr('Your session expired — please sign in again.');
+
+      // If already signed in, route appropriately.
+      api.get('/api/auth/me').then((d) => {
+        if (d.user && d.user.role === 'admin') location.href = '/admin';
+        else if (d.user) showErr('This account is not an administrator. Use the user portal instead.');
+      }).catch(() => {});
+
+      document.getElementById('adminForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.classList.remove('show');
+        const btn = document.getElementById('signBtn');
+        btn.disabled = true;
+        try {
+          const r = await api.post('/api/auth/login', {
+            username: document.getElementById('fUser').value.trim(),
+            password: document.getElementById('fPass').value,
+          });
+          if (r.user && r.user.role !== 'admin') {
+            showErr('This account is not an administrator. Use the user portal instead.');
+            // log them back out of the admin surface
+            try { await api.post('/api/auth/logout', {}); } catch (_) {}
+            btn.disabled = false;
+            return;
+          }
+          location.href = '/admin';
+        } catch (ex) {
+          showErr(ex.message);
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+  </body>
+</html>
