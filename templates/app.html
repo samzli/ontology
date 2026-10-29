@@ -1,0 +1,538 @@
+ <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ system_name }} · Insurance Ontology Workspace</title>
+    <link rel="stylesheet" href="/static/css/app.css?v=17">
+    <script defer src="/static/js/common.js?v=24"></script>
+    <script defer src="/static/js/graph.js?v=15"></script>
+    <script defer src="/static/js/app.js?v=34"></script>
+    <link rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ED1B2E'/><text x='16' y='22' font-size='17' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>O</text></svg>">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="logo">O</span> {{ system_name }}</div>
+        <nav class="nav">
+          <button data-view="dashboard" class="active"><span
+              class="ic">📊</span> Dashboard</button>
+          <button data-view="analytics"><span class="ic">📈</span>
+            Performance analytics</button>
+          <button data-view="chat"><span class="ic">💬</span> Ask the
+            ontology</button>
+          <button data-view="models"><span class="ic">🤖</span> Model
+            centre</button>
+          <button data-view="data"><span class="ic">🗂️</span> Data
+            centre</button>
+          <button data-view="workspace"><span class="ic">🧩</span> Ontology
+            workspace</button>
+          <button data-view="graphstudio"><span class="ic">🕸️</span> Graph
+            studio</button>
+          <button data-view="history"><span class="ic">🕘</span>
+            History</button>
+          <button data-view="library"><span class="ic">📚</span> Knowledge
+            library</button>
+          <button data-view="reports"><span class="ic">📄</span> My
+            reports</button>
+          {% if is_admin %}
+          <a href="/admin" style="text-decoration:none;color:inherit">
+            <button><span class="ic">⚙️</span> Admin console</button>
+          </a>
+          {% endif %}
+        </nav>
+        <div class="side-foot">
+          Signed in as <b style="color:#C7D2DF">{{ user.username }}</b><br>
+          {{ system_name }} v{{ version }}
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <h1 id="pageTitle">Ask the ontology</h1>
+          <span class="pack-pill" id="packPill">Loading pack…</span>
+          <select id="packSelect" class="input"
+            style="max-width:260px;font-size:12.5px;padding:4px 8px"
+            title="Scenario: switch the ontology pack this portal works in">
+            <option value>Loading scenarios…</option>
+          </select>
+          <span class="spacer"></span>
+          <div class="userbox">
+            <div style="text-align:right;line-height:1.25">
+              <div style="font-weight:600">{{ user.display_name or user.username
+                }}</div>
+              <div class="small muted">@{{ user.username }}</div>
+            </div>
+            <span class="avatar">{{ user.username[:2] | upper }}</span>
+            <button class="icon-btn" id="logoutBtn" title="Sign out"
+              style="font-size:13px">Sign out</button>
+          </div>
+        </header>
+
+        <div class="content">
+          <!-- ================ DASHBOARD ================ -->
+          <section class="view active" id="view-dashboard">
+            <div class="page-head">
+              <div>
+                <h2>Dashboard</h2>
+                <p>Active ontology overview — key metrics, the full knowledge
+                  graph, and quick Q&amp;A.</p>
+              </div>
+              <span class="spacer"></span>
+              <span class="pack-pill" id="dashPackPill">Loading pack…</span>
+            </div>
+            <div class="card" id="dashBanner"
+              style="margin-bottom:18px;border-left:4px solid var(--red)">
+              <div class="card-b" id="dashBannerBody"
+                style="display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center">
+                <span class="muted small">Loading scenario…</span>
+              </div>
+            </div>
+            <div class="grid grid-4" id="kpiRow"
+              style="margin-bottom:18px"></div>
+            <div id="kpiGroups" style="margin-bottom:18px"></div>
+            <div class="card" id="dashGraphCard" style="margin-bottom:18px">
+              <div class="card-h"><h3>🕸️ Knowledge graph — full ontology</h3>
+                <span class="spacer"></span>
+                <div class="segmented" id="graphLayer" role="group"
+                  aria-label="Graph layer">
+                  <button data-l="visual" aria-pressed="true">Impact
+                    graph</button>
+                  <button data-l="class" aria-pressed="false">Class
+                    relationships</button>
+                </div>
+                <button class="btn btn-ghost btn-xs" id="dashFullGraphBtn">Open
+                  large view ↗</button>
+              </div>
+              <div class="card-b">
+                <div id="dashGraphHost" style="min-height:380px"></div>
+                <div id="graphLegend"
+                  style="margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#5a6478"></div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:18px;display:none"
+              id="pinnedCard">
+              <div class="card-h"><h3>📌 Pinned insights</h3>
+                <span class="spacer"></span>
+                <button class="btn btn-ghost btn-xs" id="clearPinnedBtn">Clear
+                  all</button>
+              </div>
+              <div class="card-b" id="pinnedBody"></div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h3>💬 Quick question</h3></div>
+              <div class="card-b">
+                <div class="chat-bar"
+                  style="box-shadow:none;border:none;padding:0">
+                  <textarea id="dashAskInput" rows="2"
+                    placeholder="Ask about the ontology, e.g. What drives the VNB gap?"></textarea>
+                  <div class="bar-bottom">
+                    <button class="btn btn-primary btn-sm"
+                      id="dashSendBtn">Ask</button>
+                    <span class="spacer"></span>
+                    <button class="btn btn-ghost btn-sm" id="dashGoChatBtn">Go
+                      to Ask →</button>
+                  </div>
+                </div>
+                <div id="dashAnswer" style="margin-top:14px"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================ ANALYTICS ================ -->
+          <section class="view" id="view-analytics">
+            <div class="page-head">
+              <div>
+                <h2>Performance analytics</h2>
+                <p>Monthly VNB trend, month-on-month driver attribution
+                  (active agents × productivity × mix), target back-solve and
+                  agent-salesforce health.</p>
+              </div>
+              <span class="spacer"></span>
+              <span class="pack-pill" id="anaMonthPill">—</span>
+            </div>
+            <div id="analyticsBody"><div class="empty">Loading
+                analytics…</div></div>
+          </section>
+
+          <!-- ================ CHAT ================ -->
+          <section class="view" id="view-chat">
+            <div class="chat-wrap">
+              <div class="chat-intro" id="chatIntro">
+                <div class="big">Ask anything about the active ontology</div>
+                <p>The rules engine answers canonical questions instantly; AI
+                  mode is grounded in the same knowledge base. Every answer
+                  shows its impact chain.</p>
+                <div class="chips" id="chipRow"></div>
+              </div>
+              <div class="thread" id="thread"></div>
+
+              <div class="chat-bar">
+                <div class="bar-top">
+                  <div class="segmented" id="modeSwitch" role="group"
+                    aria-label="Answer mode">
+                    <button data-mode="auto" aria-pressed="true">Auto</button>
+                    <button data-mode="rules" aria-pressed="false">Rules
+                      engine</button>
+                    <button data-mode="ai" aria-pressed="false">AI mode</button>
+                  </div>
+                  <button class="btn btn-compare" id="compareBtn"
+                    aria-pressed="false"
+                    title="Answer the same question twice — grounded in the ontology and with no ontology at all — and compare both answers and impact chains">
+                    ◐ Compare: with / without ontology
+                  </button>
+                  <span class="spacer"></span>
+                  <button class="btn btn-ghost btn-xs" data-view="models"
+                    title="Choose which AI model answers your questions">🤖
+                    Model: <span id="askModelName">Default</span> ·
+                    change</button>
+                  <span class="mode-note" id="modeNote"><b>Auto</b> — rules
+                    engine first, AI only when no rule matches.</span>
+                </div>
+                <textarea id="askInput" rows="2"
+                  placeholder="Type your question, e.g. What drives the VNB gap?  (Enter to send · Shift+Enter for a new line)"></textarea>
+                <div class="bar-bottom">
+                  <button class="btn btn-primary btn-sm"
+                    id="sendBtn">Send</button>
+                  <button class="btn btn-ghost btn-sm"
+                    id="clearBtn">Clear</button>
+                  <button class="btn btn-ghost btn-sm" id="saveQBtn"
+                    title="Save the typed question to your own question list">★
+                    Save question</button>
+                  <button class="btn btn-ghost btn-sm" id="batchQBtn"
+                    title="Paste a whole list of questions and answer them one by one">📋
+                    Batch</button>
+                  <span class="spacer"></span>
+                  <button class="btn btn-navy btn-sm" id="reportBtn">📄 Generate
+                    report from session</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================ MODEL CENTRE ================ -->
+          <section class="view" id="view-models">
+            <div class="page-head">
+              <div>
+                <h2>Model centre</h2>
+                <p>Choose which AI model answers your questions, and register
+                  your own OpenAI-compatible endpoints (OpenAI, Azure OpenAI,
+                  Ollama, vLLM…). The rules engine never calls a model — it is
+                  always free and instant.</p>
+              </div>
+              <span class="spacer"></span>
+              <button class="btn btn-primary" id="mcAddBtn">＋ Add my
+                model</button>
+            </div>
+            <div id="modelsBody"><div class="empty">Loading models…</div></div>
+          </section>
+
+          <!-- ================ LIBRARY ================ -->
+          <section class="view" id="view-library">
+            <div class="page-head">
+              <div>
+                <h2>Knowledge library</h2>
+                <p id="libSub">Read-only view of the entities, formulas and data
+                  that power the active ontology.</p>
+              </div>
+            </div>
+            <div id="libraryBody"></div>
+          </section>
+
+          <!-- ================ REPORTS ================ -->
+          <section class="view" id="view-reports">
+            <div class="page-head">
+              <div>
+                <h2>My reports</h2>
+                <p>Analytics reports generated from your Q&amp;A sessions.
+                  Download as HTML, PDF or Markdown.</p>
+              </div>
+              <span class="spacer"></span>
+              <button class="btn btn-ghost" id="sampleReportBtn"
+                title="One-click demo report: recommended questions answered and rendered with charts, ontology graph and analytics">⚡
+                Sample
+                report</button>
+              <button class="btn btn-primary" id="reportBtn2">📄 Generate
+                report</button>
+            </div>
+            <div id="reportsBody" class="grid"></div>
+          </section>
+
+          <!-- ================ DATA CENTRE ================ -->
+          <section class="view" id="view-data">
+            <div class="page-head">
+              <div>
+                <h2>Data centre</h2>
+                <p>Underlying data tables that feed the ontology. Add your own
+                  CSV/XLSX in <b>Graph studio</b> — it previews the file against
+                  the active ontology without changing anything.</p>
+              </div>
+            </div>
+            <div id="dataBody"></div>
+          </section>
+
+          <!-- ================ WORKSPACE ================ -->
+          <section class="view" id="view-workspace">
+            <div class="page-head">
+              <div>
+                <h2>Ontology workspace</h2>
+                <p>Build and manage the active ontology — entities, attributes,
+                  graph nodes/edges, formulas and question rules.</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-b">
+                <label class="fld" style="margin:0">
+                  <span>🔍 Search the ontology — find entities, attributes,
+                    formulas, rules by name or text</span>
+                  <input type="text" id="ontoSearch"
+                    placeholder="e.g. vnb, agent, premium…">
+                </label>
+                <div id="ontoSearchResults" class="small mt8"></div>
+                <div id="ontoInsight" style="margin-top:14px"></div>
+              </div>
+            </div>
+            {% if is_admin %}
+            <div class="card">
+              <div class="card-b">
+                <p style="margin-top:0"><b>How to create a new ontology</b> —
+                  everything happens in the Admin console, in this order:</p>
+                <div class="flex wrap" style="gap:10px">
+                  <a class="chip" href="/admin?view=onto"
+                    style="text-decoration:none">1 · 🧱 Create &amp; add
+                    entities</a>
+                  <a class="chip" href="/admin?view=onto"
+                    style="text-decoration:none">2 · 🔗 Connect relations</a>
+                  <a class="chip" href="/admin?view=data"
+                    style="text-decoration:none">3 · 🗂️ Upload data</a>
+                  <a class="chip" href="/admin?view=graph"
+                    style="text-decoration:none">4 · 📈 Review graph</a>
+                  <a class="chip" href="/admin?view=onto"
+                    style="text-decoration:none">5 · ▶ Activate pack</a>
+                </div>
+                <p class="small muted">Tip: press <b>✨ New ontology</b> in the
+                  Admin console — a guided wizard creates the pack and walks you
+                  through every step. You can also import an existing JSON
+                  ontology file (Admin console → ⬆ Import pack).</p>
+                <a href="/admin" style="text-decoration:none">
+                  <button class="btn btn-primary">🧩 Open ontology
+                    builder</button>
+                </a>
+              </div>
+            </div>
+            {% else %}
+            <div class="empty"><div class="big">🔒</div>
+              <p>Ontology building is restricted to workspace administrators.
+                What you <b>can</b> do:</p>
+              <div class="flex wrap"
+                style="gap:10px;justify-content:center;margin:12px 0">
+                <button class="chip" data-view="data">🗂️ Browse the data
+                  tables</button>
+                <button class="chip" data-view="chat">💬 Ask the ontology
+                  questions</button>
+                <button class="chip" data-view="reports">📄 Generate
+                  reports</button>
+              </div>
+              <p class="small muted">To create a brand-new ontology, contact
+                your workspace administrator.</p>
+            </div>
+            {% endif %}
+          </section>
+
+          <!-- ================ GRAPH STUDIO ================ -->
+          <section class="view" id="view-graphstudio">
+            <div class="page-head">
+              <div>
+                <h2>Graph studio</h2>
+                <p>Turn your knowledge-base data into a real ontology:
+                  pick tables, preview the entities, attributes and
+                  relations we infer, then create and activate it — you can
+                  ask questions and build reports on it immediately. You
+                  can also explore read-only graphs of your sources
+                  below.</p>
+              </div>
+              <span class="spacer"></span>
+              <label class="btn btn-primary">
+                📤 Graph from file
+                <input type="file" id="gsUploadInput"
+                  accept=".csv,.xlsx,.xls,.json" style="display:none">
+              </label>
+            </div>
+            <div class="card"
+              style="margin-bottom:14px;border:1px solid var(--brand-soft,#cfe0ff)">
+              <div class="card-h">
+                <h3>✨ Build an ontology from your data</h3>
+              </div>
+              <div class="card-b">
+                <p class="small muted" style="margin-top:0">
+                  Each picked table becomes an <b>entity</b>, each column an
+                  <b>attribute</b> (type detected automatically), and columns
+                  ending in <span class="mono">_id</span> that point at
+                  another table become <b>relations</b>. Your data rows are
+                  copied into the new ontology so it answers questions right
+                  away.</p>
+                <div class="flex"
+                  style="gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+                  <label class="fld" style="margin:0;min-width:240px;flex:1">
+                    <span>New ontology name</span>
+                    <input type="text" id="oiName"
+                      placeholder="e.g. Sales performance ontology">
+                  </label>
+                  <button class="btn btn-ghost btn-sm" id="oiSelAll">Select
+                    all tables</button>
+                  <button class="btn btn-ghost btn-sm"
+                    id="oiSelNone">Clear</button>
+                  <label class="switch"
+                    style="font-weight:400;color:var(--ink-2);gap:6px"
+                    title="Let the configured AI model write entity descriptions and suggest starter questions">
+                    <input type="checkbox" id="oiAI">
+                    <span class="track"></span>
+                    AI enrichment
+                  </label>
+                  <button class="btn btn-primary" id="oiPreviewBtn">🔍
+                    Preview inferred ontology</button>
+                </div>
+                <div id="oiSources"><div class="empty small">Loading
+                    knowledge-base tables…</div></div>
+                <div id="oiPreview" style="display:none;margin-top:14px">
+                  <div class="flex wrap" style="gap:8px;align-items:center">
+                    <span class="badge rules" id="oiCntEnt"></span>
+                    <span class="badge neutral" id="oiCntAttr"></span>
+                    <span class="badge neutral" id="oiCntRel"></span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-ghost btn-sm"
+                      id="oiCancelBtn">Discard
+                      preview</button>
+                    <button class="btn btn-primary" id="oiCreateBtn">✓
+                      Create &amp; activate ontology</button>
+                  </div>
+                  <div class="grid"
+                    style="grid-template-columns:1fr 1fr;margin-top:12px">
+                    <div class="small" id="oiEntList"></div>
+                    <div class="small" id="oiRelList"></div>
+                  </div>
+                  <div id="oiAiQs" class="small" style="margin-top:10px"></div>
+                  <div id="oiGraphHost"
+                    style="min-height:320px;margin-top:10px"></div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-h"><h3>Explore graphs of your sources</h3>
+                <span class="spacer"></span>
+                <button class="btn btn-primary btn-sm"
+                  id="gsBuildBtn">Build graph</button>
+              </div>
+              <div class="card-b">
+                <div class="segmented" id="gsViewSwitch" role="group"
+                  aria-label="Analysis view" style="margin-bottom:12px">
+                  <button data-v="schema" aria-pressed="false">Schema</button>
+                  <button data-v="lineage" aria-pressed="true">Data
+                    lineage</button>
+                  <button data-v="columns" aria-pressed="false">Column
+                    mapping</button>
+                </div>
+                <p class="small muted" id="gsViewHint"
+                  style="margin:0 0 10px"></p>
+                <div id="gsTablePicker" style="display:none">
+                  <div class="flex"
+                    style="gap:8px;align-items:center;margin-bottom:6px">
+                    <b class="small">Data tables:</b>
+                    <button class="btn btn-ghost btn-xs"
+                      id="gsSelAll">Select all</button>
+                    <button class="btn btn-ghost btn-xs"
+                      id="gsSelNone">Clear</button>
+                  </div>
+                  <div id="gsSources"><div class="empty">Loading
+                      sources…</div></div>
+                  <label id="gsUnmatchedWrap"
+                    style="display:none;margin-top:8px;gap:8px;align-items:center">
+                    <input type="checkbox" id="gsUnmatched">
+                    <span class="small">Include columns with no ontology
+                      attribute match</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-h"><h3>Your graph</h3>
+                <span class="spacer"></span>
+                <span class="small muted" id="gsStats"></span>
+              </div>
+              <div class="card-b">
+                <div id="gsGraphHost" style="min-height:420px">
+                  <div class="empty"><div class="big">🕸️</div>
+                    Pick sources above and press <b>Build graph</b> — or
+                    upload a CSV/XLSX/JSON file to graph it instantly.</div>
+                </div>
+                <div id="gsLegend"
+                  style="margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#5a6478"></div>
+              </div>
+            </div>
+            <div class="grid" style="grid-template-columns:1fr 1fr">
+              <div class="card">
+                <div class="card-h"><h3>📍 Node provenance</h3></div>
+                <div class="card-b small" id="gsProvenance">
+                  <span class="muted">Click any node in the graph to see
+                    exactly which entity, table, column or file it comes
+                    from.</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-h"><h3>🗂️ Sources used</h3></div>
+                <div class="card-b small" id="gsSourceList">
+                  <span class="muted">The list of origins behind the current
+                    graph appears here after a build.</span>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:14px">
+              <div class="card-h">
+                <h3>🕘 Generation history</h3>
+                <span class="spacer"></span>
+                <button class="btn btn-ghost btn-xs"
+                  id="gsHistoryRefresh">Refresh</button>
+              </div>
+              <div class="card-b small" id="gsHistory">
+                <span class="muted">Loading history…</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================ HISTORY ================ -->
+          <section class="view" id="view-history">
+            <div class="page-head">
+              <div>
+                <h2>History</h2>
+                <p>Your recent questions and answers in this session.</p>
+              </div>
+              <span class="spacer"></span>
+              <button class="btn btn-ghost" id="clearHistoryBtn">Clear
+                history</button>
+            </div>
+            <div id="historyBody"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <nav class="mobile-tabbar">
+      <button data-view="dashboard" class="active"><span
+          class="ic">📊</span>Dash</button>
+      <button data-view="analytics"><span class="ic">📈</span>Trend</button>
+      <button data-view="chat"><span class="ic">💬</span>Ask</button>
+      <button data-view="data"><span class="ic">🗂️</span>Data</button>
+      <button data-view="workspace"><span class="ic">🧩</span>Build</button>
+      <button data-view="graphstudio"><span class="ic">🕸️</span>Graph</button>
+      <button data-view="models"><span class="ic">🤖</span>Models</button>
+      <button data-view="history"><span class="ic">🕘</span>History</button>
+      <button data-view="library"><span class="ic">📚</span>Library</button>
+      <button data-view="reports"><span class="ic">📄</span>Reports</button>
+      {% if is_admin %}<a href="/admin"
+        style="flex:1;text-decoration:none;color:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px"><span
+          class="ic" style="font-size:16px">⚙️</span>Admin</a>{% endif %}
+    </nav>
+
+  </body>
+</html>
