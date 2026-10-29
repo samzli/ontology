@@ -19,14 +19,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from jinja2 import Environment, BaseLoader
 
+from modules.db import DATA_DIR as _DATA_DIR, BUNDLED_DATA_DIR
 from modules.db import audit, get_conn, now
 from modules import analytics as an
 from modules import ontology_service as svc
 from modules import report_charts as rc
 
-DATA_ROOT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"
-)
+DATA_ROOT = str(_DATA_DIR)
+BUNDLED_ROOT = str(BUNDLED_DATA_DIR)
 REPORTS_ROOT = os.path.join(DATA_ROOT, "reports")
 
 BRAND_RED = "#ED1B2E"
@@ -1300,7 +1300,14 @@ def _render_pdf(
 
 
 def _abs(dbrel: str) -> str:
-    return os.path.normpath(os.path.join(DATA_ROOT, dbrel))
+    path = os.path.normpath(os.path.join(DATA_ROOT, dbrel))
+    if not os.path.exists(path):
+        # Reports generated before the deployment (shipped in data/reports/)
+        # are read-only on serverless hosts; fall back to the bundled copy.
+        bundled = os.path.normpath(os.path.join(BUNDLED_ROOT, dbrel))
+        if os.path.exists(bundled):
+            return bundled
+    return path
 
 
 def list_reports(conn, user: Dict[str, Any]) -> List[Dict[str, Any]]:

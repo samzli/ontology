@@ -16,16 +16,61 @@ import re
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Depends, HTTPException, Request
 
 from modules import config
-from modules.db import audit, get_conn, get_setting, now
+from modules.db import audit, get_conn, get_setting, now, session_signing_key
 
 COOKIE_NAME = "onti_session"
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{3,64}$")
 PBKDF2_ITERATIONS = 240_000
+
+
+# ---------------------------------------------------------------------------
+# Session tokens
+# ---------------------------------------------------------------------------
+
+
+def _b64(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _unb64(raw: str) -> bytes:
+    return base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+
+
+def issue_session_token(user_id: int, expires_at: str) -> str:
+    """Return a signed token ``payload.signature``.
+
+    The token is also stored in the ``sessions`` table (so logout revokes it
+    on that instance), but it is self-contained: a serverless instance that
+    never saw the login can still verify it with the shared machine key.
+    """
+    payload = _b64(f"{int(user_id)}|{expires_at}".encode("utf-8"))
+    sig = hmac.new(
+        session_signing_key(), payload.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    return f"{payload}.{sig}"
+
+
+def verify_session_token(token: str) -> Optional[Tuple[int, str]]:
+    """Validate a signed token; returns ``(user_id, expires_at)`` or None."""
+    payload, _, sig = (token or "").partition(".")
+    if not payload or not sig:
+        return None
+    expected = hmac.new(
+        session_signing_key(), payload.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
+    try:
+        user_id, expires = _unb64(payload).decode("utf-8").split("|", 1)
+        return int(user_id), expires
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Password hashing
@@ -264,9 +309,9 @@ def authenticate(
         audit(conn, username, "auth.login_failed", "bad password", ip)
         raise AuthError("Invalid username or password.", 401)
 
-    token = secrets.token_urlsafe(32)
     created = datetime.now(timezone.utc)
     expires = created + timedelta(days=config.SESSION_DAYS)
+    token = issue_session_token(row["id"], expires.isoformat(timespec="seconds"))
     conn.execute(
         "INSERT INTO sessions(token, user_id, created_at, expires_at, user_agent) "
         "VALUES(?,?,?,?,?)",
@@ -299,18 +344,34 @@ def user_by_token(conn: sqlite3.Connection, token: str) -> Optional[sqlite3.Row]
         "WHERE sessions.token=?",
         (token,),
     ).fetchone()
-    if row is None:
+    if row is not None:
+        sess = conn.execute(
+            "SELECT expires_at FROM sessions WHERE token=?", (token,)
+        ).fetchone()
+        try:
+            if _parse_dt(sess["expires_at"]) < datetime.now(timezone.utc):
+                conn.execute("DELETE FROM sessions WHERE token=?", (token,))
+                return None
+        except (TypeError, ValueError):
+            return None
+        return row
+
+    # Serverless fallback: the login happened on another instance, so its
+    # ``sessions`` row is not visible here. The token itself is signed with
+    # the shared machine key, so verify it and load the user directly.
+    parsed = verify_session_token(token)
+    if parsed is None:
         return None
-    sess = conn.execute(
-        "SELECT expires_at FROM sessions WHERE token=?", (token,)
-    ).fetchone()
+    user_id, expires_at = parsed
     try:
-        if _parse_dt(sess["expires_at"]) < datetime.now(timezone.utc):
-            conn.execute("DELETE FROM sessions WHERE token=?", (token,))
+        if _parse_dt(expires_at) < datetime.now(timezone.utc):
             return None
     except (TypeError, ValueError):
         return None
-    return row
+    user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if user is None or not user["enabled"]:
+        return None
+    return user
 
 
 def logout(conn: sqlite3.Connection, token: str, ip: str = "") -> None:
