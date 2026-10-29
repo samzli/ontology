@@ -30,7 +30,7 @@ uploaded tables in Graph studio
 - **Backend:** Python 3.10+ · FastAPI · SQLite (zero external services)
 - **Frontend:** server-rendered Jinja2 pages + vanilla HTML/CSS/JS — no
   build step, no CDN
-- **Auth:** local accounts, PBKDF2 hashes, server-side session cookies,
+- **Auth:** local accounts, PBKDF2 hashes, signed HttpOnly session cookies,
   role-based portals
 - **Default URL:** <http://localhost:8010> — or `http://onti.local:8010`
   after the one-line hosts mapping below
@@ -919,7 +919,10 @@ database, not in files.
 
 ### Data & backups
 
-Everything stateful lives in the `data/` folder:
+Locally, everything stateful lives in the `data/` folder. On a serverless
+host there is no writable `data/`; the app then uses `/tmp/onti-data`
+(or the directory named by `ONTI_DATA_DIR`) — see
+[Deploying to Vercel](#deploying-to-vercel-serverless).
 
 - `onti.db` (+ `-wal` / `-shm`) — users, ontology packs, datasets,
   reports metadata, audit.
@@ -927,11 +930,69 @@ Everything stateful lives in the `data/` folder:
   used by the sample pack seed and as a ready-to-import example.
 - `motor_insurance_ontology.json` — a second sample schema (motor
   claims domain) demonstrating that any BP2-format JSON can be imported.
-- `.onti.key` — machine-local key used to encrypt model API keys.
+- `.onti.key` — machine-local key used to encrypt model API keys and
+  to sign session cookies.
 - `reports/` — generated report files.
 - `*.csv|xlsx` uploads are parsed and stored as rows in the database.
 
-To back up: stop the server, copy the whole `data/` folder.
+To back up: stop the server, copy the whole `data/` folder (or the
+directory named by `ONTI_DATA_DIR`).
+
+### Deploying to Vercel (serverless)
+
+The repository is linked to Vercel, so every push to the connected
+branch triggers a deployment. Vercel detects the FastAPI `app` in
+`main.py` and deploys the whole site as **one function** (Fluid compute);
+`vercel.json` sets `maxDuration` to 60 s, 1 GB memory and the files the
+function reads at runtime (`data/`, `templates/`, `static/`, `config/`,
+`modules/`, `common/`). No separate static build is involved: FastAPI
+serves the Jinja pages and `/static` assets itself.
+
+**Why the deployment used to fail.** Vercel mounts the deployment
+read-only, so SQLite could not create its `-wal` sidecar next to
+`data/onti.db`; startup died in `db.init_db` →
+`get_conn` → `PRAGMA journal_mode = WAL` with
+`sqlite3.OperationalError: unable to open database file`, and every
+request returned HTTP 500 `FUNCTION_INVOCATION_FAILED`.
+
+**Writable storage.** `modules/db.py` detects `VERCEL` and switches to
+`/tmp/onti-data` (`ONTI_DATA_DIR` overrides the location on any host):
+
+- On the first request of each instance the bundled, pre-seeded
+  `data/onti.db` is copied to the writable directory, so every visitor
+  sees the same packs, KPI data, demo reports and pre-provisioned
+  accounts — including `admin` / `Onti@2026`.
+- Reports that were generated before the deployment are read from the
+  bundled `data/reports/` folder when they are absent from the writable
+  directory.
+- Writes made **inside the app** (new registrations, uploaded data,
+  generated reports, model configs) live as long as the function instance
+  and are not shared between instances. For durable multi-user writes,
+  run the app on a VM/container with a persistent disk, or point
+  `ONTI_DATA_DIR` at a mounted persistent volume.
+- Session cookies are signed with the bundled key and also validated
+  statelessly, so a login survives cold starts and requests served by
+  another instance.
+
+**Let any account in.** Production deployments are public, but if
+**Deployment Protection → Vercel Authentication** is enabled, visitors are
+asked to sign in with a Vercel account and colleagues outside the Vercel
+team cannot open the app. In Vercel: *Project → Settings → Deployment
+Protection* → disable **Vercel Authentication** for the production domain
+(or hand out a Protection Bypass link). Inside the app, users can then open
+`/app`, sign in with a pre-provisioned account, or self-register
+(`allow_registration` is on by default); admins add accounts in
+**Admin → Users & audit**.
+
+**Environment variables.** Set `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME`
+in *Project → Settings → Environment Variables* and redeploy. They are
+read from `os.environ` on first startup and imported once into the
+encrypted model configuration (the same bootstrap also accepts
+`LLM_VERIFY_SSL=false` / `SKIP_SSL_VERIFY=1`). AI features stay optional —
+the rules engine, graph, imports and reports work without a model.
+
+**Health check.** `GET /health` returns JSON without authentication and
+is the quickest way to confirm a deployment is alive.
 
 ---
 
@@ -1113,6 +1174,7 @@ Code/
 ├─ main.py              # FastAPI app: pages, routes, SSE only.
 ├─ start_server.bat
 ├─ requirements.txt
+├─ vercel.json          # serverless build/route config (all paths → main.py)
 ├─ config/config.json   # port, session, upload settings
 ├─ modules/
 │  ├─ db.py             # schema, connections, settings, audit, crypto

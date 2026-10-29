@@ -14,7 +14,7 @@ Browser (vanilla JS)
   ▼
 FastAPI (main.py)            ← thin HTTP layer only
   │
-  ├── modules/auth.py        ← PBKDF2 accounts, server-side sessions
+  ├── modules/auth.py        ← PBKDF2 accounts, signed session cookies
   ├── modules/ontology_service.py  ← rules engine, formulas, graphs,
   │                                    search, health, graph studio
   ├── modules/qa_service.py  ← rules-first / LLM-fallback pipeline
@@ -32,12 +32,24 @@ FastAPI (main.py)            ← thin HTTP layer only
   ├── modules/induction.py   ← AI ontology proposals (+ evidence)
   └── modules/db.py          ← SQLite schema, settings, audit, crypto
         ▼
-      data/onti.db (SQLite, WAL)
+      data/onti.db (SQLite, WAL; /tmp/onti-data on read-only hosts)
 ```
 
 No external services: one Python process, one SQLite file. The
 frontend is server-rendered Jinja2 plus four static JS files
 (`common.js`, `graph.js`, `app.js`, `admin.js`) — no build step.
+
+`modules/db.py:_resolve_data_dir` picks the writable data directory:
+`ONTI_DATA_DIR` when set, `/tmp/onti-data` when `VERCEL` is present
+(the deployment itself is read-only), otherwise the bundled `data/`
+folder. On first connection the bundled `data/onti.db` is copied into
+that writable directory, so a fresh serverless instance starts with the
+same seeded packs, accounts and report metadata. Files under
+`data/reports/` that are not present in the writable directory are read
+from the bundled copy (`report_builder._abs`). The machine key
+(`data/.onti.key`) always stays next to the bundled data, so encrypted
+model API keys and signed session cookies are identical across
+instances.
 
 ## 2. Data model (SQLite)
 
@@ -46,7 +58,7 @@ Core tables (selection):
 | Table                                   | Purpose                                         |
 | --------------------------------------- | ----------------------------------------------- |
 | `users`                                 | accounts, PBKDF2 hashes, roles                  |
-| `sessions`                              | server-side session cookies                     |
+| `sessions`                              | session tokens (signed + stored)                |
 | `ontology_packs`                        | one row per ontology (see origin note below)    |
 | `entities` / `attributes` / `relations` | the ontology schema                             |
 | `graph_nodes` / `graph_edges`           | the impact graph (auto-generated if empty)      |
@@ -634,9 +646,14 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 
 ## 8. Security notes
 
-- Sessions are HttpOnly cookies backed by the `sessions` table;
-  `/api/admin/*` requires the admin role; the admin UI is a separate
-  page with no cross-links from the user portal.
+- Sessions are HttpOnly cookies whose value is an HMAC-signed
+  `user_id|expires` payload (`auth.issue_session_token`). The token is
+  also written to the `sessions` table so logout revokes it immediately
+  on the issuing instance; other serverless instances verify the
+  signature and load the user directly, so a cookie survives cold starts
+  and per-instance `/tmp` databases. `/api/admin/*` requires the admin
+  role; the admin UI is a separate page with no cross-links from the
+  user portal.
 - API keys (system and user) are encrypted with a machine-local key
   (`.onti.key`) and never returned unmasked by any API.
 - **Credential normalisation.** A key pasted from e-mail, a spreadsheet
