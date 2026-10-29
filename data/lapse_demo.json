@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "id": "lapse_experience_synthetic_demo",
+  "version": "0.2-demo",
+  "status": "approved",
+  "approval": {
+    "reviewer": "User \u2014 ontology structure approved; synthetic demonstration configured under that approval",
+    "approved_at": "2026-10-14T17:49:49+08:00",
+    "scope": "Constructed demonstration only; no approval of original data inferred."
+  },
+  "source_files": [
+    "demo/SYNTHETIC_DEMO.xlsx"
+  ],
+  "settings": {
+    "rate_basis": "verified_comparable_imported_rates",
+    "assumption_version": "2024_BEV",
+    "rate_tolerance": 1e-08,
+    "financial_currency": null,
+    "aggregation": "segment_only",
+    "rate_basis_note": "Rates are deliberately compatible within this synthetic fixture. They are not inferred from rounded counts and are not presented as the original workbook basis."
+  },
+  "allowed_queries": [
+    "comparison",
+    "events",
+    "financial",
+    "definitions"
+  ],
+  "definitions": {
+    "A/E": "Actual lapse rate divided by the applicable expected lapse rate, with both rates on the same confirmed basis. Above 1 means actual exceeds expected; it is not automatically a financial loss.",
+    "policy year": "The year of a policy measured from inception, not the calendar year.",
+    "experience variance": "The difference between observed experience and a matched expectation. Rate differences are expressed in percentage points; they are distinct from financial impacts."
+  },
+  "entities": [
+    "Product",
+    "Channel",
+    "ExperienceObservation",
+    "LapseAssumption",
+    "BusinessEvent",
+    "FinancialResult"
+  ],
+  "deferred_entities": [
+    "Policy",
+    "Agent"
+  ],
+  "relationships": [
+    {
+      "from": "ExperienceObservation",
+      "to": "Product",
+      "type": "has_product",
+      "keys": [
+        "product"
+      ],
+      "cardinality": "many_to_one"
+    },
+    {
+      "from": "ExperienceObservation",
+      "to": "Channel",
+      "type": "has_channel",
+      "keys": [
+        "channel"
+      ],
+      "cardinality": "many_to_one"
+    },
+    {
+      "from": "ExperienceObservation",
+      "to": "LapseAssumption",
+      "type": "compared_with",
+      "keys": [
+        "product",
+        "policy_year",
+        "channel",
+        "assumption_version"
+      ],
+      "time_rule": "assumption covers the entire observation month",
+      "cardinality": "many_to_one_exact"
+    },
+    {
+      "from": "BusinessEvent",
+      "to": "ExperienceObservation",
+      "type": "potentially_relevant_to",
+      "keys": [
+        "product",
+        "channel"
+      ],
+      "time_rule": "date intervals overlap; All expands to the applicable channels",
+      "cardinality": "many_to_many",
+      "causal": false
+    },
+    {
+      "from": "FinancialResult",
+      "to": "ExperienceObservation",
+      "type": "shares_reporting_scope",
+      "keys": [
+        "product",
+        "month"
+      ],
+      "rule": "retrieve financial results separately; do not join then sum over segments",
+      "causal": false
+    }
+  ],
+  "tables": {
+    "experience": {
+      "sheets": [
+        "Monthly_Experience"
+      ],
+      "fields": {
+        "month": [
+          "REPORT_MONTH",
+          "REPORT_MTH"
+        ],
+        "product": [
+          "PLANGROUP"
+        ],
+        "policy_year": [
+          "POLICY_YEAR"
+        ],
+        "channel": [
+          "CHANNEL_NM"
+        ],
+        "actual_rate": [
+          "ACTUAL_LAPSE_RATE"
+        ],
+        "expected_rate": [
+          "EXPECTED_LAPSE_RATE"
+        ],
+        "exposure": [
+          "EXPOSURE"
+        ],
+        "actual_lapses": [
+          "ACTUAL_LAPSES"
+        ],
+        "data_status": [
+          "DATA_STATUS"
+        ]
+      },
+      "required": [
+        "month",
+        "product",
+        "policy_year",
+        "channel",
+        "actual_rate",
+        "expected_rate"
+      ],
+      "key": [
+        "month",
+        "product",
+        "policy_year",
+        "channel"
+      ]
+    },
+    "assumptions": {
+      "sheets": [
+        "Lapse_Assumptions"
+      ],
+      "fields": {
+        "version": [
+          "ASSUMPTION_VERSION"
+        ],
+        "effective_from": [
+          "EFFECTIVE_FROM"
+        ],
+        "effective_to": [
+          "EFFECTIVE_TO"
+        ],
+        "product": [
+          "PLANGROUP"
+        ],
+        "policy_year": [
+          "POLICY_YEAR"
+        ],
+        "channel": [
+          "CHANNEL_NM"
+        ],
+        "expected_rate": [
+          "EXPECTED_LAPSE_RATE"
+        ],
+        "data_status": [
+          "DATA_STATUS"
+        ]
+      },
+      "required": [
+        "version",
+        "effective_from",
+        "effective_to",
+        "product",
+        "policy_year",
+        "channel",
+        "expected_rate"
+      ],
+      "key": [
+        "version",
+        "effective_from",
+        "effective_to",
+        "product",
+        "policy_year",
+        "channel"
+      ]
+    },
+    "events": {
+      "sheets": [
+        "Business_Events"
+      ],
+      "fields": {
+        "id": [
+          "EVENT_ID"
+        ],
+        "start": [
+          "START_DATE"
+        ],
+        "end": [
+          "END_DATE"
+        ],
+        "product": [
+          "AFFECTED_PLANGROUP"
+        ],
+        "channel": [
+          "AFFECTED_CHANNEL"
+        ],
+        "description": [
+          "DESCRIPTION"
+        ],
+        "potential_link": [
+          "POTENTIAL_EXPERIENCE_LINK"
+        ],
+        "data_status": [
+          "DATA_STATUS"
+        ]
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "product",
+        "channel",
+        "description"
+      ],
+      "key": [
+        "id"
+      ]
+    },
+    "financial": {
+      "sheets": [
+        "Financial_Variance"
+      ],
+      "fields": {
+        "month": [
+          "REPORT_MONTH",
+          "REPORT_MTH"
+        ],
+        "product": [
+          "PLANGROUP"
+        ],
+        "framework": [
+          "FRAMEWORK"
+        ],
+        "metric": [
+          "METRIC"
+        ],
+        "lapse_impact": [
+          "LAPSE_EXPERIENCE_IMPACT_M"
+        ],
+        "data_status": [
+          "DATA_STATUS"
+        ]
+      },
+      "required": [
+        "month",
+        "product",
+        "framework",
+        "metric",
+        "lapse_impact"
+      ],
+      "key": [
+        "month",
+        "product",
+        "framework",
+        "metric"
+      ]
+    }
+  },
+  "provenance": {
+    "basis": "Proposed from user-supplied screenshots IMG_1324 through IMG_1345. Original workbook and application code not supplied.",
+    "synthetic": "README labels analytical data synthetic. Test fixture is newly constructed, not a reconstruction of the complete workbook."
+  },
+  "open_decisions": [
+    "Confirm whether reported rates are monthly or annualised and count-based or premium-weighted.",
+    "Reconcile expected rates between Monthly_Experience and Lapse_Assumptions; do not silently prefer either.",
+    "Confirm assumption-version selection and coverage for 2023 observations.",
+    "Confirm financial currency; millions alone does not identify currency.",
+    "Confirm Sheet1 record grain and reconciliation before linking policy/agent detail."
+  ],
+  "dimensions": {
+    "product": [
+      "WP",
+      "20PLP",
+      "15PAY25",
+      "CR",
+      "NG_LIP_ISS",
+      "HB"
+    ],
+    "channel": [
+      "Agency",
+      "Worksite Marketing"
+    ]
+  },
+  "structure_approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-10-14T17:49:49+08:00",
+    "scope": "Ontology structure approved; original workbook unavailable. This does not validate actual data or rate basis."
+  },
+  "mode": "synthetic_demo",
+  "source_sha256": {
+    "demo/SYNTHETIC_DEMO.xlsx": "89d150d948546c68852ae962cf1f4ae3c0eb5686aec6b55413feb8f9f206bf43"
+  }
+}

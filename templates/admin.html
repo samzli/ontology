@@ -1,0 +1,75 @@
+ <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ system_name }} · Ontology Governance Console</title>
+    <link rel="stylesheet" href="/static/css/app.css?v=17">
+    <script defer src="/static/js/common.js?v=24"></script>
+    <script defer src="/static/js/graph.js?v=15"></script>
+    <script defer src="/static/js/admin.js?v=25"></script>
+    <link rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230E2A47'/><text x='16' y='22' font-size='17' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>O</text></svg>">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="logo">O</span> {{ system_name }}</div>
+        <nav class="nav">
+          <button data-view="users" class="active"><span class="ic">👥</span>
+            Users &amp; audit</button>
+          <button data-view="dash"><span class="ic">📊</span> System
+            dashboard</button>
+          <button data-view="onto"><span class="ic">🧩</span> Ontology
+            governance</button>
+          <button data-view="data"><span class="ic">🗂️</span> Data
+            oversight</button>
+          <button data-view="questions"><span class="ic">❓</span> Canonical
+            questions</button>
+          <button data-view="graph"><span class="ic">🕸️</span> Knowledge
+            graph</button>
+          <button data-view="models"><span class="ic">🤖</span> Models &amp;
+            usage</button>
+          <button data-view="proposals"><span class="ic">✨</span> AI
+            proposals <span class="badge rules" id="propBadge"
+              style="display:none;margin-left:4px"></span></button>
+          <button data-view="reports"><span class="ic">📄</span>
+            All reports</button>
+        </nav>
+        <div class="side-foot">
+          Administrator: <b style="color:#C7D2DF">{{ user.username }}</b><br>
+          {{ system_name }} v{{ version }}
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <h1 id="pageTitle">Dashboard</h1>
+          <span class="pack-pill" id="packPill"></span>
+          <span class="spacer"></span>
+          <span class="role-tag admin">admin</span>
+          <div class="userbox">
+            <span class="avatar">{{ user.username[:2] | upper }}</span>
+            <button class="icon-btn" id="logoutBtn" title="Sign out"
+              style="font-size:13px">Sign out</button>
+          </div>
+        </header>
+        <div class="content" id="content"></div>
+      </div>
+    </div>
+
+    <nav class="mobile-tabbar">
+      <button data-view="users" class="active"><span
+          class="ic">👥</span>Users</button>
+      <button data-view="dash"><span class="ic">📊</span>Dash</button>
+      <button data-view="onto"><span class="ic">🧩</span>Onto</button>
+      <button data-view="data"><span class="ic">🗂️</span>Data</button>
+      <button data-view="questions"><span class="ic">❓</span>Q</button>
+      <button data-view="graph"><span class="ic">🕸️</span>Graph</button>
+      <button data-view="models"><span class="ic">🤖</span>Models</button>
+      <button data-view="proposals"><span class="ic">✨</span>AI</button>
+      <button data-view="reports"><span class="ic">📄</span>Reports</button>
+    </nav>
+
+  </body>
+</html>

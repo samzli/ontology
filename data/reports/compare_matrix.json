@@ -1,0 +1,615 @@
+[
+  {
+    "pack": 6,
+    "pack_name": "VNB / APE Insurance Sample Pack",
+    "question": "What is the VNB in April?",
+    "uc": "VNB Business Planning",
+    "elapsed_s": 4.1,
+    "with": {
+      "label": "With ontology",
+      "source": "rules",
+      "answer": "## VNB in Apr 2025\n\n| Metric | Apr 2025 | Mar 2025 | Delta |\n|---|---: | ---:|---: |\n| Total APE | $6.87M | $6.40M | +0.48 $M |\n| **Total VNB** | **$1.32M** | $1.22M | **+0.10 $M** |\n| VNB margin | 19.2% | 19.1% | +0.12 pp |\n| Agency VNB | $0.59M | $0.51M | +0.07 $M |\n| Agency share | 45% | 42% | — |\n\nMoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity",
+      "graph": {
+        "matched": [
+          "TotalVNB",
+          "TotalAPE",
+          "AgentProductivity",
+          "ActiveAgentCount",
+          "AgencyVNB",
+          "VnbMonthly"
+        ],
+        "nodes": [
+          "TotalVNB",
+          "TotalAPE",
+          "BlendedVNBMargin",
+          "ChannelAPE",
+          "AgentProductivity",
+          "AgentStatus",
+          "ActiveAgentCount",
+          "AgencyAPE",
+          "WeightedVNBMargin",
+          "AgencyVNB",
+          "OperationalLevers",
+          "VnbMonthly",
+          "AgentMonthly"
+        ],
+        "edge_ids": [
+          "E1",
+          "E3",
+          "E5",
+          "E12",
+          "E13",
+          "E14",
+          "E17",
+          "E18",
+          "E19",
+          "E21",
+          "E22",
+          "X1",
+          "X2",
+          "X6"
+        ]
+      },
+      "model": "ontology-engine",
+      "grounding": {
+        "tables": [
+          "agent_master",
+          "agent_monthly",
+          "agents",
+          "channel_monthly",
+          "channels",
+          "kpi",
+          "kpi_linkage",
+          "mix",
+          "mix_monthly",
+          "products",
+          "scenario_data",
+          "vnb_monthly"
+        ],
+        "metrics": [
+          "derived_ape",
+          "derived_margin",
+          "derived_vnb",
+          "gap_margin",
+          "gap_vnb",
+          "stated_ape",
+          "stated_margin",
+          "stated_vnb",
+          "year"
+        ],
+        "table_count": 12,
+        "metric_count": 9,
+        "graph_nodes": 13,
+        "graph_edges": 14
+      }
+    },
+    "without": {
+      "label": "Without ontology",
+      "source": "ai",
+      "answer": "Based on the raw data provided, the **Total VNB in April 2025** is **$1.32M** (specifically $1.32055M).\n\nHere are the details from the `vnb_monthly` table for April 2025:\n\n| Metric | April 2025 |\n|---|---|\n| Total APE | $6.87M |\n| **Total VNB** | **$1.32M** |\n| VNB Margin | 19.2% |\n| Agency APE | $3.28M |\n| Agency VNB | $0.59M |\n| Agency share of VNB | 44.6% |\n\nThe narrative driver for April states: *\"VNB up strongly: more active Agency agents, higher productivity and richer Unit-Linked mix.\"*",
+      "graph": null,
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "grounding": {
+        "tables": [
+          "kpi",
+          "products",
+          "mix",
+          "channels",
+          "agents",
+          "vnb_monthly",
+          "channel_monthly",
+          "mix_monthly",
+          "agent_master",
+          "agent_monthly",
+          "kpi_linkage",
+          "scenario_data"
+        ],
+        "metrics": [],
+        "table_count": 12,
+        "metric_count": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0
+      }
+    },
+    "value": {
+      "tables_used": 12,
+      "metrics_used": 9,
+      "chain_nodes": 13,
+      "chain_edges": 14,
+      "baseline_tables_used": 12,
+      "baseline_chain_nodes": 0
+    }
+  },
+  {
+    "pack": 6,
+    "pack_name": "VNB / APE Insurance Sample Pack",
+    "question": "How does VNB in April compare to the previous month?",
+    "uc": "VNB Business Planning",
+    "elapsed_s": 6.5,
+    "with": {
+      "label": "With ontology",
+      "source": "rules",
+      "answer": "## VNB in Apr 2025\n\n| Metric | Apr 2025 | Mar 2025 | Delta |\n|---|---: | ---:|---: |\n| Total APE | $6.87M | $6.40M | +0.48 $M |\n| **Total VNB** | **$1.32M** | $1.22M | **+0.10 $M** |\n| VNB margin | 19.2% | 19.1% | +0.12 pp |\n| Agency VNB | $0.59M | $0.51M | +0.07 $M |\n| Agency share | 45% | 42% | — |\n\nMoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity",
+      "graph": {
+        "matched": [
+          "TotalVNB",
+          "TotalAPE",
+          "AgentProductivity",
+          "ActiveAgentCount",
+          "AgencyVNB",
+          "VnbMonthly"
+        ],
+        "nodes": [
+          "TotalVNB",
+          "TotalAPE",
+          "BlendedVNBMargin",
+          "ChannelAPE",
+          "AgentProductivity",
+          "AgentStatus",
+          "ActiveAgentCount",
+          "AgencyAPE",
+          "WeightedVNBMargin",
+          "AgencyVNB",
+          "OperationalLevers",
+          "VnbMonthly",
+          "AgentMonthly"
+        ],
+        "edge_ids": [
+          "E1",
+          "E3",
+          "E5",
+          "E12",
+          "E13",
+          "E14",
+          "E17",
+          "E18",
+          "E19",
+          "E21",
+          "E22",
+          "X1",
+          "X2",
+          "X6"
+        ]
+      },
+      "model": "ontology-engine",
+      "grounding": {
+        "tables": [
+          "agent_master",
+          "agent_monthly",
+          "agents",
+          "channel_monthly",
+          "channels",
+          "kpi",
+          "kpi_linkage",
+          "mix",
+          "mix_monthly",
+          "products",
+          "scenario_data",
+          "vnb_monthly"
+        ],
+        "metrics": [
+          "derived_ape",
+          "derived_margin",
+          "derived_vnb",
+          "gap_margin",
+          "gap_vnb",
+          "stated_ape",
+          "stated_margin",
+          "stated_vnb",
+          "year"
+        ],
+        "table_count": 12,
+        "metric_count": 9,
+        "graph_nodes": 13,
+        "graph_edges": 14
+      }
+    },
+    "without": {
+      "label": "Without ontology",
+      "source": "ai",
+      "answer": "## VNB in April vs. March\n\n| Metric | Apr 2025 | Mar 2025 | Change |\n|---|---: | ---:|---:|\n| **Total VNB** | **$1.32M** | $1.22M | **+$0.10M** |\n| VNB Margin | 19.2% | 19.1% | +0.12 pp |\n| Total APE | $6.87M | $6.40M | +$0.48M |\n| Agency VNB | $0.59M | $0.51M | +$0.07M |\n| Agency share of VNB | 44.6% | 42.2% | +2.5 pp |\n\n**Month-over-month change: +8.1%** (vs. March's -2.5% decline).\n\n**Key drivers of the April increase:**\n- **Agency VNB grew +14.4% MoM** — the strongest channel movement in April\n- **Agency share of total VNB rose** from 42.2% to 44.6%\n- **Total APE increased** by ~$0.48M (+7.4%)\n- **VNB margin improved** slightly from 19.1% to 19.2%\n\nThe narrative driver in the data confirms: *\"VNB up: Agency active agents and productivity both improved.\"*",
+      "graph": null,
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "grounding": {
+        "tables": [
+          "kpi",
+          "products",
+          "mix",
+          "channels",
+          "agents",
+          "vnb_monthly",
+          "channel_monthly",
+          "mix_monthly",
+          "agent_master",
+          "agent_monthly",
+          "kpi_linkage",
+          "scenario_data"
+        ],
+        "metrics": [],
+        "table_count": 12,
+        "metric_count": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0
+      }
+    },
+    "value": {
+      "tables_used": 12,
+      "metrics_used": 9,
+      "chain_nodes": 13,
+      "chain_edges": 14,
+      "baseline_tables_used": 12,
+      "baseline_chain_nodes": 0
+    }
+  },
+  {
+    "pack": 6,
+    "pack_name": "VNB / APE Insurance Sample Pack",
+    "question": "Why is there such a movement in VNB during April?",
+    "uc": "VNB Business Planning",
+    "elapsed_s": 133.1,
+    "with": {
+      "label": "With ontology",
+      "source": "rules",
+      "answer": "The ontology-derived VNB is **$1.45M** vs the stated **$1.45M** → a **$-0.00M gap** (19.5% vs 19.5% margin). This is attributable to **mix realization / assumption change**.",
+      "graph": {
+        "matched": [
+          "TotalVNB",
+          "TotalAPE",
+          "BlendedVNBMargin",
+          "ChannelBlendedMargin"
+        ],
+        "nodes": [
+          "DistributionChannel",
+          "TotalVNB",
+          "TotalAPE",
+          "BlendedVNBMargin",
+          "ChannelAPE",
+          "ChannelBlendedMargin",
+          "ProductMixWeight",
+          "ProductVNBMargin",
+          "AgencyVNB",
+          "VnbMonthly",
+          "ChannelMonthly"
+        ],
+        "edge_ids": [
+          "E24",
+          "E1",
+          "E2",
+          "E3",
+          "E7",
+          "E8",
+          "E19",
+          "X1",
+          "X4"
+        ]
+      },
+      "model": "ontology-engine",
+      "grounding": {
+        "tables": [
+          "agent_master",
+          "agent_monthly",
+          "agents",
+          "channel_monthly",
+          "channels",
+          "kpi",
+          "kpi_linkage",
+          "mix",
+          "mix_monthly",
+          "products",
+          "scenario_data",
+          "vnb_monthly"
+        ],
+        "metrics": [
+          "derived_ape",
+          "derived_margin",
+          "derived_vnb",
+          "gap_margin",
+          "gap_vnb",
+          "stated_ape",
+          "stated_margin",
+          "stated_vnb",
+          "year"
+        ],
+        "table_count": 12,
+        "metric_count": 9,
+        "graph_nodes": 11,
+        "graph_edges": 9
+      }
+    },
+    "without": {
+      "label": "Without ontology",
+      "source": "ai",
+      "answer": "Based on the uploaded data, the April VNB movement (a **+8.1% MoM increase**, from $1.22M to $1.32M) was primarily driven by the **Agency channel**, which the data explicitly attributes to three factors.\n\nThe `vnb_monthly` table's narrative for April 2025 states:  \n> *\"VNB up strongly: more active Agency agents, higher productivity and richer Unit-Linked mix.\"*\n\nHere is the numerical evidence from the `channel_monthly` and `vnb_monthly` tables:\n\n| Driver | Mar 2025 | Apr 2025 | Change |\n|---|---|---|---|\n| **Active agents** (all channels) | 588 | 613 | **+25 agents** |\n| **Avg productivity** (all channels) | $13.1K | $13.4K | **+$0.3K** |\n| **Agency APE** | $2.93M | $3.28M | **+$0.35M** |\n| **Agency VNB** | $0.51M | $0.59M | **+$0.07M** |\n| **Agency share of VNB** | 42.2% | 44.6% | **+2.4 pp** |\n| **Weighted margin component** (Agency mix) | 4.39% | 4.49% | **+0.10 pp** |\n\n**Key takeaways from the raw data:**\n1. **Volume growth**: The Agency channel saw both a higher active agent count (+25) and higher per-agent productivity, lifting Agency APE by $0.35M.\n2. **Mix improvement**: The `mix_monthly` table shows the weighted VNB margin component for Agency rose to 4.49%, meaning the sales mix shifted toward higher-margin products (e.g., Unit-Linked at 25% margin) — this raises VNB for the same APE.\n3. **Outsized contribution**: Agency's VNB grew by $0.07M, representing roughly 70% of the total company VNB increase of $0.10M. The remaining ~$0.03M came from the Banca and Brokerage channels.\n\nIn short: April's VNB spike was **volume-driven** (more active, more productive agents) **plus mix-driven** (richer product mix), concentrated heavily in the Agency channel.",
+      "graph": null,
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "grounding": {
+        "tables": [
+          "kpi",
+          "products",
+          "mix",
+          "channels",
+          "agents",
+          "vnb_monthly",
+          "channel_monthly",
+          "mix_monthly",
+          "agent_master",
+          "agent_monthly",
+          "kpi_linkage",
+          "scenario_data"
+        ],
+        "metrics": [],
+        "table_count": 12,
+        "metric_count": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0
+      }
+    },
+    "value": {
+      "tables_used": 12,
+      "metrics_used": 9,
+      "chain_nodes": 11,
+      "chain_edges": 9,
+      "baseline_tables_used": 12,
+      "baseline_chain_nodes": 0
+    }
+  },
+  {
+    "pack": 23,
+    "pack_name": "Actuarial Lapse Experience Study (Core Tables)",
+    "question": "What is the lapse experience in September?",
+    "uc": "Lapse Experience Study",
+    "elapsed_s": 13.4,
+    "with": {
+      "label": "With ontology",
+      "source": "rules",
+      "answer": "## Lapse experience — **2024-09**\n\n| Month | Exposure | Actual lapses | Actual rate (ann.) | Expected rate | A/E ratio |\n|---|---|---|---|---|---|\n| 2024-09 | 14400 | 63 | 5.3% | 4.0% | 1.25 |\n\n| 2024-08  *(previous month)* | 14400 | 55 | 4.6% | 4.0% | 1.11 |",
+      "graph": {
+        "matched": [
+          "actual_lapse_rate",
+          "expected_lapse_rate",
+          "a_e_ratio",
+          "exposure"
+        ],
+        "nodes": [
+          "actual_lapse_rate",
+          "expected_lapse_rate",
+          "lapse_variance",
+          "a_e_ratio",
+          "exposure",
+          "policy_year"
+        ],
+        "edge_ids": [
+          "G1",
+          "G2",
+          "G3"
+        ]
+      },
+      "model": "ontology-engine",
+      "grounding": {
+        "tables": [
+          "financial_variance",
+          "lapse_assumptions",
+          "monthly_experience",
+          "policy_data"
+        ],
+        "metrics": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "M5",
+          "M6",
+          "M7"
+        ],
+        "table_count": 4,
+        "metric_count": 7,
+        "graph_nodes": 6,
+        "graph_edges": 3
+      }
+    },
+    "without": {
+      "label": "Without ontology",
+      "source": "ai",
+      "answer": "Based on the `monthly_experience` table, the lapse experience for **September 2024** (the most recent September in the data) is:\n\n| Metric | September 2024 |\n|---|---:|\n| Total exposure (sum of 24 cohorts) | 28,800 |\n| Actual lapses (sum) | 63 |\n| **Actual lapse rate (avg)** | **5.25%** |\n| Expected lapse rate (avg) | 4.00% |\n| **A/E ratio (avg)** | **1.25** |\n| Variance vs expected (pp) | **+1.25 pp** |\n\n**Breakdown by trend:**  \nThe September 2024 experience exceeds expectation by 1.25 percentage points, with an A/E ratio of 1.25 (i.e., 25% more lapses than expected).\n\n**Context — September 2023:**  \nIn September 2023, actual lapses were exactly at expectation: 4.00% actual vs 4.00% expected (A/E = 1.00). So September 2024 represents a clear deterioration versus the prior-year September.\n\n**Financial impact (from `financial_variance` table, September 2024):**  \nThe lapse experience impact on financial metrics (CSM, Insurance Service Result, EV) was **−$36M total** (average −$6M per metric across the 6 rows), confirming the adverse lapse experience as a drag on value.",
+      "graph": null,
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "grounding": {
+        "tables": [
+          "policy_data",
+          "lapse_assumptions",
+          "monthly_experience",
+          "financial_variance"
+        ],
+        "metrics": [],
+        "table_count": 4,
+        "metric_count": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0
+      }
+    },
+    "value": {
+      "tables_used": 4,
+      "metrics_used": 7,
+      "chain_nodes": 6,
+      "chain_edges": 3,
+      "baseline_tables_used": 4,
+      "baseline_chain_nodes": 0
+    }
+  },
+  {
+    "pack": 23,
+    "pack_name": "Actuarial Lapse Experience Study (Core Tables)",
+    "question": "How does September lapse compare to the previous month?",
+    "uc": "Lapse Experience Study",
+    "elapsed_s": 14.1,
+    "with": {
+      "label": "With ontology",
+      "source": "rules",
+      "answer": "## 2024-09 vs 2024-08 — lapse experience comparison\n\n| Month | Exposure | Actual lapses | Actual rate (ann.) | Expected rate | A/E |\n|---|---:|---:|---:|---:|---:|\n| 2024-08 | 14400 | 55 | 4.6% | 4.0% | 1.11 |\n| 2024-09 | 14400 | 63 | 5.2% | 4.0% | 1.25 |\n| **Change** | +0 | +8 | **+0.67 pp** | +0.00 pp | **+0.13** |\n\nLargest cohort moves:\n- **WP · 1 · Agency**: 9.0% → 12.0% (+3.00 pp)\n- **WP · 1 · Worksite Marketing**: 6.0% → 8.0% (+2.00 pp)\n- **WP · 3 · Agency**: 5.0% → 7.0% (+2.00 pp)",
+      "graph": {
+        "matched": [
+          "actual_lapse_rate",
+          "expected_lapse_rate",
+          "a_e_ratio",
+          "exposure",
+          "channel"
+        ],
+        "nodes": [
+          "actual_lapse_rate",
+          "expected_lapse_rate",
+          "lapse_variance",
+          "a_e_ratio",
+          "exposure",
+          "policy_year",
+          "channel"
+        ],
+        "edge_ids": [
+          "G1",
+          "G2",
+          "G3",
+          "G5"
+        ]
+      },
+      "model": "ontology-engine",
+      "grounding": {
+        "tables": [
+          "financial_variance",
+          "lapse_assumptions",
+          "monthly_experience",
+          "policy_data"
+        ],
+        "metrics": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "M5",
+          "M6",
+          "M7"
+        ],
+        "table_count": 4,
+        "metric_count": 7,
+        "graph_nodes": 7,
+        "graph_edges": 4
+      }
+    },
+    "without": {
+      "label": "Without ontology",
+      "source": "ai",
+      "answer": "## September 2024 vs August 2024 — Lapse Comparison\n\n| Metric | Aug 2024 | Sep 2024 | Change |\n|---|---:|---:|---:|\n| **Exposure** | 14,400 | 14,400 | 0 |\n| **Actual lapses** | 55 | 63 | **+8** |\n| **Actual lapse rate** | 4.58% | 5.25% | **+0.67 pp** |\n| **Expected lapse rate** | 4.00% | 4.00% | 0 |\n| **A/E ratio** | 1.11 | 1.25 | **+0.13** |\n\n### Key observations:\n- **Lapse experience worsened** in September: actual lapses increased by 8 (from 55 to 63) with the same exposure level.\n- The **A/E ratio rose from 1.11 to 1.25**, meaning actual lapses were 25% above expected in September (vs 11% above expected in August).\n- The **variance from expected widened** from +0.58 pp to +1.25 pp.\n\n### Largest segment-level deteriorations (Sep vs Aug):\n| Segment | Aug rate | Sep rate | Change |\n|---|---:|---:|---:|\n| WP · Policy Year 1 · Agency | 9.0% | 12.0% | **+3.0 pp** |\n| WP · Policy Year 1 · Worksite Marketing | 6.0% | 8.0% | **+2.0 pp** |\n| WP · Policy Year 3 · Agency | 5.0% | 7.0% | **+2.0 pp** |\n\n**Conclusion:** September shows a clear adverse movement in lapse experience compared to August, driven primarily by WP plan early-policy-year segments.",
+      "graph": null,
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "grounding": {
+        "tables": [
+          "policy_data",
+          "lapse_assumptions",
+          "monthly_experience",
+          "financial_variance"
+        ],
+        "metrics": [],
+        "table_count": 4,
+        "metric_count": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0
+      }
+    },
+    "value": {
+      "tables_used": 4,
+      "metrics_used": 7,
+      "chain_nodes": 7,
+      "chain_edges": 4,
+      "baseline_tables_used": 4,
+      "baseline_chain_nodes": 0
+    }
+  },
+  {
+    "pack": 23,
+    "pack_name": "Actuarial Lapse Experience Study (Core Tables)",
+    "question": "Why is there such a movement in lapse during September?",
+    "uc": "Lapse Experience Study",
+    "elapsed_s": 19.4,
+    "with": {
+      "label": "With ontology",
+      "source": "rules",
+      "answer": "## Why the movement in 2024-09 (vs 2024-08)\n\nOverall actual lapse rate moved **4.6% → 5.2%** (+0.67 pp); A/E 1.11 → 1.25.\n\nBiggest cohort movers:\n\n| Cohort | 2024-08 rate | 2024-09 rate | Delta (pp) | A/E (prev → cur) |\n|---|---:|---:|---:|---:|\n| WP · 1 · Agency | 9.0% | 12.0% | +3.00 | 1.5 → 2.0 |\n| WP · 1 · Worksite Marketing | 6.0% | 8.0% | +2.00 | 1.2 → 1.6 |\n| WP · 3 · Agency | 5.0% | 7.0% | +2.00 | 1.25 → 1.75 |\n| WP · 2 · Agency | 7.0% | 8.0% | +1.00 | 1.4 → 1.6 |\n| 20PLP · 1 · Agency | 5.0% | 5.0% | +0.00 | 1.0 → 1.0 |\nFinancial bridge — lapse experience impact attributed in 2024-09:\n\n| Product | Framework | Metric | Lapse experience impact ($M) |\n|---|---|---|---:|\n| WP | IFRS17 | CSM | -12.0 |\n| WP | IFRS17 | Insurance Service Result | -7.0 |\n| WP | EV | EV | -10.0 |\n| 20PLP | IFRS17 | CSM | -3.0 |\n| 20PLP | IFRS17 | Insurance Service Result | -2.0 |\n| 20PLP | EV | EV | -2.0 |",
+      "graph": {
+        "matched": [
+          "actual_lapse_rate",
+          "a_e_ratio",
+          "plan_group",
+          "channel",
+          "financial_bridge"
+        ],
+        "nodes": [
+          "actual_lapse_rate",
+          "lapse_variance",
+          "a_e_ratio",
+          "policy_year",
+          "plan_group",
+          "channel",
+          "ifrs17_lapse_impact",
+          "ev_lapse_impact",
+          "financial_bridge"
+        ],
+        "edge_ids": [
+          "G2",
+          "G3",
+          "G4",
+          "G5",
+          "G9",
+          "G10"
+        ]
+      },
+      "model": "ontology-engine",
+      "grounding": {
+        "tables": [
+          "financial_variance",
+          "lapse_assumptions",
+          "monthly_experience",
+          "policy_data"
+        ],
+        "metrics": [
+          "M1",
+          "M2",
+          "M3",
+          "M4",
+          "M5",
+          "M6",
+          "M7"
+        ],
+        "table_count": 4,
+        "metric_count": 7,
+        "graph_nodes": 9,
+        "graph_edges": 6
+      }
+    },
+    "without": {
+      "label": "Without ontology",
+      "source": "ai",
+      "answer": "Based on the raw data provided, I cannot determine a definitive **cause** for the September lapse movement. The uploaded tables contain lapse **outcomes** (actual lapses, rates, A/E ratios) but do **not** include any explanatory variables that would let me identify *why* the movement occurred.\n\nHere is what the data **does** show about September 2024:\n\n---\n\n### 1. The movement is broad-based (not isolated to one segment)\n\n| Segment | Aug 2024 rate | Sep 2024 rate | Change |\n|---|---:|---:|---:|\n| WP · PY1 · Agency | 9.0% | 12.0% | **+3.0 pp** |\n| WP · PY1 · Worksite Marketing | 6.0% | 8.0% | **+2.0 pp** |\n| WP · PY2 · Agency | 5.0% | 7.0% | **+2.0 pp** |\n| WP · PY2 · Worksite Marketing | 4.0% | 6.0% | **+2.0 pp** |\n| WP · PY3 · Agency | 5.0% | 7.0% | **+2.0 pp** |\n| WP · PY3 · Worksite Marketing | 4.0% | 5.0% | **+1.0 pp** |\n| 20PLP · PY1 · Agency | 4.0% | 4.0% | 0.0 pp |\n| 20PLP · PY1 · Worksite Marketing | 3.0% | 3.0% | 0.0 pp |\n| 20PLP · PY2 · Agency | 3.0% | 3.0% | 0.0 pp |\n| 20PLP · PY2 · Worksite Marketing | 3.0% | 3.0% | 0.0 pp |\n| 20PLP · PY3 · Agency | 3.0% | 3.0% | 0.0 pp |\n| 20PLP · PY3 · Worksite Marketing | 3.0% | 3.0% | 0.0 pp |\n\n**Key observation:** The increase is entirely concentrated in the **WP** plan group across **all policy years and both channels**. The **20PLP** plan group shows **zero movement** — its rates stayed flat at 3–4%.\n\n---\n\n### 2. Financial impact is visible in the same month\n\nThe `financial_variance` table for **2024-09** shows:\n\n| Framework | Metric | Lapse experience impact |\n|---|---:|---:|\n| IFRS17 | CSM | **−$12.00M** |\n| IFRS17 | Insurance Service Result | **−$7.00M** |\n| EV | EV | **−$10.00M** |\n\nTotal lapse experience impact for September: **−$29.00M** across all frameworks/metrics.\n\n---\n\n### 3. What the data does **NOT** tell us\n\nThe uploaded data contains **no fields** that would explain the *driver* of the lapse increase, such as:\n- Premium rate changes or repricing\n- Policyholder communication / retention campaigns\n- Economic or market conditions\n- Competitor actions\n- Product feature changes\n- Servicing or billing issues specific to WP policies\n\n---\n\n### 4. What I can say with confidence\n\nThe September lapse movement is:\n- **Real and material** — A/E ratio rose from 1.11 to 1.25, and financial impact was −$29M\n- **Specific to the WP plan group** — 20PLP was completely unaffected\n- **Broad within WP** — affected all policy years and both distribution channels\n- **Not explained by the data provided** — no causal variables exist in the uploaded tables\n\nTo identify the root cause, you would need additional data such as policy-level characteristics of the lapsed policies (premium size, payment method, agent, region, policy age, etc.) or external context (market events, product changes, operational issues) that is not present in the current dataset.",
+      "graph": null,
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "grounding": {
+        "tables": [
+          "policy_data",
+          "lapse_assumptions",
+          "monthly_experience",
+          "financial_variance"
+        ],
+        "metrics": [],
+        "table_count": 4,
+        "metric_count": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0
+      }
+    },
+    "value": {
+      "tables_used": 4,
+      "metrics_used": 7,
+      "chain_nodes": 9,
+      "chain_edges": 6,
+      "baseline_tables_used": 4,
+      "baseline_chain_nodes": 0
+    }
+  }
+]
