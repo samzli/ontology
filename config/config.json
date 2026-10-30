@@ -6,6 +6,10 @@
     "host": "0.0.0.0",
     "port": 8010
   },
+  "runtime": {
+    "run_log": "data/run_log.jsonl",
+    "run_log_max_entries": 5000
+  },
   "security": {
     "session_days": 7,
     "allow_registration": true,

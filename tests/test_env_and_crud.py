@@ -12,12 +12,8 @@ The test:
 from __future__ import annotations
 
 import json
-import os
-import secrets
 import shutil
-import sqlite3
 import sys
-import time
 from pathlib import Path
 
 import httpx
@@ -25,9 +21,10 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-sys.path.insert(0, str(ROOT))  # noqa: E402  (twice on purpose; ROOT is root of this project)
-from modules.db import init_db, get_conn, decrypt_secret  # noqa: E402
-from modules.seed import _env_value, migrate_legacy_model  # noqa: E402
+sys.path.insert(
+    0, str(ROOT)
+)  # noqa: E402  (twice on purpose; ROOT is root of this project)
+from modules.seed import _env_value  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 ADMIN_USER = "admin"
@@ -109,9 +106,14 @@ def test_env_mutations():
         else:
             verify_ssl = True
         return {
-            "api_key": values.get("LLM_API_KEY") or values.get("SILICONFLOW_API_KEY", ""),
-            "base_url": values.get("LLM_BASE_URL") or values.get("SILICONFLOW_BASE_URL") or "https://api.openai.com/v1",
-            "model": (values.get("LLM_MODEL_NAME") or values.get("SILICONFLOW_MODEL_NAME", "")).strip(),
+            "api_key": values.get("LLM_API_KEY")
+            or values.get("SILICONFLOW_API_KEY", ""),
+            "base_url": values.get("LLM_BASE_URL")
+            or values.get("SILICONFLOW_BASE_URL")
+            or "https://api.openai.com/v1",
+            "model": (
+                values.get("LLM_MODEL_NAME") or values.get("SILICONFLOW_MODEL_NAME", "")
+            ).strip(),
             "verify_ssl": verify_ssl,
             "has_nova_var": any(k.startswith("NOVA_") for k in values),
         }
@@ -132,7 +134,10 @@ NOVA_VERIFY_SSL=false
         r["api_key"] == "sk-sxgufsjqmwqyncmxjbczbjpxloicfttvvgaxnscufkjrtlhn",
         "Nova vars added → SILICONFLOW_* still default for migration",
     )
-    ok(r["base_url"] == SF_BASE_URL, "base_url stays SF (SILICONFLOW_* takes fallback precedence)")
+    ok(
+        r["base_url"] == SF_BASE_URL,
+        "base_url stays SF (SILICONFLOW_* takes fallback precedence)",
+    )
     ok(r["has_nova_var"], "NOVA_* vars detected")
     ok(r["verify_ssl"] is False, "NOVA_VERIFY_SSL=false overrides to False")
 
@@ -143,9 +148,15 @@ LLM_MODEL_NAME=deepseek-ai/DeepSeek-V4-Flash
 NOVA_VERIFY_SSL=0
 """
     r = parse_env_lines(env_b)
-    ok(r["api_key"] == "sk-test123", "LLM_* generic picks up correctly (SF vars deleted)")
+    ok(
+        r["api_key"] == "sk-test123",
+        "LLM_* generic picks up correctly (SF vars deleted)",
+    )
     ok(r["base_url"] == SF_BASE_URL, "base_url from LLM_BASE_URL")
-    ok(r["verify_ssl"] is False, "NOVA_VERIFY_SSL=0 → verify_ssl=False even with SF base_url")
+    ok(
+        r["verify_ssl"] is False,
+        "NOVA_VERIFY_SSL=0 → verify_ssl=False even with SF base_url",
+    )
 
     # Test C — MODIFY: switch entirely to Nova as default
     env_c = """LLM_API_KEY='ak-JCMc8dU1ZBVTZTcRfN3mzGKW5jmqKXyAlpDcWss2u4T8DYBD'
@@ -154,7 +165,10 @@ LLM_MODEL_NAME="DeepSeek-V4-Flash"
 LLM_VERIFY_SSL=false
 """
     r = parse_env_lines(env_c)
-    ok(r["api_key"] == "ak-JCMc8dU1ZBVTZTcRfN3mzGKW5jmqKXyAlpDcWss2u4T8DYBD", "Nova key with quotes → clean")
+    ok(
+        r["api_key"] == "ak-JCMc8dU1ZBVTZTcRfN3mzGKW5jmqKXyAlpDcWss2u4T8DYBD",
+        "Nova key with quotes → clean",
+    )
     ok(r["base_url"] == NOVA_BASE_URL, "base_url = Nova")
     ok(r["model"] == NOVA_MODEL, "model = DeepSeek-V4-Flash")
     ok(r["verify_ssl"] is False, "LLM_VERIFY_SSL=false → False")
@@ -274,10 +288,14 @@ def http_api_tests():
     r = c.post("/api/admin/models/test", json={"config_id": nova_id})
     ok(r.status_code in (200, 400), f"Nova test → {r.status_code}")
     if r.status_code == 200:
-        ok(r.json().get("status") == "connected", f"Nova status=connected latency={r.json().get('latency_ms')}ms")
+        ok(
+            r.json().get("status") == "connected",
+            f"Nova status=connected latency={r.json().get('latency_ms')}ms",
+        )
     else:
         ok(
-            "Internal Server Error" in (r.json().get("error", "") + r.json().get("provider_error", "")),
+            "Internal Server Error"
+            in (r.json().get("error", "") + r.json().get("provider_error", "")),
             f"Nova returned provider error (gateway-level) — but no crash. Body snippet: {r.text[:120]}",
         )
 
@@ -293,14 +311,20 @@ def http_api_tests():
     )
     ok(r.status_code == 400, f"verify_ssl=true on Nova → {r.status_code}")
     pe = (r.json().get("provider_error") or "").lower()
-    ok("certificate" in pe or "ssl" in pe or "self-signed" in pe, f"SSL error surfaced properly: {pe[:80]}")
+    ok(
+        "certificate" in pe or "ssl" in pe or "self-signed" in pe,
+        f"SSL error surfaced properly: {pe[:80]}",
+    )
 
     # -- TEST CONNECTION: SF (should succeed) --
     print("\n  Testing SiliconFlow connection...")
     r = c.post("/api/admin/models/test", json={"config_id": sf_id})
     ok(r.status_code == 200, f"SF test → {r.status_code}")
     if r.status_code == 200:
-        ok(r.json().get("status") == "connected", f"SF status=connected latency={r.json().get('latency_ms')}ms")
+        ok(
+            r.json().get("status") == "connected",
+            f"SF status=connected latency={r.json().get('latency_ms')}ms",
+        )
 
     # -- SWITCH DEFAULT: Nova → SF (section 4) --
     section("Section 4 — Nova ↔ SF default switching")
@@ -318,12 +342,18 @@ def http_api_tests():
     models = r.json()["models"]
     sf_def = [m for m in models if m["id"] == sf_id][0]
     ok(sf_def["is_default"], "SF is now default")
-    ok(not [m for m in models if m["id"] == nova_id][0]["is_default"], "Nova no longer default (no stale flag)")
+    ok(
+        not [m for m in models if m["id"] == nova_id][0]["is_default"],
+        "Nova no longer default (no stale flag)",
+    )
 
     # Real Q&A through SF default
     print("  Real Q&A via SF default...")
     with c.stream(
-        "POST", "/api/ask-stream", json={"question": "What is Total VNB?", "mode": "auto", "history": None}, timeout=120
+        "POST",
+        "/api/ask-stream",
+        json={"question": "What is Total VNB?", "mode": "auto", "history": None},
+        timeout=120,
     ) as resp:
         ok(resp.status_code == 200, f"ask-stream via SF → HTTP {resp.status_code}")
         got = False
@@ -346,7 +376,10 @@ def http_api_tests():
     print("  Real Q&A via Nova default...")
     c.post(f"/api/admin/models/{nova_id}/default")
     with c.stream(
-        "POST", "/api/ask-stream", json={"question": "What is Total VNB?", "mode": "auto", "history": None}, timeout=120
+        "POST",
+        "/api/ask-stream",
+        json={"question": "What is Total VNB?", "mode": "auto", "history": None},
+        timeout=120,
     ) as resp:
         ok(resp.status_code == 200, f"ask-stream via Nova → HTTP {resp.status_code}")
         got = False

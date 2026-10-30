@@ -20,14 +20,58 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]{1,48}$")
 
 
 class AdminValueError(Exception):
+    """Validation or not-found error raised by admin services.
+
+    The API layer maps ``status_code`` onto the HTTP response.
+
+    Attributes:
+        message (str): Human-readable error description.
+        status_code (int): HTTP status code to return.
+
+    Example:
+        >>> raise AdminValueError("Ontology pack not found.", 404)
+    """
+
     def __init__(self, message: str, status_code: int = 422):
+        """Initialize the error.
+
+        Args:
+            message (str): Human-readable error description.
+            status_code (int): HTTP status code to return. Defaults to 422.
+
+        Example:
+            >>> AdminValueError("Pack name is required.").status_code
+            422
+        """
         super().__init__(message)
         self.message = message
         self.status_code = status_code
 
 
 class AdminConflict(Exception):
+    """Integrity conflict (HTTP 409) raised when a change would break references.
+
+    Attributes:
+        message (str): Human-readable error description.
+        status_code (int): Always 409.
+        conflicts (List[Dict[str, Any]]): Machine-readable conflict records.
+
+    Example:
+        >>> raise AdminConflict("Entity 'policy' is in use.", [{"type": "attributes"}])
+    """
+
     def __init__(self, message: str, conflicts: Optional[List[Dict[str, Any]]] = None):
+        """Initialize the conflict.
+
+        Args:
+            message (str): Human-readable error description.
+            conflicts (Optional[List[Dict[str, Any]]]): Conflict records to
+                attach; ``None`` becomes an empty list.
+
+        Example:
+            >>> AdminConflict("duplicate", [{"type": "edge"}]).status_code
+            409
+        """
         super().__init__(message)
         self.message = message
         self.status_code = 409
@@ -40,6 +84,23 @@ class AdminConflict(Exception):
 
 
 def list_packs(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """List every ontology pack with aggregate counts of its content.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+
+    Returns:
+        List[Dict[str, Any]]: One dict per pack holding the raw pack columns
+            plus ``entities_n``, ``nodes_n``, ``edges_n``, ``rules_n``,
+            ``questions_n`` and ``rows_n``, active pack first.
+
+    Raises:
+        sqlite3.DatabaseError: When the query fails.
+
+    Example:
+        >>> list_packs(conn)[0]["slug"]
+        'vnb-ape-sample'
+    """
     rows = conn.execute("""SELECT p.*,
                   (SELECT COUNT(*) FROM entities e WHERE e.pack_id=p.id) AS entities_n,
                   (SELECT COUNT(*) FROM graph_nodes g WHERE g.pack_id=p.id) AS nodes_n,
@@ -53,6 +114,22 @@ def list_packs(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
 
 
 def get_pack(conn: sqlite3.Connection, pack_id: int) -> Dict[str, Any]:
+    """Fetch a single ontology pack by id.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        Dict[str, Any]: The pack row as a plain dict.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> get_pack(conn, 1)["name"]
+        'VN BAPE Sample'
+    """
     row = conn.execute("SELECT * FROM ontology_packs WHERE id=?", (pack_id,)).fetchone()
     if row is None:
         raise AdminValueError("Ontology pack not found.", 404)
@@ -60,6 +137,21 @@ def get_pack(conn: sqlite3.Connection, pack_id: int) -> Dict[str, Any]:
 
 
 def active_pack_id(conn: sqlite3.Connection) -> Optional[int]:
+    """Return the id of the pack currently marked active.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+
+    Returns:
+        Optional[int]: Active pack id, or ``None`` when no pack is active.
+
+    Raises:
+        sqlite3.DatabaseError: When the query fails.
+
+    Example:
+        >>> active_pack_id(conn)
+        1
+    """
     row = conn.execute("SELECT id FROM ontology_packs WHERE is_active=1").fetchone()
     return row["id"] if row else None
 
@@ -67,6 +159,27 @@ def active_pack_id(conn: sqlite3.Connection) -> Optional[int]:
 def create_pack(
     conn: sqlite3.Connection, actor: str, *, slug: str, name: str, description: str = ""
 ) -> int:
+    """Create an empty ontology pack.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        slug (str): Unique identifier (2-49 chars: lowercase letters, digits,
+            ``-`` or ``_``).
+        name (str): Human-readable pack name.
+        description (str): Optional description. Defaults to "".
+
+    Returns:
+        int: Primary key of the new pack.
+
+    Raises:
+        AdminValueError: When the slug is malformed or the name is empty.
+        AdminConflict: When the slug already exists.
+
+    Example:
+        >>> create_pack(conn, "admin", slug="demo-pack", name="Demo")
+        7
+    """
     slug = (slug or "").strip()
     name = (name or "").strip()
     if not SLUG_RE.match(slug):
@@ -96,10 +209,26 @@ def bump_pack_version(
     pack_id: int,
     expected_version: Optional[int] = None,
 ) -> int:
-    """Optimistic lock: verify expected_version matches current, then bump.
+    """Optimistically bump the pack version after a write.
 
-    Raises AdminConflict if the pack was modified by another session
-    since the caller last read it. Returns the new version number.
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        expected_version (Optional[int]): Version the caller last read, or
+            ``None`` to skip the concurrency check.
+
+    Returns:
+        int: The new version number (current + 1).
+
+    Raises:
+        AdminValueError: When the pack does not exist.
+        AdminConflict: When ``expected_version`` differs from the stored
+            version, i.e. another session modified the pack meanwhile.
+
+    Example:
+        >>> bump_pack_version(conn, "admin", 1, expected_version=3)
+        4
     """
     row = conn.execute(
         "SELECT version FROM ontology_packs WHERE id=?", (pack_id,)
@@ -128,10 +257,27 @@ def bump_pack_version(
 def check_pack_version(
     conn: sqlite3.Connection, pack_id: int, expected_version: int
 ) -> None:
-    """Raise AdminConflict if the pack's current version != expected_version.
+    """Verify the pack version without modifying it.
 
-    Check-only counterpart of bump_pack_version: endpoints call this before a
-    write, and the service-layer write function performs the actual bump.
+    Check-only counterpart of :func:`bump_pack_version`: endpoints call this
+    before a write, and the service-layer write function performs the actual
+    bump.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+        expected_version (int): Version the caller last read.
+
+    Returns:
+        None: Returns ``None`` when the stored version matches.
+
+    Raises:
+        AdminValueError: When the pack does not exist.
+        AdminConflict: When the stored version differs from
+            ``expected_version``.
+
+    Example:
+        >>> check_pack_version(conn, 1, 4)
     """
     row = conn.execute(
         "SELECT version FROM ontology_packs WHERE id=?", (pack_id,)
@@ -155,6 +301,25 @@ def check_pack_version(
 
 
 def activate_pack(conn: sqlite3.Connection, actor: str, pack_id: int) -> None:
+    """Make the given pack the single active pack.
+
+    Clears ``is_active`` on every pack, sets it on ``pack_id`` and mirrors the
+    choice into ``app_settings.active_pack_id``.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack to activate.
+
+    Returns:
+        None: The activation is committed by the caller.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> activate_pack(conn, "admin", 1)
+    """
     get_pack(conn, pack_id)
     conn.execute("UPDATE ontology_packs SET is_active=0")
     conn.execute("UPDATE ontology_packs SET is_active=1 WHERE id=?", (pack_id,))
@@ -165,6 +330,23 @@ def activate_pack(conn: sqlite3.Connection, actor: str, pack_id: int) -> None:
 
 
 def delete_pack(conn: sqlite3.Connection, actor: str, pack_id: int) -> None:
+    """Delete a pack together with the rows that cascade from it.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+        AdminConflict: When the pack is currently active.
+
+    Example:
+        >>> delete_pack(conn, "admin", 5)
+    """
     pack = get_pack(conn, pack_id)
     if pack["is_active"]:
         raise AdminConflict(
@@ -179,6 +361,27 @@ def delete_pack(conn: sqlite3.Connection, actor: str, pack_id: int) -> None:
 def duplicate_pack(
     conn: sqlite3.Connection, actor: str, pack_id: int, new_slug: str, new_name: str
 ) -> int:
+    """Clone a pack under a new slug and name via export/import.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the source pack.
+        new_slug (str): Slug for the copy.
+        new_name (str): Display name for the copy.
+
+    Returns:
+        int: Primary key of the new pack.
+
+    Raises:
+        AdminValueError: When the source pack is missing or its payload is
+            invalid.
+        AdminConflict: When ``new_slug`` already exists.
+
+    Example:
+        >>> duplicate_pack(conn, "admin", 1, "demo-copy", "Demo (copy)")
+        8
+    """
     get_pack(conn, pack_id)
     data = export_pack(conn, pack_id)
     data["slug"] = new_slug
@@ -191,11 +394,25 @@ def duplicate_pack(
 def sync_visual_graph(
     conn: sqlite3.Connection, actor: str, pack_id: int
 ) -> Dict[str, int]:
-    """Rebuild graph_nodes / graph_edges from entities / relations.
+    """Rebuild ``graph_nodes`` / ``graph_edges`` from entities / relations.
 
-    Makes the curated "impact graph" identical in structure to the
-    schema layer, so the two graphs shown across the portals always
-    correspond. Returns the new node/edge counts.
+    Makes the curated "impact graph" identical in structure to the schema
+    layer, so the two graphs shown across the portals always correspond.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack to rebuild.
+
+    Returns:
+        Dict[str, int]: ``{"nodes": n, "edges": n}`` counts written.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> sync_visual_graph(conn, "admin", 1)
+        {'nodes': 12, 'edges': 9}
     """
     get_pack(conn, pack_id)
     layer_grp = {1: "financial", 2: "financial", 3: "operational", 4: "mix", 5: "cross"}
@@ -256,6 +473,22 @@ def sync_visual_graph(
 def reset_builtin_pack(
     conn: sqlite3.Connection, actor: str, slug: str = "vnb-ape-sample"
 ) -> None:
+    """Delete the built-in pack and re-seed it from scratch.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        slug (str): Slug of the built-in pack. Defaults to "vnb-ape-sample".
+
+    Returns:
+        None: The reset is committed by the caller.
+
+    Raises:
+        sqlite3.DatabaseError: When the delete or the seed queries fail.
+
+    Example:
+        >>> reset_builtin_pack(conn, "admin")
+    """
     row = conn.execute("SELECT id FROM ontology_packs WHERE slug=?", (slug,)).fetchone()
     if row:
         conn.execute("DELETE FROM ontology_packs WHERE id=?", (row["id"],))
@@ -269,6 +502,25 @@ def reset_builtin_pack(
 
 
 def export_pack(conn: sqlite3.Connection, pack_id: int) -> Dict[str, Any]:
+    """Serialise a pack into an ``onti-pack/v1`` JSON document.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        Dict[str, Any]: The pack document with ``entities``, ``attributes``,
+            ``relations``, graph nodes and edges, metric formulas, question
+            rules, tables (columns and dataset rows included), the question
+            bank and the analysis spec.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> export_pack(conn, 1)["format"]
+        'onti-pack/v1'
+    """
     pack = get_pack(conn, pack_id)
     tables_out = []
     for t in conn.execute(
@@ -313,6 +565,25 @@ def export_pack(conn: sqlite3.Connection, pack_id: int) -> Dict[str, Any]:
     ]
 
     def dump(table: str, order: str = "sort,id", extra_skip=()) -> List[Dict[str, Any]]:
+        """Collect one child table of the pack, dropping surrogate keys.
+
+        Args:
+            table (str): Table name to read.
+            order (str): SQL ``ORDER BY`` expression. Defaults to "sort,id".
+            extra_skip (tuple): Additional column names to drop. Defaults to
+                ``()``.
+
+        Returns:
+            List[Dict[str, Any]]: Rows as plain dicts without ``id``,
+                ``pack_id`` and the ``extra_skip`` columns.
+
+        Raises:
+            sqlite3.OperationalError: When the table name is invalid.
+
+        Example:
+            >>> dump("entities")[0]["key"]
+            'policy'
+        """
         skip = ("id", "pack_id") + extra_skip
         return [
             {k: v for k, v in dict(r).items() if k not in skip}
@@ -346,26 +617,58 @@ def export_pack(conn: sqlite3.Connection, pack_id: int) -> Dict[str, Any]:
 
 
 def _require(obj: Dict[str, Any], keys: Tuple[str, ...], ctx: str) -> None:
+    """Validate that a payload dict carries all required non-empty fields.
+
+    Args:
+        obj (Dict[str, Any]): Payload to inspect.
+        keys (Tuple[str, ...]): Field names that must be present and non-empty.
+        ctx (str): Context label used in the error message.
+
+    Returns:
+        None: Returns ``None`` when every field is present.
+
+    Raises:
+        AdminValueError: Listing the missing fields.
+
+    Example:
+        >>> _require({"key": "a", "label_en": "A"}, ("key", "label_en"), "entity")
+    """
     missing = [k for k in keys if obj.get(k) in (None, "")]
     if missing:
         raise AdminValueError(f"{ctx}: missing fields {missing}")
 
 
 def _normalize_pack_payload(data: Any) -> Dict[str, Any]:
-    """Accept both onti-pack/v1 exports and raw ontology JSON (BP2 format).
+    """Normalise any supported ontology JSON into the onti-pack/v1 layout.
 
+    Accepts both ``onti-pack/v1`` exports and raw ontology JSON (BP2 format).
     The BP2 format uses different field names:
-      - entity:   ``id`` → ``key``
-      - attribute: ``id`` → ``key``, ``owned_class`` → ``entity_key``,
-                   ``unique`` → ``is_unique``
-      - relation:  ``id`` → ``key``, ``source_class`` → ``source_key``,
-                   ``target_class`` → ``target_key``,
-                   ``source_class_attribute`` → ``source_attr``,
-                   ``target_class_attribute`` → ``target_attr``
+
+    * entity: ``id`` → ``key``
+    * attribute: ``id`` → ``key``, ``owned_class`` → ``entity_key``,
+      ``unique`` → ``is_unique``
+    * relation: ``id`` → ``key``, ``source_class`` → ``source_key``,
+      ``target_class`` → ``target_key``,
+      ``source_class_attribute`` → ``source_attr``,
+      ``target_class_attribute`` → ``target_attr``
 
     A file with an unknown ``format`` marker is still accepted when it
     contains recognizable ontology content, so hand-written packs do not
     fail just because of a stray marker field.
+
+    Args:
+        data (Any): Parsed JSON payload of the uploaded pack file.
+
+    Returns:
+        Dict[str, Any]: Payload converted to the onti-pack/v1 layout.
+
+    Raises:
+        AdminValueError: When the payload is not a dict, or the format marker
+            is unknown and no ontology content is present.
+
+    Example:
+        >>> _normalize_pack_payload({"entities": [{"id": "Policy"}]})["format"]
+        'onti-pack/v1'
     """
     if not isinstance(data, dict):
         raise AdminValueError(
@@ -401,16 +704,46 @@ def _normalize_pack_payload(data: Any) -> Dict[str, Any]:
 
 
 def _slugify(name: Any) -> str:
-    """Lowercase identifier safe for pack keys: 'ExperienceObservation' →
-    'experienceobservation'; spaces/punctuation collapse to '_'."""
+    """Turn an arbitrary label into a lowercase pack-safe identifier.
+
+    ``'ExperienceObservation'`` becomes ``'experienceobservation'``, while
+    spaces and punctuation collapse to ``'_'``.
+
+    Args:
+        name (Any): Source label, converted with ``str``.
+
+    Returns:
+        str: Sanitised identifier, or ``"item"`` when nothing usable remains.
+
+    Example:
+        >>> _slugify("Monthly Experience")
+        'monthly_experience'
+    """
     s = re.sub(r"[^a-zA-Z0-9\-_]+", "_", str(name)).strip("_").lower()
     return s or "item"
 
 
 def _convert_relationship_graph_to_v1(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert a relationship-graph style ontology JSON (entities as plain
-    name strings, ``relationships`` with from/to/type, ``tables`` as a dict)
-    to onti-pack/v1."""
+    """Convert a relationship-graph ontology into onti-pack/v1.
+
+    Handles documents whose entities are plain name strings and whose
+    ``relationships`` entries use from/to/type (``tables`` given as a dict),
+    e.g. the ``lapse_demo.json`` fixture.
+
+    Args:
+        data (Dict[str, Any]): Parsed relationship-graph document.
+
+    Returns:
+        Dict[str, Any]: Equivalent onti-pack/v1 document.
+
+    Raises:
+        AdminValueError: When an entity or a relationship lacks its required
+            name/type/endpoint fields.
+
+    Example:
+        >>> _convert_relationship_graph_to_v1({"entities": ["Policy"]})["slug"]
+        'imported-pack'
+    """
     slug = _slugify(data.get("slug") or data.get("id") or "imported-pack")
     name = data.get("name") or str(data.get("id") or slug).replace("_", " ").title()
     out: Dict[str, Any] = {
@@ -532,7 +865,23 @@ def _convert_relationship_graph_to_v1(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _convert_bp2_to_v1(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert a raw ontology JSON (ontology_BP2 format) to onti-pack/v1."""
+    """Convert a raw ontology JSON (``ontology_BP2`` format) to onti-pack/v1.
+
+    Args:
+        data (Dict[str, Any]): Parsed BP2 document using ``id`` /
+            ``owned_class`` / ``source_class`` field names.
+
+    Returns:
+        Dict[str, Any]: Equivalent onti-pack/v1 document.
+
+    Raises:
+        AdminValueError: When an entity, attribute or relation is missing its
+            identifying fields.
+
+    Example:
+        >>> _convert_bp2_to_v1({"entities": [{"id": "Policy"}]})["format"]
+        'onti-pack/v1'
+    """
     out: Dict[str, Any] = {
         "format": "onti-pack/v1",
         "slug": data.get("slug") or "imported-pack",
@@ -620,6 +969,33 @@ def import_pack(
     slug_override: Optional[str] = None,
     activate: bool = False,
 ) -> int:
+    """Import an ontology document into the database as a new pack.
+
+    The payload is normalised first, then every section (entities,
+    attributes, relations, graph nodes and edges, formulas, rules, tables
+    with columns and dataset rows, question bank) is inserted and the pack is
+    validated end-to-end. A failed import rolls the partial pack back.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        data (Dict[str, Any]): Pack document in any supported format.
+        slug_override (Optional[str]): Slug to use instead of the payload's
+            own slug.
+        activate (bool): Activate the imported pack. Defaults to False.
+
+    Returns:
+        int: Primary key of the new pack.
+
+    Raises:
+        AdminValueError: When the slug is invalid, a required field is
+            missing, or the data violates a unique constraint.
+        AdminConflict: When the slug already exists.
+
+    Example:
+        >>> import_pack(conn, "admin", export_pack(conn, 1), "demo-copy")
+        9
+    """
     data = _normalize_pack_payload(data)
     slug = slug_override or data.get("slug")
     name = data.get("name") or slug
@@ -863,6 +1239,21 @@ def import_pack(
 
 
 def _pack_counts(conn: sqlite3.Connection, pack_id: int) -> Dict[str, int]:
+    """Count the ontology elements belonging to a pack.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        Dict[str, int]: Counts keyed by ``entities``, ``attributes``,
+            ``relations``, ``nodes``, ``edges``, ``formulas``, ``rules``,
+            ``tables`` and ``questions``.
+
+    Example:
+        >>> _pack_counts(conn, 1)["entities"]
+        12
+    """
     counts: Dict[str, int] = {}
     for table, name in (
         ("entities", "entities"),
@@ -886,7 +1277,26 @@ def _pack_counts(conn: sqlite3.Connection, pack_id: int) -> Dict[str, int]:
 def snapshot_pack(
     conn: sqlite3.Connection, actor: str, pack_id: int, label: str = ""
 ) -> int:
-    """Store a full onti-pack/v1 snapshot of the pack (auto-backup safe point)."""
+    """Store a full onti-pack/v1 snapshot of the pack (auto-backup safe point).
+
+    Only the 20 most recent versions of a pack are retained.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        label (str): Snapshot label; defaults to ``"auto-backup"``.
+
+    Returns:
+        int: Primary key of the created ``pack_versions`` row.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> snapshot_pack(conn, "admin", 1, "before-edit")
+        3
+    """
     pack = get_pack(conn, pack_id)
     if not label:
         label = "auto-backup"
@@ -917,6 +1327,23 @@ def snapshot_pack(
 
 
 def list_versions(conn: sqlite3.Connection, pack_id: int) -> List[Dict[str, Any]]:
+    """List the stored snapshots of a pack, newest first.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        List[Dict[str, Any]]: ``id``, ``label``, ``created_by``,
+            ``created_at`` and the decoded ``counts`` per version.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> list_versions(conn, 1)[0]["label"]
+        'before-edit'
+    """
     get_pack(conn, pack_id)
     return [
         {
@@ -940,7 +1367,23 @@ def restore_version(
     """Replace the pack content with a stored snapshot.
 
     The current state is auto-snapshotted first, so a restore is always
-    reversible.  Activation flag and slug are preserved.
+    reversible. Activation flag and slug are preserved.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack to restore.
+        version_id (int): Primary key of the ``pack_versions`` row to apply.
+
+    Returns:
+        None: The restored pack keeps the original slug.
+
+    Raises:
+        AdminValueError: When the pack or the version is missing, or the
+            stored payload cannot be imported.
+
+    Example:
+        >>> restore_version(conn, "admin", 1, 3)
     """
     pack = get_pack(conn, pack_id)
     row = conn.execute(
@@ -1001,9 +1444,22 @@ def preview_import(
 ) -> Dict[str, Any]:
     """Validate and summarise a pack payload **without writing anything**.
 
-    Returns ``{slug, name, counts, issues, warnings}`` where *issues* block
-    the import and *warnings* are advisory.  Reuses the same field
-    requirements as :func:`import_pack` so the preview never lies.
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        data (Dict[str, Any]): Pack document in any supported format.
+        slug_override (Optional[str]): Slug to validate instead of the
+            payload's own slug.
+
+    Returns:
+        Dict[str, Any]: ``slug``, ``name``, ``counts``, ``issues`` (blocking
+            problems), ``warnings`` (advisory notes) and ``can_import``.
+
+    Raises:
+        AdminValueError: When the payload cannot be normalised at all.
+
+    Example:
+        >>> preview_import(conn, {"entities": [{"key": "a", "label_en": "A"}]})["can_import"]
+        True
     """
     data = _normalize_pack_payload(data)
     slug = slug_override or data.get("slug")
@@ -1082,16 +1538,20 @@ def preview_import(
 # ---------------------------------------------------------------------------
 
 
-def list_entities(conn, pack_id: int) -> List[Dict]:
-    return [
-        dict(r)
-        for r in conn.execute(
-            "SELECT * FROM entities WHERE pack_id=? ORDER BY sort,id", (pack_id,)
-        )
-    ]
-
-
 def _entity_keys(conn, pack_id: int) -> set:
+    """Collect the entity keys defined in a pack.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        set: Set of entity key strings.
+
+    Example:
+        >>> sorted(_entity_keys(conn, 1))
+        ['claim', 'policy']
+    """
     return {
         r["key"]
         for r in conn.execute("SELECT key FROM entities WHERE pack_id=?", (pack_id,))
@@ -1099,6 +1559,19 @@ def _entity_keys(conn, pack_id: int) -> set:
 
 
 def _node_keys(conn, pack_id: int) -> set:
+    """Collect the graph node keys defined in a pack.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        set: Set of graph node key strings.
+
+    Example:
+        >>> sorted(_node_keys(conn, 1))
+        ['claims', 'premium']
+    """
     return {
         r["key"]
         for r in conn.execute("SELECT key FROM graph_nodes WHERE pack_id=?", (pack_id,))
@@ -1106,6 +1579,26 @@ def _node_keys(conn, pack_id: int) -> set:
 
 
 def upsert_entity(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update an entity and bump the pack version.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Entity fields; ``key`` and ``label_en`` are
+            required, ``layer``, ``description`` and ``sort`` optional.
+
+    Returns:
+        int: Primary key of the stored entity row.
+
+    Raises:
+        AdminValueError: When the pack is missing, or the key or label is
+            empty.
+
+    Example:
+        >>> upsert_entity(conn, "admin", 1, {"key": "policy", "label_en": "Policy"})
+        4
+    """
     get_pack(conn, pack_id)
     if not payload.get("key") or not payload.get("label_en"):
         raise AdminValueError("Entity key and label are required.")
@@ -1144,6 +1637,27 @@ def upsert_entity(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_entity(conn, actor, pack_id: int, key: str) -> None:
+    """Delete an entity once it has no dependents.
+
+    Attributes, pack tables and relation endpoints referencing the entity are
+    reported as conflicts instead of being deleted silently.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Entity key to delete.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the entity does not exist (404).
+        AdminConflict: When other rows still reference the entity.
+
+    Example:
+        >>> delete_entity(conn, "admin", 1, "policy")
+    """
     row = conn.execute(
         "SELECT id FROM entities WHERE pack_id=? AND key=?", (pack_id, key)
     ).fetchone()
@@ -1170,6 +1684,27 @@ def delete_entity(conn, actor, pack_id: int, key: str) -> None:
 
 
 def upsert_relation(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update a relation between two existing entities.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Relation fields; ``key``, ``source_key`` and
+            ``target_key`` are required.
+
+    Returns:
+        int: Primary key of the stored relation row.
+
+    Raises:
+        AdminValueError: When a required field is empty or an endpoint does
+            not reference an existing entity.
+
+    Example:
+        >>> upsert_relation(conn, "admin", 1, {
+        ...     "key": "policy_claim", "source_key": "policy", "target_key": "claim"})
+        2
+    """
     keys = _entity_keys(conn, pack_id)
     for f in ("key", "source_key", "target_key"):
         if not payload.get(f):
@@ -1212,6 +1747,23 @@ def upsert_relation(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_relation(conn, actor, pack_id: int, key: str) -> None:
+    """Delete a relation and bump the pack version.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Relation key to delete.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the relation does not exist (404).
+
+    Example:
+        >>> delete_relation(conn, "admin", 1, "policy_claim")
+    """
     cur = conn.execute(
         "DELETE FROM relations WHERE pack_id=? AND key=?", (pack_id, key)
     )
@@ -1222,6 +1774,27 @@ def delete_relation(conn, actor, pack_id: int, key: str) -> None:
 
 
 def upsert_attribute(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update an attribute owned by an existing entity.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Attribute fields; ``entity_key``, ``key``
+            and ``label_en`` are required.
+
+    Returns:
+        int: Primary key of the stored attribute row.
+
+    Raises:
+        AdminValueError: When the entity is unknown, a required field is empty,
+            or ``data_type`` is not STRING/INTEGER/FLOAT.
+
+    Example:
+        >>> upsert_attribute(conn, "admin", 1, {
+        ...     "entity_key": "policy", "key": "premium", "label_en": "Premium"})
+        6
+    """
     if payload.get("entity_key") not in _entity_keys(conn, pack_id):
         raise AdminValueError("entity_key must reference an existing entity.")
     if not payload.get("key") or not payload.get("label_en"):
@@ -1265,6 +1838,24 @@ def upsert_attribute(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_attribute(conn, actor, pack_id: int, entity_key: str, key: str) -> None:
+    """Delete an attribute and bump the pack version.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        entity_key (str): Owning entity key.
+        key (str): Attribute key.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the attribute does not exist (404).
+
+    Example:
+        >>> delete_attribute(conn, "admin", 1, "policy", "premium")
+    """
     cur = conn.execute(
         "DELETE FROM attributes WHERE pack_id=? AND entity_key=? AND key=?",
         (pack_id, entity_key, key),
@@ -1279,6 +1870,27 @@ def delete_attribute(conn, actor, pack_id: int, entity_key: str, key: str) -> No
 
 
 def upsert_node(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update a graph node.
+
+    Aliases are stored as a JSON list; a comma separated string is split into
+    one alias per part.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Node fields; ``key`` is required.
+
+    Returns:
+        int: Primary key of the stored node row.
+
+    Raises:
+        AdminValueError: When ``key`` is empty.
+
+    Example:
+        >>> upsert_node(conn, "admin", 1, {"key": "claims", "label": "Claims"})
+        3
+    """
     if not payload.get("key"):
         raise AdminValueError("Node key is required.")
     aliases = payload.get("aliases", [])
@@ -1319,6 +1931,24 @@ def upsert_node(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_node(conn, actor, pack_id: int, key: str) -> None:
+    """Delete a graph node that no edge references.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Node key to delete.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the node does not exist (404).
+        AdminConflict: When at least one graph edge references the node.
+
+    Example:
+        >>> delete_node(conn, "admin", 1, "claims")
+    """
     if not conn.execute(
         "SELECT 1 FROM graph_nodes WHERE pack_id=? AND key=?", (pack_id, key)
     ).fetchone():
@@ -1342,6 +1972,29 @@ def delete_node(conn, actor, pack_id: int, key: str) -> None:
 
 
 def upsert_edge(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update a graph edge between existing nodes.
+
+    ``source_key`` may hold a comma separated list of source node keys.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Edge fields; ``key``, ``source_key`` and
+            ``target_key`` are required.
+
+    Returns:
+        int: Primary key of the stored edge row.
+
+    Raises:
+        AdminValueError: When a required field is empty or an endpoint is not
+            an existing graph node.
+
+    Example:
+        >>> upsert_edge(conn, "admin", 1, {
+        ...     "key": "claims_premium", "source_key": "claims", "target_key": "premium"})
+        5
+    """
     for f in ("key", "source_key", "target_key"):
         if not payload.get(f):
             raise AdminValueError(f"Edge '{f}' is required.")
@@ -1384,6 +2037,23 @@ def upsert_edge(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_edge(conn, actor, pack_id: int, key: str) -> None:
+    """Delete a graph edge and bump the pack version.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Edge key to delete.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the edge does not exist (404).
+
+    Example:
+        >>> delete_edge(conn, "admin", 1, "claims_premium")
+    """
     cur = conn.execute(
         "DELETE FROM graph_edges WHERE pack_id=? AND key=?", (pack_id, key)
     )
@@ -1397,6 +2067,31 @@ def delete_edge(conn, actor, pack_id: int, key: str) -> None:
 
 
 def upsert_formula(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update a metric formula after validating its expression.
+
+    The expression may only reference helper functions and the other metric
+    keys of the pack; the edited key itself is removed from the namespace so
+    formulas cannot self-reference.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Formula fields; ``key`` and ``expression``
+            are required.
+
+    Returns:
+        int: Primary key of the stored formula row.
+
+    Raises:
+        AdminValueError: When a required field is empty or the expression does
+            not validate.
+
+    Example:
+        >>> upsert_formula(conn, "admin", 1, {
+        ...     "key": "loss_ratio", "expression": "claims / premium"})
+        2
+    """
     if not payload.get("key") or not payload.get("expression"):
         raise AdminValueError("Formula key and expression are required.")
     # Allowed names: helper functions + all existing metric keys (the edited
@@ -1440,6 +2135,24 @@ def upsert_formula(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_formula(conn, actor, pack_id: int, key: str) -> None:
+    """Delete a metric formula that no other formula references.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Formula key to delete.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the formula does not exist (404).
+        AdminConflict: When another formula's expression uses ``key``.
+
+    Example:
+        >>> delete_formula(conn, "admin", 1, "loss_ratio")
+    """
     # Other formulas referencing this key?
     others = conn.execute(
         "SELECT key, expression FROM metric_formulas WHERE pack_id=? AND key<>?",
@@ -1463,6 +2176,23 @@ def delete_formula(conn, actor, pack_id: int, key: str) -> None:
 
 
 def _valid_regex_list(value: Any, field: str) -> str:
+    """Validate a list of regular expressions and return it as JSON.
+
+    Args:
+        value (Any): A JSON string, a list of patterns, or ``None``.
+        field (str): Field name used in error messages.
+
+    Returns:
+        str: JSON-encoded list of patterns that all compile.
+
+    Raises:
+        AdminValueError: When the value is not a list of strings or a pattern
+            does not compile.
+
+    Example:
+        >>> _valid_regex_list(["premium"], "patterns")
+        '["premium"]'
+    """
     if isinstance(value, str):
         try:
             parsed = json.loads(value or "[]")
@@ -1481,6 +2211,31 @@ def _valid_regex_list(value: Any, field: str) -> str:
 
 
 def upsert_rule(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
+    """Create or update a question rule.
+
+    Patterns, require-groups and guards must be valid regex lists and the
+    Jinja answer template must parse.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        payload (Dict[str, Any]): Rule fields; ``key`` and ``template`` are
+            required.
+
+    Returns:
+        int: Primary key of the stored rule row.
+
+    Raises:
+        AdminValueError: When a required field is empty, a regex is invalid,
+            or the template cannot be parsed.
+
+    Example:
+        >>> upsert_rule(conn, "admin", 1, {
+        ...     "key": "loss_ratio", "patterns": ["loss ratio"],
+        ...     "template": "The loss ratio is {{ value }}."})
+        2
+    """
     if not payload.get("key") or not payload.get("template"):
         raise AdminValueError("Rule key and answer template are required.")
     patterns = _valid_regex_list(payload.get("patterns", []), "patterns")
@@ -1529,6 +2284,23 @@ def upsert_rule(conn, actor, pack_id: int, payload: Dict[str, Any]) -> int:
 
 
 def delete_rule(conn, actor, pack_id: int, key: str) -> None:
+    """Delete a question rule and bump the pack version.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Rule key to delete.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the rule does not exist (404).
+
+    Example:
+        >>> delete_rule(conn, "admin", 1, "loss_ratio")
+    """
     cur = conn.execute(
         "DELETE FROM question_rules WHERE pack_id=? AND key=?", (pack_id, key)
     )
@@ -1544,6 +2316,21 @@ def delete_rule(conn, actor, pack_id: int, key: str) -> None:
 
 
 def normalize_question(text: str) -> str:
+    """Normalise a question for duplicate detection.
+
+    Lowercases the text, strips punctuation and collapses whitespace runs into
+    single spaces.
+
+    Args:
+        text (str): Raw question text.
+
+    Returns:
+        str: Normalised text; empty string for empty input.
+
+    Example:
+        >>> normalize_question("What is the Loss Ratio?")
+        'what is the loss ratio'
+    """
     return re.sub(
         r"\s+",
         " ",
@@ -1561,6 +2348,24 @@ def add_question(
     source: str = "imported",
     actor: str = "system",
 ) -> bool:
+    """Insert a question into the bank unless an equivalent one exists.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+        text (str): Question text.
+        category (str): Optional category. Defaults to "".
+        source (str): Provenance marker, e.g. ``"imported"``.
+        actor (str): Actor name reserved for callers; defaults to "system".
+
+    Returns:
+        bool: ``True`` when a row was inserted, ``False`` for an empty or
+            already present question.
+
+    Example:
+        >>> add_question(conn, 1, "What is the loss ratio?")
+        True
+    """
     text = (text or "").strip()
     if not text:
         return False
@@ -1580,6 +2385,26 @@ def add_question(
 def import_questions(
     conn, actor, pack_id: int, items: List[Dict[str, str]]
 ) -> Dict[str, int]:
+    """Bulk-import questions into a pack's question bank.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        items (List[Dict[str, str]]): Entries with ``question`` and optional
+            ``category`` / ``source``.
+
+    Returns:
+        Dict[str, int]: ``inserted``, ``duplicates``, ``invalid`` and
+            ``total`` counts.
+
+    Raises:
+        AdminValueError: With status 404 when the pack does not exist.
+
+    Example:
+        >>> import_questions(conn, "admin", 1, [{"question": "Loss ratio?"}])
+        {'inserted': 1, 'duplicates': 0, 'invalid': 0, 'total': 1}
+    """
     get_pack(conn, pack_id)
     inserted = dup = invalid = 0
     for it in items:
@@ -1615,6 +2440,22 @@ def import_questions(
 def list_questions(
     conn, pack_id: int, search: str = "", category: str = "", limit: int = 500
 ) -> List[Dict]:
+    """List question-bank entries with optional search and category filters.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+        search (str): Substring matched against the question text.
+        category (str): Exact category filter.
+        limit (int): Maximum number of rows. Defaults to 500.
+
+    Returns:
+        List[Dict]: Question rows, canonical entries first.
+
+    Example:
+        >>> list_questions(conn, 1, category="ratio")[0]["question"]
+        'What is the loss ratio?'
+    """
     sql = "SELECT * FROM question_bank WHERE pack_id=?"
     args: List[Any] = [pack_id]
     if search:
@@ -1629,6 +2470,22 @@ def list_questions(
 
 
 def delete_question(conn, actor, qid: int) -> None:
+    """Delete a question-bank entry.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        qid (int): Primary key of the ``question_bank`` row.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: When the question does not exist (404).
+
+    Example:
+        >>> delete_question(conn, "admin", 42)
+    """
     cur = conn.execute("DELETE FROM question_bank WHERE id=?", (qid,))
     if cur.rowcount == 0:
         raise AdminValueError("Question not found.", 404)
@@ -1641,6 +2498,19 @@ def delete_question(conn, actor, qid: int) -> None:
 
 
 def list_tables(conn, pack_id: int) -> List[Dict]:
+    """List pack tables together with their columns and dataset summaries.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+
+    Returns:
+        List[Dict]: Table rows plus ``columns`` and ``datasets`` lists.
+
+    Example:
+        >>> list_tables(conn, 1)[0]["key"]
+        'experience'
+    """
     out = []
     for t in conn.execute(
         "SELECT * FROM pack_tables WHERE pack_id=? ORDER BY id", (pack_id,)
@@ -1675,6 +2545,28 @@ def create_dataset(
     kind: str = "upload",
     activate: bool = False,
 ) -> int:
+    """Insert a dataset (and its rows) for an existing pack table.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        table_id (int): Primary key of the target ``pack_tables`` row.
+        name (str): Dataset display name.
+        filename (str): Originating file name.
+        rows (List[Dict[str, Any]]): Rows to store, in order.
+        kind (str): Dataset kind, ``"upload"`` or ``"seed"``.
+        activate (bool): Make the new dataset the active one.
+
+    Returns:
+        int: Primary key of the new dataset.
+
+    Raises:
+        AdminValueError: With status 404 when the target table is missing.
+
+    Example:
+        >>> create_dataset(conn, "admin", 3, "FY24", "fy24.xlsx", rows)
+        9
+    """
     t = conn.execute("SELECT * FROM pack_tables WHERE id=?", (table_id,)).fetchone()
     if t is None:
         raise AdminValueError("Target table not found.", 404)
@@ -1702,6 +2594,19 @@ def create_dataset(
 
 
 def list_datasets(conn, table_id: int) -> List[Dict]:
+    """List the datasets belonging to a pack table.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        table_id (int): Primary key of the ``pack_tables`` row.
+
+    Returns:
+        List[Dict]: Dataset rows ordered by id.
+
+    Example:
+        >>> list_datasets(conn, 3)[0]["name"]
+        'FY24'
+    """
     return [
         dict(r)
         for r in conn.execute(
@@ -1711,6 +2616,23 @@ def list_datasets(conn, table_id: int) -> List[Dict]:
 
 
 def set_active_dataset(conn, actor, table_id: int, dataset_id: int) -> None:
+    """Mark one dataset of a table as the active dataset.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        table_id (int): Primary key of the ``pack_tables`` row.
+        dataset_id (int): Primary key of the dataset.
+
+    Returns:
+        None: The change is committed by the caller.
+
+    Raises:
+        AdminValueError: When the dataset does not belong to the table (404).
+
+    Example:
+        >>> set_active_dataset(conn, "admin", 3, 9)
+    """
     if not conn.execute(
         "SELECT 1 FROM datasets WHERE id=? AND table_id=?", (dataset_id, table_id)
     ).fetchone():
@@ -1722,6 +2644,22 @@ def set_active_dataset(conn, actor, table_id: int, dataset_id: int) -> None:
 
 
 def delete_dataset(conn, actor, dataset_id: int) -> None:
+    """Delete a dataset and promote the newest remaining dataset.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        dataset_id (int): Primary key of the dataset.
+
+    Returns:
+        None: The deletion is committed by the caller.
+
+    Raises:
+        AdminValueError: With status 404 when the dataset does not exist.
+
+    Example:
+        >>> delete_dataset(conn, "admin", 9)
+    """
     d = conn.execute("SELECT * FROM datasets WHERE id=?", (dataset_id,)).fetchone()
     if d is None:
         raise AdminValueError("Dataset not found.", 404)
@@ -1750,6 +2688,26 @@ def table_rows(
     limit: int = 200,
     offset: int = 0,
 ) -> Dict[str, Any]:
+    """Read a page of rows from a table's dataset.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        table_id (int): Primary key of the ``pack_tables`` row.
+        dataset_id (Optional[int]): Dataset to read; defaults to the table's
+            active dataset.
+        limit (int): Maximum rows returned. Defaults to 200.
+        offset (int): Rows to skip. Defaults to 0.
+
+    Returns:
+        Dict[str, Any]: ``dataset_id``, ``total`` and the decoded ``rows``.
+
+    Raises:
+        AdminValueError: With status 404 when the table does not exist.
+
+    Example:
+        >>> table_rows(conn, 3, limit=10)["total"]
+        42
+    """
     t = conn.execute("SELECT * FROM pack_tables WHERE id=?", (table_id,)).fetchone()
     if t is None:
         raise AdminValueError("Table not found.", 404)
@@ -1770,7 +2728,19 @@ def table_rows(
 
 
 def table_columns(conn, table_id: int) -> List[Dict[str, Any]]:
-    """Ordered column metadata for a pack table."""
+    """Return the ordered column metadata of a pack table.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        table_id (int): Primary key of the ``pack_tables`` row.
+
+    Returns:
+        List[Dict[str, Any]]: Column rows ordered by ``sort`` then id.
+
+    Example:
+        >>> table_columns(conn, 3)[0]["key"]
+        'policy_id'
+    """
     return [
         dict(c)
         for c in conn.execute(
@@ -1783,11 +2753,23 @@ def table_columns(conn, table_id: int) -> List[Dict[str, Any]]:
 def find_table_by_name(conn, pack_id: int, name: str) -> Optional[Dict[str, Any]]:
     """Route an uploaded item (file stem / sheet name) to a pack table.
 
-    Matching order: exact key, then normalised label, then token-set equality,
-    then token overlap. Tokenisation reuses
-    :func:`ontology_service._key_tokens`, so e.g. sheet ``Monthly_Experience``
-    still routes to the table keyed ``experience``. Returns the table row
-    (as produced by :func:`list_tables`) or ``None`` when nothing matches.
+    Matching order: exact key, then token-set equality on the key or the
+    normalised label, then any token overlap. Tokenisation reuses
+    :func:`ontology_service._key_tokens`, so e.g. sheet
+    ``Monthly_Experience`` still routes to the table keyed ``experience``.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+        name (str): File stem or sheet name to match.
+
+    Returns:
+        Optional[Dict[str, Any]]: The table row (as produced by
+            :func:`list_tables`), or ``None`` when nothing matches.
+
+    Example:
+        >>> find_table_by_name(conn, 1, "Monthly_Experience")["key"]
+        'experience'
     """
     wanted = str(name or "").strip()
     if not wanted:
@@ -1822,11 +2804,32 @@ def create_table(
     description: str,
     columns: List[Dict[str, Any]],
 ) -> int:
-    """Create a pack table (and its columns) from an inferred structure.
+    """Create a pack table and its columns from an inferred structure.
 
     Mirrors the inline ``INSERT INTO pack_tables/pack_columns`` used by
     :func:`import_pack`. The caller is responsible for the matching ontology
     entity/attributes and for syncing the visual graph afterwards.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        actor (str): Username recorded in the audit log.
+        pack_id (int): Primary key of the pack.
+        key (str): Table key, unique within the pack.
+        label (str): Display label; falls back to ``key``.
+        entity_key (str): Ontology entity the table represents.
+        description (str): Optional description.
+        columns (List[Dict[str, Any]]): Column definitions; each needs ``key``.
+
+    Returns:
+        int: Primary key of the new table.
+
+    Raises:
+        AdminValueError: When the pack is missing, ``key`` is empty, or the
+            table key already exists (409).
+
+    Example:
+        >>> create_table(conn, "admin", 1, "experience", "Experience", "policy", "", cols)
+        4
     """
     get_pack(conn, pack_id)
     if not key:
@@ -1868,7 +2871,20 @@ def create_table(
 
 
 def list_audit(conn, limit: int = 100) -> List[Dict[str, Any]]:
-    """Most recent audit-trail events (capped at 500)."""
+    """Return the most recent audit-trail events.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        limit (int): Maximum number of rows, capped at 500. Defaults to 100.
+
+    Returns:
+        List[Dict[str, Any]]: ``ts``, ``actor``, ``action``, ``detail`` and
+            ``ip`` per event, newest first.
+
+    Example:
+        >>> list_audit(conn, 5)[0]["action"]
+        'pack.activate'
+    """
     rows = conn.execute(
         "SELECT ts, username AS actor, action, detail, ip FROM audit_log "
         "ORDER BY id DESC LIMIT ?",
@@ -1885,11 +2901,26 @@ def instance_graph(
     entity_filter: str = "",
     search: str = "",
 ) -> Dict[str, Any]:
-    """Two-layer graph.
+    """Build the two-layer instance graph of a pack.
 
     Schema layer: entities + relations. Instance nodes: one per data row
-    (capped, with search/type filter). Instance edges: resolved from
-    entity relations whose source_attr/target_attr match table columns.
+    (capped, with search/type filter). Instance edges: resolved from entity
+    relations whose source_attr/target_attr match table columns.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (int): Primary key of the pack.
+        node_limit (int): Maximum number of instance nodes. Defaults to 300.
+        entity_filter (str): Only include tables of this entity key.
+        search (str): Case-insensitive substring filter on row content.
+
+    Returns:
+        Dict[str, Any]: ``schema`` (nodes/edges) and ``instances`` (nodes,
+            edges, ``total_rows``, ``truncated``, ``node_limit``).
+
+    Example:
+        >>> instance_graph(conn, 1, node_limit=50)["instances"]["truncated"]
+        True
     """
     schema_nodes = []
     for e in conn.execute(
@@ -2025,7 +3056,38 @@ def instance_graph(
 
 
 def dashboard_stats(conn) -> Dict[str, Any]:
+    """Aggregate platform statistics for the admin dashboard.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+
+    Returns:
+        Dict[str, Any]: Global counts, active-pack counts, 7-day LLM call
+            totals, 30-day LLM usage by model and user, user activity,
+            security signals and database usage.
+
+    Raises:
+        sqlite3.DatabaseError: When a required query fails.
+
+    Example:
+        >>> dashboard_stats(conn)["users"]
+        3
+    """
+
     def n(sql, params=()):
+        """Count the rows produced by a single-value query.
+
+        Args:
+            sql (str): SELECT statement returning one numeric column.
+            params (tuple): Query parameters. Defaults to ``()``.
+
+        Returns:
+            Any: The first column of the first result row.
+
+        Example:
+            >>> n("SELECT COUNT(*) FROM users")
+            3
+        """
         return conn.execute(sql, params).fetchone()[0]
 
     pid = active_pack_id(conn)

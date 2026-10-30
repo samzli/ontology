@@ -24,6 +24,17 @@ from modules.db import audit, get_conn, now
 from modules import analytics as an
 from modules import ontology_service as svc
 from modules import report_charts as rc
+from modules.constants import (
+    REPORT_ATTR_LABELS,
+    REPORT_CHART_NOTES,
+    REPORT_CORE_NODES,
+    REPORT_GRAPH_NODES,
+    REPORT_METRIC_ROWS,
+    REPORT_QA_ANSWER_CHARS,
+    REPORT_QA_ITEMS,
+    REPORT_SUMMARY_METRICS,
+    REPORT_UID_CHARS,
+)
 
 DATA_ROOT = str(_DATA_DIR)
 BUNDLED_ROOT = str(BUNDLED_DATA_DIR)
@@ -35,7 +46,19 @@ BRAND_INK = "#1F2933"
 
 
 class ReportError(Exception):
+    """Exception raised for report generation, access and deletion failures.
+
+    Example:
+        >>> raise ReportError("Report not found.", 404)
+    """
+
     def __init__(self, message: str, status_code: int = 400):
+        """Initialise the error with a message and an HTTP status code.
+
+        Args:
+            message (str): Human-readable error message.
+            status_code (int): HTTP status code returned to the caller.
+        """
         super().__init__(message)
         self.message = message
         self.status_code = status_code
@@ -47,11 +70,24 @@ class ReportError(Exception):
 
 
 def _inline_html(text: str) -> str:
+    """Escape a string and convert inline Markdown (code, bold, italic, links).
+
+    Args:
+        text (str): Inline Markdown fragment to convert.
+
+    Returns:
+        str: HTML-escaped fragment with inline Markdown tags converted.
+
+    Example:
+        >>> _inline_html("**VNB** is `growing`")
+        '<strong>VNB</strong> is <code>growing</code>'
+    """
     text = html.escape(text, quote=False)
     # Protect images so the link rule below cannot turn them into anchors.
     held: List[str] = []
 
     def _hold(m):
+        """Stash an image match and return a placeholder token."""
         held.append(m.group(0))
         return f"\x00{len(held) - 1}\x00"
 
@@ -66,6 +102,22 @@ def _inline_html(text: str) -> str:
 
 
 def md_to_html_fragment(md: str) -> str:
+    """Convert the Markdown subset produced by Onti into an HTML fragment.
+
+    Handles headings, horizontal rules, tables, bullet/numbered lists,
+    standalone images (kept as raw Markdown for the embedding pass) and
+    paragraphs.
+
+    Args:
+        md (str): Markdown document to convert; ``None``/empty yields ``""``.
+
+    Returns:
+        str: HTML fragment with one element per source block.
+
+    Example:
+        >>> md_to_html_fragment("# Title")
+        '<h1>Title</h1>'
+    """
     lines = (md or "").replace("\r\n", "\n").split("\n")
     out: List[str] = []
     i = 0
@@ -198,7 +250,23 @@ _HTML_SHELL = """<!DOCTYPE html>
 
 
 def _embed_images(html_fragment: str, asset_map: Dict[str, str]) -> str:
+    """Embed resolvable images as inline base64 ``<figure>`` blocks.
+
+    Args:
+        html_fragment (str): Fragment containing Markdown image references.
+        asset_map (dict[str, str]): Relative path -> base64 PNG payload.
+
+    Returns:
+        str: Fragment where resolvable images are embedded; unresolved
+        references are left untouched.
+
+    Example:
+        >>> _embed_images("![KPI](charts/a.png)", {"charts/a.png": "AAAA"})
+        '<figure><img alt="KPI" src="data:image/png;base64,AAAA"/>...'
+    """
+
     def repl(m):
+        """Swap one image reference for an embedded figure, if resolvable."""
         alt, src = m.group(1), m.group(2)
         data = asset_map.get(src)
         if data:
@@ -217,6 +285,18 @@ def _embed_images(html_fragment: str, asset_map: Dict[str, str]) -> str:
 
 
 def _inline_rl(text: str) -> str:
+    """Escape a string and convert inline Markdown for ReportLab paragraphs.
+
+    Args:
+        text (str): Markdown text to convert.
+
+    Returns:
+        str: ReportLab mini-HTML with code and bold markup applied.
+
+    Example:
+        >>> _inline_rl("**VNB** and `code`")
+        '<b>VNB</b> and <font face="Courier" size="9">code</font>'
+    """
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"`([^`]+)`", r'<font face="Courier" size="9">\1</font>', text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
@@ -224,7 +304,28 @@ def _inline_rl(text: str) -> str:
 
 
 def md_to_flowables(md: str, styles, image_loader, full_width):
-    """image_loader(rel_path) -> ReportLab Image flowable or None."""
+    """Convert the Onti Markdown subset into ReportLab flowables.
+
+    Supports headings, horizontal rules, tables, bullets, images and
+    paragraphs; numeric list items fall through as plain paragraphs.
+
+    Args:
+        md (str): Markdown document to convert.
+        styles (dict[str, ParagraphStyle]): Named styles for H1-H4, TH, TD and
+            Caption elements.
+        image_loader (Callable[[str], Any]): Maps a relative image path to a
+            ReportLab Image flowable, or ``None`` when unavailable.
+        full_width (float): Available body width in points, used for tables.
+
+    Returns:
+        list: ReportLab flowables ready to be appended to a document story.
+
+    Raises:
+        Exception: Propagated from ``image_loader`` when an image cannot be built.
+
+    Example:
+        >>> flows = md_to_flowables("## Head", styles, loader, 480)
+    """
     from reportlab.lib import colors
     from reportlab.platypus import (
         Paragraph,
@@ -380,6 +481,20 @@ def md_to_flowables(md: str, styles, image_loader, full_width):
 def _metric_rows(
     pack: Dict[str, Any], computed: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
+    """Collect declared formula metrics that the engine actually computed.
+
+    Args:
+        pack (dict): Loaded ontology pack, read for its ``formulas`` list.
+        computed (dict): Computation result holding a ``metrics`` mapping.
+
+    Returns:
+        list[dict]: One row per computed metric with key, label, value, format,
+        unit and expression.
+
+    Example:
+        >>> _metric_rows(pack, {"metrics": {"vnb": 12.5}})[0]["key"]
+        'vnb'
+    """
     vals = computed.get("metrics", {})
     out = []
     for f in pack.get("formulas", []):
@@ -399,12 +514,31 @@ def _metric_rows(
 
 
 def _fmt_metric(v: Any, fmt: str) -> str:
+    """Format a metric value through the shared chart formatter (2 decimals)."""
     return rc.format_value(v, fmt, 2)
 
 
 def _chain_from_session(
     pack: Dict[str, Any], qa_items: List[Dict[str, Any]]
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Build impact-chain nodes and edges from the analysed questions.
+
+    Falls back to the pack's core nodes plus the links among them when the
+    questions carry no usable graph evidence.
+
+    Args:
+        pack (dict): Loaded ontology pack (nodes, links) used for labels and
+            the fallback chain.
+        qa_items (list[dict]): Question records, each optionally holding a
+            ``graph`` with ``nodes`` and ``edge_ids``.
+
+    Returns:
+        tuple[list[dict], list[dict]]: ``(nodes, edges)`` suitable for
+        :func:`modules.report_charts.render_chain_graph`.
+
+    Example:
+        >>> nodes, edges = _chain_from_session(pack, qa_items)
+    """
     visual = svc.visual_graph(pack)
     link_map = {lk["id"]: lk for lk in visual["links"]}
     node_meta = {n["key"]: n for n in pack.get("nodes", [])}
@@ -412,6 +546,7 @@ def _chain_from_session(
     edges: Dict[str, Dict[str, Any]] = {}
 
     def add_node(nid: str, override: Optional[Dict[str, Any]] = None) -> None:
+        """Register a chain node once, merging optional label/group/value overrides."""
         if nid in node_map:
             return
         meta = node_meta.get(nid, {})
@@ -445,9 +580,9 @@ def _chain_from_session(
     if nodes and edges:
         return nodes, list(edges.values())
     # Fallback: core nodes from the pack definition + edges among them.
-    core = [n for n in pack.get("nodes", []) if n.get("is_core")][:12]
+    core = [n for n in pack.get("nodes", []) if n.get("is_core")][:REPORT_CORE_NODES]
     if not core:
-        core = pack.get("nodes", [])[:12]
+        core = pack.get("nodes", [])[:REPORT_CORE_NODES]
     ids = {n["key"] for n in core}
     fallback_edges = [
         {
@@ -475,6 +610,25 @@ def _chain_from_session(
 def _ai_interpretation(
     pack: Dict[str, Any], qa_items: List[Dict[str, Any]]
 ) -> Optional[str]:
+    """Ask the configured LLM for the business-interpretation section.
+
+    The prompt is grounded in the ontology context and the Q&A record so the
+    model cannot introduce external facts.
+
+    Args:
+        pack (dict): Loaded ontology pack used to build the model context.
+        qa_items (list[dict]): Question records; only the first 12 are quoted.
+
+    Returns:
+        str | None: Markdown bullet points, or ``None`` when no model is
+        configured or the model call does not succeed.
+
+    Raises:
+        Exception: Propagated from the LLM client or context builder.
+
+    Example:
+        >>> text = _ai_interpretation(pack, qa_items) or "(no model configured)"
+    """
     from modules.llm_client import (
         ConfiguredLLM,
         build_system_prompt,
@@ -489,8 +643,8 @@ def _ai_interpretation(
         context = svc.build_llm_context(pack)
         system = build_system_prompt(context)
         qa_blob = "\n".join(
-            f"Q: {q.get('question','')}\nA: {q.get('answer','')[:600]}"
-            for q in qa_items[:12]
+            f"Q: {q.get('question','')}\nA: {q.get('answer','')[:REPORT_QA_ANSWER_CHARS]}"
+            for q in qa_items[:REPORT_QA_ITEMS]
         )
         prompt = (
             "Based ONLY on the ontology knowledge base and the Q&A record below, write the "
@@ -633,6 +787,38 @@ def build_report(
     actor: str = "system",
     text_only: bool = False,
 ) -> Dict[str, Any]:
+    """Generate a report (Markdown, HTML and PDF) and register it in the database.
+
+    Sections are assembled dynamically from the data that exists, numbered in
+    render order: summary, Q&A, ontology evidence, KPI, charts, ontology graph,
+    analytics, AI interpretation and appendix.
+
+    Args:
+        conn: Open database connection used for loading the pack and auditing.
+        owner_id (int | None): User id owning the report; ``None`` for system.
+        title (str): Report title shown on the cover.
+        scope (str): Report scope label, e.g. ``"session"`` or ``"pack"``.
+        sections (list[str] | None): Sections to include; defaults to
+            summary, qa, evidence, kpi and charts.
+        include_ai (bool): Whether to request the LLM interpretation section.
+        qa_items (list[dict] | None): Q&A records to embed in the report.
+        pack_id (int | None): Ontology pack to use; defaults to the active pack.
+        actor (str): Actor name recorded in the audit log.
+        text_only (bool): Skip all ontology-derived content (no pack data).
+
+    Returns:
+        dict: Report metadata with ``id``, ``uid``, output ``dir`` and the
+        ``md_path``/``html_path``/``pdf_path`` file locations, the included
+        section names and the ``ai_included`` flag.
+
+    Raises:
+        OSError: If the report directory or output files cannot be written.
+
+    Example:
+        >>> info = build_report(conn, owner_id=1, title="Q3 VNB review")
+        >>> info["sections"]
+        ['summary', 'kpi', 'charts', 'appendix']
+    """
     qa_items = qa_items or []
     sections = sections or ["summary", "qa", "evidence", "kpi", "charts"]
     pid = pack_id
@@ -666,14 +852,14 @@ def build_report(
     # KPI cards: first six formatted metrics.
     kpi_cards = [
         {"label": m["label"], "display": _fmt_metric(m["value"], m["fmt"])}
-        for m in metric_rows[:6]
+        for m in metric_rows[:REPORT_METRIC_ROWS]
     ]
 
     # Charts.
     chart_specs, chart_notes = rc.auto_chart_specs(tables_rows)
     chain_nodes, chain_edges = _chain_from_session(pack, qa_items)
 
-    uid = uuid.uuid4().hex[:12]
+    uid = uuid.uuid4().hex[:REPORT_UID_CHARS]
     rdir = os.path.join(REPORTS_ROOT, uid)
     cdir = os.path.join(rdir, "charts")
     os.makedirs(cdir, exist_ok=True)
@@ -705,7 +891,7 @@ def build_report(
                 "label": n.get("label") or n["id"],
                 "grp": n.get("group", ""),
             }
-            for n in pack.get("nodes", [])[:40]
+            for n in pack.get("nodes", [])[:REPORT_GRAPH_NODES]
         ]
         onto_edges = [
             {
@@ -836,11 +1022,11 @@ def build_report(
             "Key figures: "
             + ", ".join(
                 f"**{m['label']} {_fmt_metric(m['value'], m['fmt'])}**"
-                for m in metric_rows[:4]
+                for m in metric_rows[:REPORT_SUMMARY_METRICS]
             )
             + "."
         )
-    for note in chart_notes[:2] if not text_only else []:
+    for note in chart_notes[:REPORT_CHART_NOTES] if not text_only else []:
         clean = re.sub(r"\*\*", "", note)
         takeaways.append(clean)
     if not takeaways:
@@ -889,7 +1075,8 @@ def build_report(
             {
                 "label": e.get("label_en") or e["key"],
                 "layer": e.get("layer", 3),
-                "attrs": ", ".join(attrs[:10]) + (" …" if len(attrs) > 10 else ""),
+                "attrs": ", ".join(attrs[:REPORT_ATTR_LABELS])
+                + (" …" if len(attrs) > REPORT_ATTR_LABELS else ""),
             }
         )
     formula_rows = [
@@ -1025,6 +1212,25 @@ def build_report(
 
 
 def _render_html(md: str, rdir: str, title: str, pack_name: str) -> str:
+    """Render the Markdown report to a self-contained HTML file.
+
+    Every referenced PNG is base64-embedded so the HTML file stands alone.
+
+    Args:
+        md (str): Canonical Markdown report source.
+        rdir (str): Report directory that chart images are resolved against.
+        title (str): Report title used in the HTML ``<title>``.
+        pack_name (str): Ontology pack name shown in the footer.
+
+    Returns:
+        str: Absolute path of the written ``report.html``.
+
+    Raises:
+        OSError: If the HTML file cannot be written.
+
+    Example:
+        >>> _render_html(md, rdir, "Q3 review", "Insurance pack")
+    """
     fragment = md_to_html_fragment(md)
     # base64-embed every referenced PNG -> truly self-contained single file.
     asset_map = {}
@@ -1052,6 +1258,25 @@ def _render_html(md: str, rdir: str, title: str, pack_name: str) -> str:
 def _render_pdf(
     md: str, rdir: str, title: str, kpi_cards: List[Dict[str, str]], pack_name: str
 ) -> str:
+    """Render the Markdown report to a ReportLab PDF with cover and KPI cards.
+
+    Args:
+        md (str): Canonical Markdown report source.
+        rdir (str): Report directory that chart images are resolved against.
+        title (str): Report title shown on the cover page.
+        kpi_cards (list[dict]): KPI cards with ``label`` and ``display`` values.
+        pack_name (str): Ontology pack name printed in the page footer.
+
+    Returns:
+        str: Absolute path of the written ``report.pdf``.
+
+    Raises:
+        OSError: If the PDF file cannot be written.
+        ImportError: If ReportLab or Pillow is not installed.
+
+    Example:
+        >>> _render_pdf(md, rdir, "Q3 review", kpi_cards, "Insurance pack")
+    """
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_LEFT
     from reportlab.lib.pagesizes import A4
@@ -1164,6 +1389,7 @@ def _render_pdf(
     path = os.path.join(rdir, "report.pdf")
 
     def footer(canvas, doc):
+        """Draw the page footer rule, pack name and page number."""
         canvas.saveState()
         canvas.setStrokeColor(colors.HexColor("#E4E7EB"))
         canvas.setLineWidth(0.5)
@@ -1271,6 +1497,7 @@ def _render_pdf(
     story.append(PageBreak())
 
     def image_loader(rel):
+        """Load a report-relative PNG as a size-fitted ReportLab Image flowable."""
         ap = os.path.normpath(os.path.join(rdir, rel))
         if not ap.startswith(rdir) or not os.path.exists(ap):
             return None
@@ -1300,6 +1527,20 @@ def _render_pdf(
 
 
 def _abs(dbrel: str) -> str:
+    """Resolve a database-relative report path, falling back to the bundled copy.
+
+    Args:
+        dbrel (str): Path stored in the ``reports`` table, relative to the data
+            directory.
+
+    Returns:
+        str: Absolute path to the writable data copy, or to the bundled
+        read-only copy when the former does not exist.
+
+    Example:
+        >>> _abs("reports/abc123/report.pdf")
+        '/.../data/reports/abc123/report.pdf'
+    """
     path = os.path.normpath(os.path.join(DATA_ROOT, dbrel))
     if not os.path.exists(path):
         # Reports generated before the deployment (shipped in data/reports/)
@@ -1311,6 +1552,24 @@ def _abs(dbrel: str) -> str:
 
 
 def list_reports(conn, user: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """List reports visible to a user, newest first.
+
+    Admins see every report; other users see only reports they own.
+
+    Args:
+        conn: Open database connection.
+        user (dict): Current user record with ``id`` and ``role``.
+
+    Returns:
+        list[dict]: Report rows joined with the owner username.
+
+    Raises:
+        Exception: Database errors from ``conn.execute`` are propagated.
+
+    Example:
+        >>> list_reports(conn, {"id": 1, "role": "admin"})
+        [{'uid': 'abc123', 'title': 'Q3 review', 'owner': 'alice', ...}]
+    """
     is_admin = user.get("role") == "admin"
     sql = "SELECT r.*, u.username AS owner FROM reports r LEFT JOIN users u ON u.id=r.owner_id"
     args = ()
@@ -1322,6 +1581,24 @@ def list_reports(conn, user: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def get_record(conn, uid: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch one report record and enforce ownership/role access.
+
+    Args:
+        conn: Open database connection.
+        uid (str): Report unique identifier.
+        user (dict): Current user record with ``id`` and ``role``.
+
+    Returns:
+        dict: The report row joined with the owner username.
+
+    Raises:
+        ReportError: If the report does not exist (404) or the user is neither
+            its owner nor an admin (403).
+
+    Example:
+        >>> get_record(conn, "abc123", {"id": 1, "role": "admin"})["title"]
+        'Q3 review'
+    """
     row = conn.execute(
         "SELECT r.*, u.username AS owner FROM reports r LEFT JOIN users u ON u.id=r.owner_id "
         "WHERE uid=?",
@@ -1335,6 +1612,26 @@ def get_record(conn, uid: str, user: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def report_file(conn, uid: str, kind: str, user: Dict[str, Any]) -> str:
+    """Resolve the on-disk path of a report artefact after access checks.
+
+    Args:
+        conn: Open database connection.
+        uid (str): Report unique identifier.
+        kind (str): One of ``"md"``, ``"html"`` or ``"pdf"``.
+        user (dict): Current user record with ``id`` and ``role``.
+
+    Returns:
+        str: Absolute path of the requested artefact.
+
+    Raises:
+        ReportError: If access is denied or the report is unknown (from
+            :func:`get_record`), if ``kind`` is unsupported (400) or the file
+            is missing on disk (404).
+
+    Example:
+        >>> report_file(conn, "abc123", "pdf", {"id": 1, "role": "admin"})
+        '/.../data/reports/abc123/report.pdf'
+    """
     rec = get_record(conn, uid, user)
     col = {"md": "md_path", "html": "html_path", "pdf": "pdf_path"}.get(kind)
     if col is None:
@@ -1346,6 +1643,24 @@ def report_file(conn, uid: str, kind: str, user: Dict[str, Any]) -> str:
 
 
 def delete_report(conn, uid: str, user: Dict[str, Any], actor: str) -> None:
+    """Delete a report record, its output directory and write an audit entry.
+
+    Args:
+        conn: Open database connection.
+        uid (str): Report unique identifier.
+        user (dict): Current user record with ``id`` and ``role``.
+        actor (str): Actor name recorded in the audit log.
+
+    Returns:
+        None: The function deletes in place and returns nothing.
+
+    Raises:
+        ReportError: If access is denied or the report is unknown (from
+            :func:`get_record`).
+
+    Example:
+        >>> delete_report(conn, "abc123", {"id": 1, "role": "admin"}, "alice")
+    """
     rec = get_record(conn, uid, user)
     conn.execute("DELETE FROM reports WHERE id=?", (rec["id"],))
     rdir = os.path.join(REPORTS_ROOT, uid)
