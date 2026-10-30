@@ -23,8 +23,9 @@ so a change in VNB splits, without an unexplained residual, into:
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from common.values import is_num as _is_num, month_label
 
 AGENCY_CHANNEL = "CH001"
 NON_AGENCY_CHANNELS = ("CH002", "CH003")
@@ -52,8 +53,23 @@ TABLE_PURPOSE = {
 
 
 def requirements(data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    """Report whether this pack can power the analytics views and, if not,
-    which of the required monthly tables are missing (used by the UI copy)."""
+    """Report whether this pack can power the analytics views.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        ``available`` plus the ``required_tables``, ``key_columns`` and
+        ``table_purpose`` reference data, the ``present_tables`` list and the
+        ``missing_tables`` list the UI turns into empty-state copy.
+
+    Raises:
+        None: missing tables are reported, never raised.
+
+    Example:
+        >>> requirements({"vnb_monthly": [{"month": "2025-04"}]})["available"]
+        False
+    """
     present = sorted(data.keys())
     missing = [t for t in REQUIRED_TABLES if not _rows(data, t)]
     return {
@@ -78,22 +94,29 @@ _RATEISH = re.compile(r"(rate|ratio|ppt|pct|percent|share|margin)", re.I)
 
 
 def _is_month(v: Any) -> bool:
+    """Whether ``v`` starts with a ``YYYY-MM`` month.
+
+    Args:
+        v: Value to test.
+
+    Returns:
+        ``True`` when the first seven characters form ``YYYY-MM``.
+    """
     return bool(re.fullmatch(r"\d{4}-\d{2}", str(v)[:7]))
 
 
-def _is_num(v: Any) -> bool:
-    try:
-        float(v)
-        return True
-    except (TypeError, ValueError):
-        return False
-
-
 def _month_source(data: Dict[str, List[Dict[str, Any]]]):
-    """The best (table, month_column) pair in this pack, or (None, None).
+    """Find the best (table, month_column) pair in this pack.
 
-    Prefers a `report_month` column over a bare `month`, and a table with more
-    rows over one with fewer, so the pick is stable and meaningful.
+    Prefers a ``report_month`` column over a bare ``month``, and a table with
+    more rows over one with fewer, so the pick is stable and meaningful.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        ``(table_name, month_column)``, or ``(None, None)`` when no table
+        carries recognisable month values.
     """
     best = None
     for tname, rows in data.items():
@@ -110,9 +133,24 @@ def _month_source(data: Dict[str, List[Dict[str, Any]]]):
 
 
 def generic_monthly(data: Dict[str, List[Dict[str, Any]]]) -> Optional[Dict[str, Any]]:
-    """A month-by-month series over whichever table this pack itself treats as
-    monthly, with the numeric columns it can measure. Returns None when the pack
-    has no usable monthly table."""
+    """Build a month-by-month series over the pack's own monthly table.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        ``{"table", "month_column", "months", "labels", "measures", "series",
+        "default_measure"}``, including a derived annualised lapse rate when
+        both the exposure and lapse columns exist, or ``None`` when the pack
+        has no usable monthly table (fewer than two months).
+
+    Raises:
+        None: an unusable pack returns ``None`` instead of raising.
+
+    Example:
+        >>> generic_monthly(data)["months"]
+        ['2025-01', '2025-02', '2025-03']
+    """
     tname, mcol = _month_source(data)
     if not tname:
         return None
@@ -185,6 +223,14 @@ def generic_monthly(data: Dict[str, List[Dict[str, Any]]]) -> Optional[Dict[str,
 # Small helpers
 # --------------------------------------------------------------------------- #
 def _num(v: Any) -> float:
+    """Coerce ``v`` to a float, treating blanks and bad values as ``0.0``.
+
+    Args:
+        v: Value to convert.
+
+    Returns:
+        The numeric value, or ``0.0`` when it cannot be parsed.
+    """
     try:
         if v is None or v == "":
             return 0.0
@@ -194,104 +240,156 @@ def _num(v: Any) -> float:
 
 
 def _rows(data: Dict[str, List[Dict[str, Any]]], key: str) -> List[Dict[str, Any]]:
+    """Return the rows for table ``key``, defaulting to an empty list.
+
+    Args:
+        data: Computed table rows keyed by table key.
+        key: Table key to read.
+
+    Returns:
+        The table's rows, or ``[]`` when the table is absent or ``None``.
+    """
     return data.get(key, []) or []
 
 
 def _month_key(v: Any) -> str:
-    """Normalise an Excel/pandas date or 'YYYY-MM-DD' string to YYYY-MM."""
+    """Normalise an Excel/pandas date or ``'YYYY-MM-DD'`` string to ``YYYY-MM``.
+
+    Args:
+        v: Raw date or month value.
+
+    Returns:
+        The first seven characters of the value (``""`` for ``None``, the whole
+        value when shorter than seven characters).
+    """
     if v is None:
         return ""
     s = str(v)[:10]
     return s[:7] if len(s) >= 7 else s
 
 
-def month_label(m: str) -> str:
-    """'2025-06' -> 'Jun 2025'."""
-    names = [
-        "",
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-    ]
-    try:
-        y, mo = m.split("-")
-        return f"{names[int(mo)]} {y}"
-    except (ValueError, IndexError):
-        return m
-
-
 def sorted_months(rows: List[Dict[str, Any]]) -> List[str]:
-    months = sorted(
+    """List the distinct months present in ``rows``, ascending.
+
+    Args:
+        rows: Rows carrying a ``month`` column.
+
+    Returns:
+        Distinct month keys in ``YYYY-MM`` form, sorted ascending.
+
+    Raises:
+        None: rows without a month are skipped.
+
+    Example:
+        >>> sorted_months([{"month": "2025-02"}, {"month": "2025-01"}])
+        ['2025-01', '2025-02']
+    """
+    return sorted(
         {_month_key(r.get("month")) for r in rows if r.get("month") is not None}
     )
-    return months
 
 
 # --------------------------------------------------------------------------- #
 # Company + channel time series
 # --------------------------------------------------------------------------- #
 def company_series(data: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-    out = []
-    for r in _rows(data, "vnb_monthly"):
-        out.append(
-            {
-                "month": _month_key(r.get("month")),
-                "label": month_label(_month_key(r.get("month"))),
-                "total_ape": _num(r.get("total_ape")),
-                "total_vnb": _num(r.get("total_vnb")),
-                "margin": _num(r.get("total_margin")),
-                "agency_ape": _num(r.get("agency_ape")),
-                "agency_vnb": _num(r.get("agency_vnb")),
-                "agency_share": _num(r.get("agency_share")),
-                "mom_vnb": _num(r.get("mom_vnb")),
-                "agency_mom": _num(r.get("agency_mom")),
-                "agency_contrib": _num(r.get("agency_contrib")),
-                "narrative": str(r.get("narrative") or ""),
-            }
-        )
+    """Build the company-level monthly series from ``vnb_monthly``.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        One dict per month with totals, margin, agency figures, MoM values,
+        agency contribution and narrative, sorted by month. Empty when the
+        table is absent.
+
+    Raises:
+        None: a missing table yields an empty series.
+
+    Example:
+        >>> company_series(data)[-1]["total_vnb"] > 0
+        True
+    """
+    out = [
+        {
+            "month": _month_key(r.get("month")),
+            "label": month_label(_month_key(r.get("month"))),
+            "total_ape": _num(r.get("total_ape")),
+            "total_vnb": _num(r.get("total_vnb")),
+            "margin": _num(r.get("total_margin")),
+            "agency_ape": _num(r.get("agency_ape")),
+            "agency_vnb": _num(r.get("agency_vnb")),
+            "agency_share": _num(r.get("agency_share")),
+            "mom_vnb": _num(r.get("mom_vnb")),
+            "agency_mom": _num(r.get("agency_mom")),
+            "agency_contrib": _num(r.get("agency_contrib")),
+            "narrative": str(r.get("narrative") or ""),
+        }
+        for r in _rows(data, "vnb_monthly")
+    ]
     out.sort(key=lambda x: x["month"])
     return out
 
 
 def channel_series(data: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-    out = []
-    for r in _rows(data, "channel_monthly"):
-        out.append(
-            {
-                "month": _month_key(r.get("month")),
-                "label": month_label(_month_key(r.get("month"))),
-                "channel_id": str(r.get("channel_id") or ""),
-                "channel_name": str(r.get("channel_name") or ""),
-                "registered": _num(r.get("registered")),
-                "active": _num(r.get("active")),
-                "active_ratio": _num(r.get("active_ratio")),
-                "avg_prod": _num(r.get("avg_prod")),
-                "ape": _num(r.get("ape")),
-                "margin": _num(r.get("margin")),
-                "vnb": _num(r.get("vnb")),
-                "mom_vnb": _num(r.get("mom_vnb")),
-            }
-        )
+    """Build the channel-level monthly series from ``channel_monthly``.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        One dict per month/channel with headcount, productivity, APE, margin and
+        VNB, sorted by ``(month, channel_id)``. Empty when the table is absent.
+
+    Raises:
+        None: a missing table yields an empty series.
+
+    Example:
+        >>> channel_series(data)[0]["channel_id"]
+        'CH001'
+    """
+    out = [
+        {
+            "month": _month_key(r.get("month")),
+            "label": month_label(_month_key(r.get("month"))),
+            "channel_id": str(r.get("channel_id") or ""),
+            "channel_name": str(r.get("channel_name") or ""),
+            "registered": _num(r.get("registered")),
+            "active": _num(r.get("active")),
+            "active_ratio": _num(r.get("active_ratio")),
+            "avg_prod": _num(r.get("avg_prod")),
+            "ape": _num(r.get("ape")),
+            "margin": _num(r.get("margin")),
+            "vnb": _num(r.get("vnb")),
+            "mom_vnb": _num(r.get("mom_vnb")),
+        }
+        for r in _rows(data, "channel_monthly")
+    ]
     out.sort(key=lambda x: (x["month"], x["channel_id"]))
     return out
 
 
-def _channel_row(
-    series: List[Dict[str, Any]], month: str, cid: str
-) -> Optional[Dict[str, Any]]:
+def _channel_index(
+    series: List[Dict[str, Any]],
+) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """Index channel rows by ``(month, channel_id)`` for O(1) lookups.
+
+    Args:
+        series: Rows from :func:`channel_series`.
+
+    Returns:
+        A mapping keyed by ``(month, channel_id)``. When a pair is duplicated,
+        the first occurrence wins (matching the previous linear scan).
+
+    Example:
+        >>> index = _channel_index(channel_series(data))
+        >>> index[("2025-04", "CH001")]["vnb"]
+        12.5
+    """
+    index: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for r in series:
-        if r["month"] == month and r["channel_id"] == cid:
-            return r
-    return None
+        index.setdefault((r["month"], r["channel_id"]), r)
+    return index
 
 
 # --------------------------------------------------------------------------- #
@@ -300,7 +398,16 @@ def _channel_row(
 def _channel_factor(prev: Dict[str, Any], cur: Dict[str, Any]) -> Dict[str, float]:
     """Decompose one channel's delta VNB into agents / productivity / margin.
 
-    VNB = A x P/1000 x M  (sequential factor substitution; effects sum exactly).
+    ``VNB = A x P/1000 x M`` with sequential factor substitution, so the three
+    effects sum exactly to ``delta_vnb``.
+
+    Args:
+        prev: Previous month's channel row.
+        cur: Current month's channel row.
+
+    Returns:
+        ``agent_effect``, ``productivity_effect``, ``mix_effect``,
+        ``delta_vnb`` and ``check`` (the sum of the three effects).
     """
     a0, a1 = _num(prev["active"]), _num(cur["active"])
     p0, p1 = _num(prev["avg_prod"]), _num(cur["avg_prod"])
@@ -321,10 +428,49 @@ def mom_attribution(
     data: Dict[str, List[Dict[str, Any]]],
     month: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Attribute the chosen month's VNB movement versus the prior month."""
+    """Attribute the chosen month's VNB movement versus the prior month.
+
+    Args:
+        data: Computed table rows keyed by table key.
+        month: Month in ``YYYY-MM`` form; defaults to the latest available.
+
+    Returns:
+        The month pair and labels, company VNB totals, the aggregate
+        ``factors``, per-channel decompositions and the agency channel row, or
+        ``None`` when there are fewer than two months, the month is unknown, or
+        it is the first month.
+
+    Raises:
+        None: unusable input returns ``None`` instead of raising.
+
+    Example:
+        >>> mom_attribution(data)["month"]
+        '2025-04'
+    """
     cs = channel_series(data)
     comp = company_series(data)
     months = sorted_months(_rows(data, "vnb_monthly"))
+    return _mom_attribution(comp, cs, months, month)
+
+
+def _mom_attribution(
+    comp: List[Dict[str, Any]],
+    cs: List[Dict[str, Any]],
+    months: List[str],
+    month: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Attribute the chosen month's VNB movement from precomputed series.
+
+    Args:
+        comp: Rows from :func:`company_series`.
+        cs: Rows from :func:`channel_series`.
+        months: Ascending month keys from :func:`sorted_months`.
+        month: Month in ``YYYY-MM`` form; defaults to the latest available.
+
+    Returns:
+        The same payload as :func:`mom_attribution`, or ``None`` when there are
+        fewer than two months, the month is unknown, or it is the first month.
+    """
     if len(months) < 2:
         return None
     cur_month = month or months[-1]
@@ -336,6 +482,7 @@ def mom_attribution(
     prev_month = months[idx - 1]
 
     channels = sorted({r["channel_id"] for r in cs})
+    index = _channel_index(cs)
     per_channel = []
     totals = {
         "agent_effect": 0.0,
@@ -344,8 +491,8 @@ def mom_attribution(
         "delta_vnb": 0.0,
     }
     for cid in channels:
-        p = _channel_row(cs, prev_month, cid)
-        c = _channel_row(cs, cur_month, cid)
+        p = index.get((prev_month, cid))
+        c = index.get((cur_month, cid))
         if not p or not c:
             continue
         f = _channel_factor(p, c)
@@ -385,6 +532,23 @@ def mom_attribution(
 # Agent-level analytics (latest month)
 # --------------------------------------------------------------------------- #
 def agent_stats(data: Dict[str, List[Dict[str, Any]]]) -> Optional[Dict[str, Any]]:
+    """Summarise the latest month's agent population.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        ``month``, ``label``, registered/active counts and ratio, the per-channel
+        summary, churn-risk / certification / status counts, tenure buckets and
+        ``master_count``, or ``None`` when ``agent_monthly`` has no rows.
+
+    Raises:
+        None: an empty table returns ``None`` instead of raising.
+
+    Example:
+        >>> agent_stats(data)["total_active"]
+        128
+    """
     monthly = _rows(data, "agent_monthly")
     master = _rows(data, "agent_master")
     if not monthly:
@@ -394,6 +558,16 @@ def agent_stats(data: Dict[str, List[Dict[str, Any]]]) -> Optional[Dict[str, Any
     cur = [r for r in monthly if _month_key(r.get("month")) == latest]
 
     def _counts(rows: List[Dict[str, Any]], field: str) -> Dict[str, int]:
+        """Count rows by the value of ``field``, most frequent first.
+
+        Args:
+            rows: Rows to count.
+            field: Column whose values form the groups; blanks become
+                ``"Unknown"``.
+
+        Returns:
+            Mapping of value to count, sorted descending by count.
+        """
         out: Dict[str, int] = {}
         for r in rows:
             k = str(r.get(field) or "Unknown")
@@ -467,20 +641,62 @@ def run_scenario(
     Holds non-Agency (Banca + Brokerage) VNB flat at the latest month, so the
     Agency channel must deliver the residual. The current Agency weighted
     margin is assumed unchanged (mix lever reported separately).
+
+    Args:
+        data: Computed table rows keyed by table key.
+        multiplier: Target as a multiple of the current total VNB (clamped to at
+            least ``1.0``; defaults to doubling).
+        planned_active: Planned Agency headcount for the productivity lever;
+            defaults to the current headcount.
+
+    Returns:
+        The target month and totals, the required Agency VNB/APE, and both
+        levers (``lever_productivity`` and ``lever_headcount``), or ``None``
+        when the company or channel series is empty or the agency channel is
+        missing.
+
+    Raises:
+        None: unusable input returns ``None`` instead of raising.
+
+    Example:
+        >>> run_scenario(data, 2.0)["required_agency_vnb"] > 0
+        True
     """
     comp = company_series(data)
     cs = channel_series(data)
+    return _run_scenario(comp, cs, multiplier, planned_active)
+
+
+def _run_scenario(
+    comp: List[Dict[str, Any]],
+    cs: List[Dict[str, Any]],
+    multiplier: float = 2.0,
+    planned_active: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Back-solve the effort needed to reach a target VNB from precomputed series.
+
+    Args:
+        comp: Rows from :func:`company_series`.
+        cs: Rows from :func:`channel_series`.
+        multiplier: Target as a multiple of the current total VNB.
+        planned_active: Planned Agency headcount; defaults to the current count.
+
+    Returns:
+        The same payload as :func:`run_scenario`, or ``None`` when either series
+        is empty or the agency channel is missing that month.
+    """
     if not comp or not cs:
         return None
     latest = comp[-1]
     cur_month = latest["month"]
-    agency = _channel_row(cs, cur_month, AGENCY_CHANNEL)
+    index = _channel_index(cs)
+    agency = index.get((cur_month, AGENCY_CHANNEL))
     if not agency:
         return None
 
     multiplier = max(1.0, _num(multiplier) or 2.0)
     non_agency_vnb = sum(
-        (_channel_row(cs, cur_month, cid) or {}).get("vnb", 0.0)
+        (index.get((cur_month, cid)) or {}).get("vnb", 0.0)
         for cid in NON_AGENCY_CHANNELS
     )
     current_total = latest["total_vnb"]
@@ -537,15 +753,35 @@ def run_scenario(
 # Roll-up used by the dashboard and template context
 # --------------------------------------------------------------------------- #
 def overview(data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """Assemble every dashboard block in one call.
+
+    Args:
+        data: Computed table rows keyed by table key.
+
+    Returns:
+        ``months``, the latest month and label, and the ``company``,
+        ``channels``, ``attribution``, ``agents`` and ``scenario`` blocks (each
+        ``None`` or empty when its data is unavailable).
+
+    Raises:
+        None: absent tables produce empty blocks instead of errors.
+
+    Example:
+        >>> overview(data)["latest_month"]
+        '2025-04'
+    """
     comp = company_series(data)
+    cs = channel_series(data)
     latest = comp[-1] if comp else None
     return {
         "months": [c["month"] for c in comp],
         "latest_month": latest["month"] if latest else "",
         "latest_label": latest["label"] if latest else "",
         "company": comp,
-        "channels": channel_series(data),
-        "attribution": mom_attribution(data),
+        "channels": cs,
+        "attribution": _mom_attribution(
+            comp, cs, sorted_months(_rows(data, "vnb_monthly"))
+        ),
         "agents": agent_stats(data),
-        "scenario": run_scenario(data),
+        "scenario": _run_scenario(comp, cs),
     }

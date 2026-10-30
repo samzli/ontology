@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import math
 import re
@@ -22,18 +21,20 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
+from common.exceptions import UploadError
+from common.io_utils import (
+    _basename,
+    _stem,
+    list_items,
+    list_sheets,
+    parse_data_file,
+    parse_item,
+)
 from modules import admin_service as adm
 from modules import ontology_service as svc
 from modules.config import ALLOWED_UPLOAD_EXT, UPLOAD_MAX_MB
+from modules.constants import IMPORT_MAX_ERRORS, IMPORT_PREVIEW_ROWS
 from modules.db import get_conn
-
-
-class UploadError(Exception):
-    def __init__(self, message: str, status_code: int = 400):
-        super().__init__(message)
-        self.message = message
-        self.status_code = status_code
-
 
 # ---------------------------------------------------------------------------
 # Upload guards
@@ -41,6 +42,24 @@ class UploadError(Exception):
 
 
 def validate_upload(filename: str, size_bytes: int) -> str:
+    """Validate an upload's file name and size against the configured guards.
+
+    Args:
+        filename: Client-supplied file name (a basename, no directories).
+        size_bytes: Payload size in bytes.
+
+    Returns:
+        str: The normalised lowercase extension, e.g. ``"csv"``.
+
+    Raises:
+        UploadError: If the name is unsafe or has no extension or an
+            unsupported one (400), or if the file exceeds ``UPLOAD_MAX_MB``
+            (413).
+
+    Example:
+        >>> validate_upload("sales.csv", 1024)
+        'csv'
+    """
     max_mb = UPLOAD_MAX_MB
     allowed = {e.lower().lstrip(".") for e in ALLOWED_UPLOAD_EXT}
     # Basename only — defeats path traversal in stored filenames.
@@ -64,90 +83,31 @@ def validate_upload(filename: str, size_bytes: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Parsing
+# Parsing  —  pure file I/O helpers live in :mod:`common.io_utils` (imported above)
 # ---------------------------------------------------------------------------
 
 
-def _read_csv(content: bytes) -> pd.DataFrame:
-    last_err: Optional[Exception] = None
-    for enc in ("utf-8-sig", "utf-8", "gbk", "gb18030", "latin-1"):
-        try:
-            return pd.read_csv(
-                io.BytesIO(content), encoding=enc, dtype=str, keep_default_na=False
-            )
-        except (UnicodeDecodeError, UnicodeError) as e:
-            last_err = e
-    raise UploadError(f"Could not decode CSV file: {last_err}")
-
-
-def _excel_engine(filename: str) -> Optional[str]:
-    """openpyxl for .xlsx; None lets pandas pick for the legacy .xls path."""
-    return "openpyxl" if filename.rsplit(".", 1)[-1].lower() == "xlsx" else None
-
-
-def list_sheets(filename: str, content: bytes) -> List[str]:
-    """Sheet names of a workbook, in workbook order; empty for non-workbooks."""
-    ext = filename.rsplit(".", 1)[-1].lower()
-    if ext not in ("xlsx", "xls"):
-        return []
-    try:
-        xls = pd.ExcelFile(io.BytesIO(content), engine=_excel_engine(filename))
-        return [str(s) for s in xls.sheet_names]
-    except Exception as e:
-        raise UploadError(f"Failed to read sheets from '{filename}': {e}")
-
-
-def _resolve_sheet(filename: str, content: bytes, sheet: Any) -> Any:
-    """Validate the requested sheet and return a pandas ``sheet_name`` value.
-
-    Accepts a sheet name or a zero-based index (as a string); defaults to the
-    first sheet. Unknown sheets fail with the list of available names so the
-    caller can retry — this is what powers the sheet picker in the UI.
-    """
-    sheets = list_sheets(filename, content)
-    if not sheets:
-        return 0
-    wanted = str(sheet).strip() if sheet not in (None, "") else ""
-    if not wanted:
-        return sheets[0]
-    if wanted in sheets:
-        return wanted
-    if wanted.isdigit() and 0 <= int(wanted) < len(sheets):
-        return int(wanted)
-    raise UploadError(
-        f"Sheet '{wanted}' not found in '{filename}'. "
-        f"Available sheets: {', '.join(sheets)}"
-    )
-
-
-def parse_data_file(filename: str, content: bytes, sheet: Any = None) -> pd.DataFrame:
-    """Parse a CSV/XLSX/XLS/JSON file. ``sheet`` selects a workbook tab (name or
-    zero-based index); it defaults to the first sheet."""
-    ext = filename.rsplit(".", 1)[-1].lower()
-    try:
-        if ext == "csv":
-            df = _read_csv(content)
-        elif ext == "json":
-            df = _read_json_records(content)
-        elif ext in ("xlsx", "xls"):
-            df = pd.read_excel(
-                io.BytesIO(content),
-                engine=_excel_engine(filename),
-                dtype=str,
-                keep_default_na=False,
-                sheet_name=_resolve_sheet(filename, content, sheet),
-            )
-        else:
-            raise UploadError(f"Unsupported data file type '.{ext}'.")
-    except UploadError:
-        raise
-    except Exception as e:
-        raise UploadError(f"Failed to parse '{filename}': {e}")
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
-
-
 def parse_question_file(filename: str, content: bytes) -> List[Dict[str, str]]:
+    """Parse a TXT / CSV / XLSX question list into question records.
+
+    TXT files yield one question per non-comment line; tabular files map a
+    ``question``-like column (falling back to the first column) and an optional
+    ``categ``-like column.
+
+    Args:
+        filename: File name; its extension selects the parser.
+        content: Raw file bytes.
+
+    Returns:
+        List[Dict[str, str]]: Records with ``question`` and ``category`` keys.
+
+    Raises:
+        UploadError: For unsupported types, undecodable text or parse failures.
+
+    Example:
+        >>> parse_question_file("q.txt", b"What is VNB?\\n# skip me")
+        [{'question': 'What is VNB?', 'category': ''}]
+    """
     ext = filename.rsplit(".", 1)[-1].lower()
     if ext == "txt":
         text = None
@@ -191,13 +151,36 @@ def parse_question_file(filename: str, content: bytes) -> List[Dict[str, str]]:
 
 
 def _norm_header(h: str) -> str:
+    """Lowercase a header and collapse non-alphanumeric runs to single spaces.
+
+    Args:
+        h: Raw header text.
+
+    Returns:
+        str: Normalised comparison key.
+    """
     return re.sub(r"[^a-z0-9]+", " ", str(h).lower()).strip()
 
 
 def guess_column_mapping(
     headers: List[str], columns_spec: List[Dict[str, Any]]
 ) -> Dict[str, str]:
-    """Map uploaded header -> instance column key. Derived columns excluded."""
+    """Map uploaded header -> instance column key. Derived columns excluded.
+
+    Exact (normalised) matches win; otherwise a containment match on key or
+    label is used for headers of at least three characters.
+
+    Args:
+        headers: Headers as found in the uploaded file.
+        columns_spec: Instance column specs (``key`` / ``label`` / ``expression``).
+
+    Returns:
+        Dict[str, str]: Uploaded header -> instance column key.
+
+    Example:
+        >>> guess_column_mapping(["Total APE"], [{"key": "total_ape"}])
+        {'Total APE': 'total_ape'}
+    """
     mapping: Dict[str, str] = {}
     targets = [c for c in columns_spec if not c.get("expression")]
     for h in headers:
@@ -237,6 +220,19 @@ def parse_mapping(raw: str) -> Optional[Dict[str, str]]:
 
     Returns ``None`` when absent/empty so the caller falls back to the guessed
     mapping; raises a 422 ``UploadError`` for malformed input.
+
+    Args:
+        raw: Raw JSON string from the upload form.
+
+    Returns:
+        Optional[Dict[str, str]]: Header -> column-key mapping, or ``None``.
+
+    Raises:
+        UploadError: With status 422 when the JSON is malformed or not an object.
+
+    Example:
+        >>> parse_mapping('{"Total APE": "total_ape"}')
+        {'Total APE': 'total_ape'}
     """
     if not raw or not str(raw).strip():
         return None
@@ -259,6 +255,20 @@ def apply_mapping_override(
 
     An override value is an instance column key; an empty value or
     :data:`IGNORE_COLUMN` drops that header, and unknown keys are ignored.
+
+    Args:
+        mapping: Mapping guessed from the headers; updated in place.
+        headers: Headers present in the uploaded file.
+        columns_spec: Instance column specs; derived columns are not valid targets.
+        override: Optional manual header -> column-key mapping.
+
+    Returns:
+        Dict[str, str]: The effective mapping (same object as ``mapping``).
+
+    Example:
+        >>> apply_mapping_override({}, ["Total APE"], specs,
+        ...                        {"Total APE": "total_ape"})
+        {'Total APE': 'total_ape'}
     """
     if not override:
         return mapping
@@ -275,6 +285,21 @@ def apply_mapping_override(
 
 
 def _coerce(raw: Any, spec: Dict[str, Any]) -> Any:
+    """Convert one raw cell value to the column's declared data type.
+
+    Blank / placeholder values become ``None``; numbers accept thousands
+    separators, currency symbols, ``%`` and ``K``/``M``/``B`` suffixes.
+
+    Args:
+        raw: Raw cell value from the parsed file.
+        spec: Column spec carrying ``data_type`` and optional ``fmt``.
+
+    Returns:
+        Any: ``None``, a stripped string, or an int / rounded float.
+
+    Raises:
+        ValueError: If the value is not numeric, or not integral for INTEGER.
+    """
     if raw is None:
         return None
     s = str(raw).strip()
@@ -306,6 +331,21 @@ def _coerce(raw: Any, spec: Dict[str, Any]) -> Any:
 def validate_rows(
     df: pd.DataFrame, mapping: Dict[str, str], columns_spec: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
+    """Validate every data row against types, enums and required columns.
+
+    Args:
+        df: Parsed data frame (header row counted as row 1).
+        mapping: Effective header -> column-key mapping.
+        columns_spec: Instance column specs (type / enum_values / required).
+
+    Returns:
+        Dict[str, Any]: Report with totals, per-row errors (first 50), valid
+        rows, a 10-row preview and mapping diagnostics.
+
+    Example:
+        >>> validate_rows(df, mapping, specs)["valid_count"]
+        237
+    """
     spec_by_key = {c["key"]: c for c in columns_spec}
     enum_by_key = {}
     for c in columns_spec:
@@ -360,9 +400,9 @@ def validate_rows(
         "total": int(len(df)),
         "valid_count": len(valid_rows),
         "error_count": len(errors),
-        "errors": errors[:50],
+        "errors": errors[:IMPORT_MAX_ERRORS],
         "rows": valid_rows,
-        "preview": valid_rows[:10],
+        "preview": valid_rows[:IMPORT_PREVIEW_ROWS],
         "mapping": mapping,
         "unmapped_headers": unmapped,
         "missing_required_columns": required_missing_cols,
@@ -370,7 +410,18 @@ def validate_rows(
 
 
 def _table_spec(conn, table_id: int) -> Tuple[Any, List[Dict[str, Any]]]:
-    """Target table row + its (non-derived) column specs, or 404."""
+    """Target table row + its (non-derived) column specs, or 404.
+
+    Args:
+        conn: Open database connection.
+        table_id: Instance table id to look up.
+
+    Returns:
+        Tuple[Any, List[Dict[str, Any]]]: The table row and its column specs.
+
+    Raises:
+        UploadError: With status 404 when the table does not exist.
+    """
     tbl = conn.execute("SELECT * FROM pack_tables WHERE id=?", (table_id,)).fetchone()
     if tbl is None:
         raise UploadError("Target table not found.", 404)
@@ -395,6 +446,26 @@ def analyse_upload(
 
     This is the single pipeline shared by the preview and commit steps, so the
     two can never drift apart.
+
+    Args:
+        conn: Open database connection.
+        table_id: Target instance table id.
+        filename: Uploaded file name.
+        content: Raw file bytes.
+        sheet: Optional workbook sheet name or index.
+        mapping_override: Optional manual header -> column-key mapping.
+
+    Returns:
+        Tuple[pd.DataFrame, Dict[str, Any]]: Parsed frame and the validation
+        report enriched with table / sheet / column display metadata.
+
+    Raises:
+        UploadError: If the table is missing or the file cannot be parsed.
+
+    Example:
+        >>> df, report = analyse_upload(conn, 3, "sales.csv", raw_bytes)
+        >>> report["valid_count"]
+        120
     """
     tbl, columns_spec = _table_spec(conn, table_id)
     sheets = list_sheets(filename, content)
@@ -435,7 +506,26 @@ def preview_upload(
     sheet: Any = None,
     mapping_override: Optional[Dict[str, str]] = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Full parse+validate pipeline for the dry-run step. Writes nothing."""
+    """Full parse+validate pipeline for the dry-run step. Writes nothing.
+
+    Args:
+        table_id: Target instance table id.
+        filename: Uploaded file name.
+        content: Raw file bytes.
+        sheet: Optional workbook sheet name or index.
+        mapping_override: Optional manual header -> column-key mapping.
+
+    Returns:
+        Tuple[pd.DataFrame, Dict[str, Any]]: Parsed frame and validation report.
+
+    Raises:
+        UploadError: If the table is missing or the file cannot be parsed.
+
+    Example:
+        >>> df, report = preview_upload(3, "sales.csv", raw_bytes)
+        >>> report["error_count"]
+        0
+    """
     with get_conn() as conn:
         return analyse_upload(
             conn, table_id, filename, content, sheet, mapping_override
@@ -452,7 +542,30 @@ def commit_upload(
     sheet: Any = None,
     mapping_override: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """Atomic commit: a single bad row aborts the whole upload."""
+    """Atomic commit: a single bad row aborts the whole upload.
+
+    Args:
+        conn: Open database connection.
+        actor: User or system identity recorded in the audit trail.
+        table_id: Target instance table id.
+        dataset_name: Dataset name; falls back to the file name.
+        filename: Uploaded file name.
+        content: Raw file bytes.
+        sheet: Optional workbook sheet name or index.
+        mapping_override: Optional manual header -> column-key mapping.
+
+    Returns:
+        Dict[str, Any]: Dataset id, imported row count, mapping, unmapped
+        headers and the sheet used.
+
+    Raises:
+        UploadError: When any row is invalid, when the file yields no rows, or
+            when the file cannot be parsed.
+
+    Example:
+        >>> commit_upload(conn, "alice", 3, "FY25 sales", "sales.csv", raw_bytes)
+        {'dataset_id': 12, 'rows': 120, ...}
+    """
     _, report = analyse_upload(
         conn, table_id, filename, content, sheet, mapping_override
     )
@@ -490,83 +603,8 @@ def commit_upload(
 NEW_TARGET = "__new__"
 
 
-def _basename(name: Any) -> str:
-    """Strip any directory part (folder uploads send relative paths)."""
-    return str(name).replace("\\", "/").rsplit("/", 1)[-1].strip()
-
-
-def _stem(filename: Any) -> str:
-    base = _basename(filename)
-    return base.rsplit(".", 1)[0] if "." in base else base
-
-
-def list_items(filename: str, content: bytes) -> List[str]:
-    """Expand one uploaded file into its importable items.
-
-    A workbook yields one item per sheet (in workbook order); CSV and JSON
-    yield a single item named after the file. Keeping items separate is what
-    lets one request carry many sheets or many files without mixing them up.
-    """
-    base = _basename(filename)
-    ext = base.rsplit(".", 1)[-1].lower() if "." in base else ""
-    if ext in ("xlsx", "xls"):
-        return list_sheets(base, content)
-    return [_stem(base)]
-
-
-def _read_json_records(content: bytes) -> pd.DataFrame:
-    """Parse a data-shaped JSON file into a flat table.
-
-    Accepts a top-level array of objects, or an object carrying a
-    ``records`` / ``data`` / ``rows`` array. An ontology-shaped document
-    (one that contains ``entities``) is rejected with a pointer to the
-    'Import pack' entry instead.
-    """
-    text = None
-    for enc in ("utf-8-sig", "utf-8", "gbk", "gb18030", "latin-1"):
-        try:
-            text = content.decode(enc)
-            break
-        except (UnicodeDecodeError, UnicodeError):
-            continue
-    if text is None:
-        raise UploadError("Could not decode JSON file.")
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as e:
-        raise UploadError(f"Invalid JSON: {e}")
-    if isinstance(data, dict) and ("entities" in data or "node_types" in data):
-        raise UploadError(
-            "This JSON is an ontology definition, not tabular data — import it "
-            "through 'Import pack' (Ontology governance) instead."
-        )
-    records: Any = data
-    if isinstance(data, dict):
-        for k in ("records", "data", "rows"):
-            if isinstance(data.get(k), list):
-                records = data[k]
-                break
-        else:
-            records = [data]
-    if not isinstance(records, list) or not records:
-        raise UploadError(
-            "JSON must be a non-empty array of records, or an object with a "
-            "'records'/'data'/'rows' array."
-        )
-    if not all(isinstance(r, dict) for r in records):
-        raise UploadError("Every JSON record must be a key/value object.")
-    df = pd.DataFrame(records).fillna("").astype(str)
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
-
-
-def parse_item(filename: str, content: bytes, item: Any) -> pd.DataFrame:
-    """Parse one item: a workbook sheet, or a whole CSV / JSON file."""
-    base = _basename(filename)
-    ext = base.rsplit(".", 1)[-1].lower() if "." in base else ""
-    if ext not in ("csv", "xlsx", "xls", "json"):
-        raise UploadError(f"Unsupported data file type '.{ext}'.")
-    return parse_data_file(base, content, item)
+# The batch I/O helpers (_basename, _stem, list_items, _read_json_records,
+# parse_item) live in :mod:`common.io_utils` (imported at the top of this file).
 
 
 def _column_type(values: List[Any]) -> str:
@@ -633,7 +671,18 @@ def _infer_new_table(df: pd.DataFrame, label: str) -> Dict[str, Any]:
 
 def _plan_index(plan: Any) -> Dict[Tuple[str, str], Dict[str, Any]]:
     """Normalise a client plan (list of ``{file,item,target,mapping,skip}``,
-    or its raw JSON string) into a lookup keyed by ``(basename, item)``."""
+    or its raw JSON string) into a lookup keyed by ``(basename, item)``.
+
+    Args:
+        plan: Parsed plan list or raw JSON string.
+
+    Returns:
+        Dict[Tuple[str, str], Dict[str, Any]]: Plan entries keyed by
+        ``(file basename, item name)``.
+
+    Raises:
+        UploadError: With status 422 when the JSON string is malformed.
+    """
     items = plan
     if isinstance(plan, str) and plan.strip():
         try:
@@ -649,6 +698,15 @@ def _plan_index(plan: Any) -> Dict[Tuple[str, str], Dict[str, Any]]:
 
 
 def _empty_item(file: str, item: str = "") -> Dict[str, Any]:
+    """Build a blank per-item report used for skipped or unparsable items.
+
+    Args:
+        file: File name the item belongs to.
+        item: Item (sheet) name; empty for a whole-file item.
+
+    Returns:
+        Dict[str, Any]: Report dict with all counters zeroed and lists empty.
+    """
     return {
         "file": file,
         "item": item,
@@ -676,7 +734,20 @@ def _analyse_one(
     tables: List[Dict[str, Any]],
     overrides: Dict[Tuple[str, str], Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Route + map + validate a single item. Writes nothing."""
+    """Route + map + validate a single item. Writes nothing.
+
+    Args:
+        conn: Open database connection.
+        pack_id: Pack that owns the candidate tables.
+        filename: Uploaded file name.
+        content: Raw file bytes.
+        item: Item (sheet) name being analysed.
+        tables: Existing pack tables used for name-based routing.
+        overrides: Plan entries keyed by ``(file, item)``.
+
+    Returns:
+        Dict[str, Any]: Per-item report (target, mapping, errors, valid rows).
+    """
     ov = overrides.get((filename, item)) or overrides.get((filename, "")) or {}
     report = _empty_item(filename, item)
     report["skip"] = bool(ov.get("skip"))
@@ -750,6 +821,20 @@ def analyse_batch(
     Every file is expanded into items; each item is routed to an existing
     pack table by name (or marked as a table to be created), then mapped and
     validated. ``files`` is a list of ``{"filename": str, "content": bytes}``.
+
+    Args:
+        conn: Open database connection.
+        pack_id: Pack that owns (or will own) the target tables.
+        files: Files to analyse, each with ``filename`` and ``content``.
+        plan: Optional client plan (list or raw JSON) routing items to targets.
+        with_rows: When ``True``, keep validated rows in each item report.
+
+    Returns:
+        Dict[str, Any]: Existing tables, per-item reports and an ``ok`` flag.
+
+    Example:
+        >>> analyse_batch(conn, 1, [{"filename": "a.csv", "content": raw}])["ok"]
+        True
     """
     tables = adm.list_tables(conn, pack_id)
     overrides = _plan_index(plan)
@@ -801,6 +886,25 @@ def commit_batch(
     (nothing is written) — the same 'one bad row aborts all' contract the
     single-file upload uses. New tables get a matching ontology entity and
     attributes so the pack stays internally consistent.
+
+    Args:
+        conn: Open database connection.
+        actor: User or system identity recorded in the audit trail.
+        pack_id: Pack that owns (or will own) the target tables.
+        files: Files to import, each with ``filename`` and ``content``.
+        plan: Optional client plan (list or raw JSON) routing items to targets.
+
+    Returns:
+        Dict[str, Any]: Per-item results, created tables and the total row count.
+
+    Raises:
+        UploadError: If every item was skipped, or if any item could not be
+            parsed, had invalid rows or had no rows; nothing is written then.
+
+    Example:
+        >>> commit_batch(conn, "system", 1, [{"filename": "a.csv",
+        ...                                  "content": raw}])["rows_total"]
+        120
     """
     analysis = analyse_batch(conn, pack_id, files, plan, with_rows=True)
     active = [i for i in analysis["items"] if not i["skip"]]

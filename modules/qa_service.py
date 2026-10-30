@@ -40,7 +40,28 @@ def rule_answer(
     computed,
     history: Optional[List[Dict[str, str]]] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Ask the rules engine; ``None`` when no rule matches."""
+    """Ask the deterministic rules engine; ``None`` when no rule matches.
+
+    Args:
+        question (str): Natural-language question from the user.
+        pack (Any): Loaded ontology pack (entities, nodes, rules, tables).
+        computed (Any): Pre-computed tables and metrics for the pack.
+        history (Optional[List[Dict[str, str]]]): Prior chat turns, oldest
+            first.
+
+    Returns:
+        Optional[Dict[str, Any]]: ``answer``, ``category``, ``nodes``,
+        ``path`` and ``graph`` for the matched rule, or ``None`` when the
+        engine has no canonical answer.
+
+    Raises:
+        Exception: Propagated from ``svc.answer_question`` when the pack cannot
+            be queried; template rendering errors are suppressed, not raised.
+
+    Example:
+        >>> rule_answer("why did VNB drop?", pack, computed)["category"]
+        'VNB Analysis'
+    """
     # Live Q&A: a rule whose template cannot render (e.g. missing input
     # rows) is skipped so Auto can fall back to AI / suggestions.
     res = svc.answer_question(
@@ -64,7 +85,23 @@ def rule_answer(
 
 
 def suggestions(question: str, pack) -> List[Dict[str, str]]:
-    """Top similar bank questions, normalised to {question, category}."""
+    """Return the top similar bank questions as ``{question, category}``.
+
+    Args:
+        question (str): Question the user asked.
+        pack (Any): Loaded ontology pack; its ``id`` scopes the search.
+
+    Returns:
+        List[Dict[str, str]]: Up to three suggestion dictionaries.
+
+    Raises:
+        Exception: Propagated from ``svc.similar_questions`` when the question
+            bank cannot be read.
+
+    Example:
+        >>> suggestions("how is vnb computed?", pack)[0]["question"]
+        'How is VNB computed?'
+    """
     items = svc.similar_questions(question, 3, pack.get("id"))
     return [
         (
@@ -88,7 +125,35 @@ async def stream_answer(
     logger=None,
     log_call: Optional[Callable[..., None]] = None,
 ) -> AsyncIterator[Dict[str, Any]]:
-    """Full answer pipeline for one question, as an async event stream."""
+    """Run the full answer pipeline for one question as an async event stream.
+
+    Args:
+        question (str): Natural-language question from the user.
+        mode (str): ``"auto"``, ``"rules"`` or ``"ai"``; selects the engine.
+        pack (Dict[str, Any]): Loaded ontology pack.
+        computed (Dict[str, Any]): Pre-computed tables and metrics for the pack.
+        model_cfg (Optional[Dict[str, Any]]): Resolved AI model configuration,
+            or ``None`` when no model is enabled.
+        history (Optional[List[Dict[str, str]]]): Prior chat turns, oldest
+            first.
+        user_id (Optional[int]): Caller id recorded in the usage log.
+        logger: Optional logger receiving rule hits.
+        log_call (Optional[Callable[..., None]]): Usage sink called with the
+            same keyword arguments as ``llm_client.log_call``.
+
+    Yields:
+        Dict[str, Any]: ``meta``, ``token``, ``done`` or ``error`` events in
+        the order described in the module docstring.
+
+    Raises:
+        Exception: Propagated from the analysis layer, the rules engine or the
+            LLM client; ``log_call`` still runs through the ``finally`` block.
+
+    Example:
+        >>> async for evt in stream_answer("q", "auto", pack, computed, None):
+        ...     print(evt["type"])
+        meta
+    """
     analysis = deep.analyze(pack, computed, question, history=history)
     if mode in ("auto", "rules"):
         hit = rule_answer(question, pack, computed, history=history)
@@ -217,7 +282,21 @@ NO_MODEL_COMPARE_MESSAGE = (
 
 
 def _analysis_payload(analysis: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Compact, JSON-safe view of the deep analysis for the UI / API."""
+    """Return a compact, JSON-safe view of the deep analysis for the UI.
+
+    Args:
+        analysis (Optional[Dict[str, Any]]): Result of ``deep.analyze``, or
+            ``None`` when no analysis was attempted.
+
+    Returns:
+        Dict[str, Any]: ``{"available": False}`` for an absent analysis,
+        otherwise the trimmed headline, month, focus, steps, findings, stats
+        and depth fields.
+
+    Example:
+        >>> _analysis_payload({"available": False})
+        {'available': False}
+    """
     if not analysis or not analysis.get("available"):
         return {"available": False}
     return {
@@ -235,7 +314,21 @@ def _analysis_payload(analysis: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 def _grounding(
     computed: Dict[str, Any], graph: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    """What the ontology contributed to an answer, for the comparison panel."""
+    """Summarise what the ontology contributed to an answer.
+
+    Args:
+        computed (Dict[str, Any]): Pre-computed tables and metrics for the pack.
+        graph (Optional[Dict[str, Any]]): Retrieved subgraph, or ``None`` when
+            no graph was inferred.
+
+    Returns:
+        Dict[str, Any]: Table and metric names plus counts of tables, metrics,
+        graph nodes and graph edges.
+
+    Example:
+        >>> _grounding(computed, None)["table_count"]
+        3
+    """
     tables = sorted((computed.get("tables") or {}).keys())
     metrics = sorted((computed.get("metrics") or {}).keys())
     nodes = (graph or {}).get("nodes") or []
@@ -262,12 +355,39 @@ def compare_answers(
     logger=None,
     log_call: Optional[Callable[..., None]] = None,
 ) -> Dict[str, Any]:
-    """Answer one question twice: grounded in the ontology, and by the same
-    model with no ontology context at all.
+    """Answer one question twice: grounded in the ontology and without it.
 
+    The second side uses the same model with no ontology context at all.
     Deliberately synchronous (two blocking model calls) so the API layer can
     run it in a worker thread; the ontology side stays on the rules engine when
     a rule matches, which needs no model.
+
+    Args:
+        question (str): Natural-language question from the user.
+        mode (str): ``"auto"``, ``"rules"`` or ``"ai"``; selects the engine.
+        pack (Dict[str, Any]): Loaded ontology pack.
+        computed (Dict[str, Any]): Pre-computed tables and metrics for the pack.
+        model_cfg (Optional[Dict[str, Any]]): Resolved AI model configuration,
+            or ``None`` when no model is enabled.
+        user_id (Optional[int]): Caller id recorded in the usage log.
+        history (Optional[List[Dict[str, str]]]): Prior chat turns, oldest
+            first.
+        logger: Optional logger passed to the LLM client.
+        log_call (Optional[Callable[..., None]]): Usage sink called with the
+            same keyword arguments as ``llm_client.log_call``.
+
+    Returns:
+        Dict[str, Any]: ``question``, ``with_ontology``, ``without_ontology``
+        and ``value`` — the reasoning-depth counters rendered by the
+        comparison panel.
+
+    Raises:
+        Exception: Propagated from the rules engine or the LLM client when an
+            upstream call fails unexpectedly.
+
+    Example:
+        >>> compare_answers("why did VNB drop?", "auto", pack, computed, None)["value"]["tables_used"]
+        3
     """
     analysis = deep.analyze(pack, computed, question, history=history)
 

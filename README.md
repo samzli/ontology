@@ -946,13 +946,6 @@ branch triggers a deployment. `vercel.json` builds `main.py` with
 Jinja pages and the `/static` assets itself, so no separate static build
 is involved.
 
-**Why the deployment used to fail.** Vercel mounts the deployment
-read-only, so SQLite could not create its `-wal` sidecar next to
-`data/onti.db`; startup died in `db.init_db` →
-`get_conn` → `PRAGMA journal_mode = WAL` with
-`sqlite3.OperationalError: unable to open database file`, and every
-request returned HTTP 500 `FUNCTION_INVOCATION_FAILED`.
-
 **Writable storage.** `modules/db.py` detects `VERCEL` and switches to
 `/tmp/onti-data` (`ONTI_DATA_DIR` overrides the location on any host):
 
@@ -1109,6 +1102,30 @@ python tests\verify_t9.py
 python tests\verify_ontology_value.py      :: writes docs\ONTOLOGY_VALUE_REPORT.md
 ```
 
+### Run log (who ran what, when)
+
+Run the whole suite — or just the scripts whose name matches a keyword —
+through the runner, and every execution is appended to
+`data/run_log.jsonl` (one JSON object per run: run id, start/finish
+timestamps, actor, host, script, status, exit code, last output line and
+duration):
+
+```bat
+python tests\run_all.py                :: every tests\*.py script
+python tests\run_all.py smoke verify_t9  :: only matching scripts
+```
+
+Inspect the most recent entries:
+
+```bat
+python -m modules.run_log              :: prints the last 10 runs
+```
+
+Retention is capped by `runtime.run_log_max_entries` (default `5000`) and
+the file location is `runtime.run_log`, both under the `runtime` block of
+`config/config.json`. The log is append-only and never read by the web app,
+so it can be shipped to an external audit store unchanged.
+
 The layer checks (`verify_t1` … `verify_t6`) are **workspace-tolerant**:
 they pin the built-in sample pack by slug rather than assuming it is the
 active pack, use per-run fixture names, and assert structural /
@@ -1164,20 +1181,44 @@ python -m modules.db
 ## 9. Project layout
 
 The codebase follows a **thin HTTP layer, fat service layer** split:
-`main.py` owns only the FastAPI surface; all business logic lives in
-`modules/`.
+`main.py` only wires the app (lifespan, exception handlers, static mount,
+router registration), the HTTP endpoints live in `routes/`, and all
+business logic lives in `modules/`.
 
 ```text
 Code/
-├─ main.py              # FastAPI app: pages, routes, SSE only.
+├─ main.py              # FastAPI app assembly: lifespan, handlers, routers.
+├─ common/
+│  ├─ logger.py          # AppLogger — dependency-free leveled console logger
+│  ├─ exceptions.py      # UploadError — status-carrying I/O failure (shared)
+│  ├─ io_utils.py        # Pure CSV/XLSX/XLS/JSON parsers → pandas frames
+│  └─ values.py          # Dependency-free value helpers (is_num, month_label)
+├─ routes/              # one APIRouter module per feature area
+│  ├─ common.py         # shared helpers: user pack, model prefs, errors, SSE
+│  ├─ pages.py          # /, /login, /app, /admin pages + health
+│  ├─ auth.py           # register / login / logout / me
+│  ├─ packs.py          # pack selection, dashboard payloads
+│  ├─ config.py         # config, questions, library, data rows, my questions
+│  ├─ graph.py          # graph, path/impact/cycles, search + insight
+│  ├─ analytics.py      # timeseries, attribution, scenario, agent stats
+│  ├─ ask.py            # SSE ask stream, compare, history
+│  ├─ reports.py        # report CRUD and file downloads
+│  ├─ admin_packs.py    # packs, ontology, proposals, question bank
+│  ├─ admin_data.py     # datasets, rows, upload, batch import, analysis
+│  ├─ admin_models.py   # model registry and connectivity tests
+│  ├─ admin_users.py    # users, settings, audit, all reports
+│  ├─ graph_studio.py   # build / infer / create ontology from tables
+│  └─ my_models.py      # per-user model management
 ├─ start_server.bat
 ├─ requirements.txt
 ├─ vercel.json          # serverless build/route config (all paths → main.py)
-├─ config/config.json   # port, session, upload settings
+├─ config/config.json   # port, session, upload, runtime (run-log) settings
 ├─ modules/
 │  ├─ db.py             # schema, connections, settings, audit, crypto
 │  ├─ seed.py           # idempotent built-in sample pack
 │  ├─ auth.py           # accounts, PBKDF2, sessions, roles
+│  ├─ constants.py      # shared UI/operation constants (no magic numbers)
+│  ├─ run_log.py        # append-only run/audit log for test executions
 │  ├─ ontology_service.py  # rule engine, formulas, graph, search,
 │  │                      # health check, formula impact analysis,
 │  │                      # graph-studio builder with provenance
@@ -1194,14 +1235,16 @@ Code/
 │  └─ report_charts.py  # matplotlib charts + chain graph
 ├─ data/
 │  ├─ onti.db                      # SQLite database (auto-created)
+│  ├─ run_log.jsonl                # test/run audit trail (who/when/what)
 │  └─ reports/                     # generated report files
+├─ tests/               # verify_t1..t9, smoke_http, run_all.py runner
 ├─ templates/           # login, app, admin pages
 └─ static/              # app.css, common.js, graph.js, app.js, admin.js
 ```
 
 ### How a question flows through the modules
 
-1. `main.py:ask_stream` validates the request, loads the active pack +
+1. `routes/ask.py:ask_stream` validates the request, loads the active pack +
    the caller's effective model config (per-user pick, else default),
    and calls `qa_service.stream_answer(...)`.
 2. `qa_service` asks `ontology_service.answer_question` (rules engine).
@@ -1210,7 +1253,7 @@ Code/
 3. On a miss (auto / AI mode), `qa_service` calls the configured LLM
    with a system prompt built from the ontology, proxies tokens, and
    attaches a post-hoc subgraph on `done`.
-4. `main.py` wraps each event dict as `data: {...}\n\n` and streams it.
+4. `routes/ask.py` wraps each event dict as `data: {...}\n\n` and streams it.
 
 The sample pack's instance data is read at seed time from the first
 `.xlsx` workbook found in the project root or `data/`. Set the

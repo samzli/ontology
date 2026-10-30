@@ -9,6 +9,8 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Tuple
 
+from common.values import is_num as _is_num
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -49,6 +51,23 @@ plt.rcParams.update(
 
 
 def format_value(v: Any, fmt: str = "number", decimals: int = 1) -> str:
+    """Format a numeric value for chart labels, tables and narratives.
+
+    Args:
+        v (Any): Value to format; ``None`` and NaN render as an en dash.
+        fmt (str): One of ``"number"``, ``"percent"``, ``"currency_m"`` or
+            ``"currency_k"``.
+        decimals (int): Decimal places used for generic and millions formats.
+
+    Returns:
+        str: Human-readable value, or ``str(v)`` when it is not numeric.
+
+    Example:
+        >>> format_value(1234.5, "number")
+        '1,234.5'
+        >>> format_value(0.125, "percent")
+        '12.5%'
+    """
     if v is None or (isinstance(v, float) and math.isnan(v)):
         return "–"
     try:
@@ -67,6 +86,19 @@ def format_value(v: Any, fmt: str = "number", decimals: int = 1) -> str:
 
 
 def _wrap(text: str, width: int = 22) -> List[str]:
+    """Greedily wrap text into lines of at most ``width`` characters.
+
+    Args:
+        text (str): Text to wrap.
+        width (int): Maximum characters per line.
+
+    Returns:
+        list[str]: Wrapped lines; a single empty string when there is no text.
+
+    Example:
+        >>> _wrap("VNB by channel and product", 12)
+        ['VNB by', 'channel and', 'product']
+    """
     words = str(text).split()
     lines, cur = [], ""
     for w in words:
@@ -87,10 +119,25 @@ def _wrap(text: str, width: int = 22) -> List[str]:
 
 
 def render_chart(spec: Dict[str, Any]) -> bytes:
-    """Return PNG bytes for a generic chart spec.
+    """Render a generic chart spec to PNG bytes using the headless Agg backend.
 
-    spec: {type: bar|hbar|line|donut, title, labels[], series[{name, values[]}],
-           fmt, unit, interpretation?}
+    Args:
+        spec (dict): Chart specification with ``type`` (``bar``, ``hbar``,
+            ``line``, ``donut`` or ``pie``), ``title``, ``labels``,
+            ``series`` (each with ``name`` and ``values``) and optional
+            ``fmt``, ``unit`` and ``interpretation`` keys.
+
+    Returns:
+        bytes: PNG image payload with brand colours and value labels.
+
+    Raises:
+        IndexError: When a donut/pie spec provides no series.
+        KeyError: When a series entry omits its ``values`` key.
+
+    Example:
+        >>> png = render_chart({"type": "bar", "title": "VNB",
+        ...                     "labels": ["Q1", "Q2"],
+        ...                     "series": [{"name": "VNB", "values": [1, 2]}]})
     """
     ctype = spec.get("type", "bar")
     labels = [str(l) for l in spec.get("labels", [])]
@@ -100,6 +147,7 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
     fig.subplots_adjust(left=0.09, right=0.98, top=0.80, bottom=0.27)
 
     def tag(x, xi, y, ha="center", dy=0, dx=0, fs=7.6):
+        """Annotate a data point with its formatted value."""
         ax.annotate(
             format_value(x, fmt),
             (xi, y),
@@ -235,6 +283,22 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
 def _layer_positions(
     nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
 ) -> Dict[str, int]:
+    """Assign each node a left-to-right layer via cycle-safe longest-path layering.
+
+    Args:
+        nodes (list[dict]): Nodes with an ``id`` and an optional explicit
+            ``level`` seed.
+        edges (list[dict]): Edges with ``source`` (comma-separated sources
+            allowed) and ``target``.
+
+    Returns:
+        dict[str, int]: Node id -> layer index; unconnected nodes default to 0.
+
+    Example:
+        >>> _layer_positions([{"id": "a"}, {"id": "b"}],
+        ...                 [{"source": "a", "target": "b"}])
+        {'a': 0, 'b': 1}
+    """
     ids = [n["id"] for n in nodes]
     level: Dict[str, int] = {}
     # seed: explicit layer field if present (smaller = upstream/left)
@@ -277,8 +341,25 @@ def render_chain_graph(
     edges: List[Dict[str, Any]],
     title: str = "Ontology Impact Chain",
 ) -> bytes:
-    """Layered left-to-right DAG. nodes: {id,label,grp?,value?}; edges:
-    {id?,source(comma OK),target,label?,edge_type?}."""
+    """Render a layered left-to-right impact chain (or ontology graph) to PNG.
+
+    Args:
+        nodes (list[dict]): Nodes with ``id``, ``label`` and optional ``grp``
+            (financial/operational/product/assumption/agent/channel),
+            ``value`` and ``level`` keys.
+        edges (list[dict]): Edges with ``source`` (comma-separated sources
+            allowed), ``target`` and optional ``label``/``edge_type`` keys.
+        title (str): Chart title drawn top-left.
+
+    Returns:
+        bytes: PNG image payload; an empty node list draws a placeholder box.
+
+    Raises:
+        KeyError: When an edge lacks its ``source`` or ``target`` key.
+
+    Example:
+        >>> png = render_chain_graph(nodes, edges, title="VNB impact chain")
+    """
     if not nodes:
         nodes = [{"id": "_empty", "label": "No chain data captured in this scope"}]
     levels = _layer_positions(nodes, edges)
@@ -435,22 +516,30 @@ def render_chain_graph(
 # ---------------------------------------------------------------------------
 
 
-def _is_num(v: Any) -> bool:
-    try:
-        float(v)
-        return True
-    except (TypeError, ValueError):
-        return False
-
-
 def auto_chart_specs(
     tables: List[Dict[str, Any]], max_charts: int = 6
 ) -> Tuple[List[Dict[str, Any]], List[str]]:
-    """Inspect active-dataset tables and synthesize chart specs.
+    """Synthesise chart specs and interpretations from instance tables.
 
-    Returns (specs, interpretations). Tables with 2..15 rows and numeric
-    columns produce one grouped-bar chart each (up to 3 numeric columns);
-    a single positive-value numeric column with <=6 rows becomes a donut.
+    Tables with 2-15 rows and at least one label plus one numeric column
+    produce one chart each: grouped bars for multiple numeric columns (up to
+    three), or a donut for a single all-positive numeric column with <=6 rows.
+
+    Args:
+        tables (list[dict]): Table definitions with ``rows``, ``columns``
+            (each carrying ``key``, ``data_type``, optional ``label`` and
+            ``fmt``) and ``label``/``key``.
+        max_charts (int): Maximum number of specs to emit.
+
+    Returns:
+        tuple[list[dict], list[str]]: ``(specs, notes)`` where specs feed
+        :func:`render_chart` and notes hold one deterministic interpretation
+        line per chart.
+
+    Example:
+        >>> specs, notes = auto_chart_specs(pack_tables)
+        >>> specs[0]["type"]
+        'bar'
     """
     specs: List[Dict[str, Any]] = []
     notes: List[str] = []
@@ -470,6 +559,7 @@ def auto_chart_specs(
 
         # Prefer a human name column; avoid raw id/code keys when names exist.
         def _label_score(c):
+            """Rank a string column as a label source (lower is better)."""
             key = (c.get("key") or "").lower()
             lab = (c.get("label") or "").lower()
             if "name" in key or "name" in lab:
@@ -516,6 +606,7 @@ def auto_chart_specs(
         lo = min(range(len(vals)), key=lambda i: vals[i])
 
         def _lbl(i):
+            """Return a usable label for row ``i``, falling back to its position."""
             t = (labels[i] or "").strip()
             return t if t else f"item {i + 1}"
 
