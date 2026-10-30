@@ -40,6 +40,16 @@ def _resolve_data_dir() -> Path:
     hosts such as Vercel mount the deployment read-only, so SQLite (and the
     ``-wal`` sidecar it creates) can only live on the writable ``/tmp``
     volume. ``ONTI_DATA_DIR`` overrides both defaults.
+
+    Returns:
+        Path: Resolved, absolute data directory.
+
+    Raises:
+        OSError: When the override path cannot be resolved.
+
+    Example:
+        >>> _resolve_data_dir().name
+        'data'
     """
     override = os.environ.get("ONTI_DATA_DIR", "").strip()
     if override:
@@ -59,7 +69,22 @@ _READY = False
 
 
 def _prepare_data_dir() -> None:
-    """Create the writable data directory and seed it from the bundle once."""
+    """Create the writable data directory and seed it from the bundle once.
+
+    Copies the bundled ``onti.db`` (dropping its ``-wal``/``-shm`` sidecars)
+    when the runtime database does not exist yet. The work is guarded by the
+    module-level ``_READY`` flag, so it happens at most once per process.
+
+    Returns:
+        None: The directory and database are ready after this call.
+
+    Raises:
+        OSError: When the directory cannot be created or the database cannot
+            be copied.
+
+    Example:
+        >>> _prepare_data_dir()
+    """
     global _READY
     if _READY:
         return
@@ -86,7 +111,23 @@ def _prepare_data_dir() -> None:
 
 @contextmanager
 def get_conn() -> Iterator[sqlite3.Connection]:
-    """Yield a SQLite connection with Row factory and foreign keys enabled."""
+    """Yield a SQLite connection with Row factory and foreign keys enabled.
+
+    The connection is committed on success, rolled back on exception, and
+    always closed.
+
+    Yields:
+        sqlite3.Connection: Connection valid for the ``with`` block.
+
+    Raises:
+        sqlite3.Error: When the database cannot be opened or a statement
+            fails.
+
+    Example:
+        >>> with get_conn() as conn:
+        ...     conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        1
+    """
     _prepare_data_dir()
     conn = sqlite3.connect(str(DB_PATH), timeout=30)
     conn.row_factory = sqlite3.Row
@@ -103,6 +144,15 @@ def get_conn() -> Iterator[sqlite3.Connection]:
 
 
 def now() -> str:
+    """Return the current UTC timestamp.
+
+    Returns:
+        str: ISO-8601 text with second precision and a ``+00:00`` offset.
+
+    Example:
+        >>> now()[:4]
+        '2026'
+    """
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
@@ -112,6 +162,21 @@ def now() -> str:
 
 
 def jloads(value: Optional[str], default: Any) -> Any:
+    """Decode a JSON text column, falling back to a default value.
+
+    Args:
+        value (Optional[str]): Raw JSON text; ``None`` or ``""`` yield the
+            default.
+        default (Any): Value returned when decoding is impossible.
+
+    Returns:
+        Any: Decoded object, or ``default`` when the text is missing or
+            malformed.
+
+    Example:
+        >>> jloads("[1, 2]", [])
+        [1, 2]
+    """
     if value is None or value == "":
         return default
     try:
@@ -121,6 +186,18 @@ def jloads(value: Optional[str], default: Any) -> Any:
 
 
 def jdumps(value: Any) -> str:
+    """Encode a value as JSON, keeping non-ASCII characters readable.
+
+    Args:
+        value (Any): Value to encode.
+
+    Returns:
+        str: JSON text produced with ``ensure_ascii=False``.
+
+    Example:
+        >>> jdumps({"k": "v"})
+        '{"k": "v"}'
+    """
     return json.dumps(value, ensure_ascii=False)
 
 
@@ -142,6 +219,21 @@ DEFAULT_SETTINGS: Dict[str, str] = {
 def get_setting(
     conn: sqlite3.Connection, key: str, default: Optional[str] = None
 ) -> Optional[str]:
+    """Read an application setting, falling back to defaults.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        key (str): Setting key.
+        default (Optional[str]): Fallback used when neither the table nor
+            ``DEFAULT_SETTINGS`` holds the key.
+
+    Returns:
+        Optional[str]: Stored value, built-in default, or ``default``.
+
+    Example:
+        >>> get_setting(conn, "allow_registration")
+        '1'
+    """
     row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
     if row is None:
         return DEFAULT_SETTINGS.get(key, default)
@@ -149,6 +241,19 @@ def get_setting(
 
 
 def set_setting(conn: sqlite3.Connection, key: str, value: Any) -> None:
+    """Insert or update an application setting.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        key (str): Setting key.
+        value (Any): Value, stored after ``str`` conversion.
+
+    Returns:
+        None: The change is committed by the caller.
+
+    Example:
+        >>> set_setting(conn, "upload_max_mb", 10)
+    """
     conn.execute(
         "INSERT INTO app_settings(key, value) VALUES(?, ?) "
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -157,6 +262,18 @@ def set_setting(conn: sqlite3.Connection, key: str, value: Any) -> None:
 
 
 def active_pack_id(conn: sqlite3.Connection) -> Optional[int]:
+    """Return the active pack id stored in the settings table.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+
+    Returns:
+        Optional[int]: Parsed pack id, or ``None`` when unset or malformed.
+
+    Example:
+        >>> active_pack_id(conn)
+        1
+    """
     raw = get_setting(conn, "active_pack_id", "")
     try:
         return int(raw) if raw else None
@@ -176,6 +293,21 @@ def audit(
     detail: str = "",
     ip: str = "",
 ) -> None:
+    """Append an entry to the audit log.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        username (str): Actor name (``"system"`` for automated events).
+        action (str): Machine-readable action key, e.g. ``"pack.create"``.
+        detail (str): Free-form detail, truncated to 1000 characters.
+        ip (str): Client IP address.
+
+    Returns:
+        None: The entry is committed by the caller.
+
+    Example:
+        >>> audit(conn, "admin", "pack.create", "id=7 slug=demo")
+    """
     conn.execute(
         "INSERT INTO audit_log(ts, username, action, detail, ip) VALUES(?,?,?,?,?)",
         (now(), username, action, detail[:1000], ip),
@@ -188,6 +320,19 @@ def audit(
 
 
 def _read_master_key(path: Path) -> Optional[bytes]:
+    """Read and decode a base64-encoded 32-byte master key file.
+
+    Args:
+        path (Path): Candidate key file.
+
+    Returns:
+        Optional[bytes]: The key bytes, or ``None`` when the file is missing,
+            corrupt, or not exactly 32 bytes.
+
+    Example:
+        >>> _read_master_key(KEY_PATH) is None
+        False
+    """
     if not path.exists():
         return None
     raw = path.read_bytes().strip()
@@ -199,7 +344,22 @@ def _read_master_key(path: Path) -> Optional[bytes]:
 
 
 def _machine_key() -> bytes:
-    """Load (or create) the 32-byte machine-local master key."""
+    """Load, or create, the 32-byte machine-local master key.
+
+    The key is looked up in ``KEY_PATH`` first and then in the writable data
+    directory; when neither exists a fresh key is generated and written with
+    owner-only permissions (best effort).
+
+    Returns:
+        bytes: The 32-byte master key.
+
+    Raises:
+        OSError: When a new key cannot be written to the data directory.
+
+    Example:
+        >>> len(_machine_key())
+        32
+    """
     for candidate in (KEY_PATH, DATA_DIR / ".onti.key"):
         key = _read_master_key(candidate)
         if key is not None:
@@ -221,11 +381,32 @@ def session_signing_key() -> bytes:
     Derived from the same machine key, so every instance of the deployment
     validates the same cookies even though the SQLite session table on
     ``/tmp`` is per-instance.
+
+    Returns:
+        bytes: 32-byte key derived from the master key.
+
+    Example:
+        >>> len(session_signing_key())
+        32
     """
     return hashlib.sha256(_machine_key() + b"session").digest()
 
 
 def _keystream(mac_key: bytes, nonce: bytes, length: int) -> bytes:
+    """Generate a deterministic HMAC-SHA256 keystream.
+
+    Args:
+        mac_key (bytes): Key for the HMAC blocks.
+        nonce (bytes): Per-message nonce mixed into every block.
+        length (int): Number of keystream bytes required.
+
+    Returns:
+        bytes: Exactly ``length`` keystream bytes.
+
+    Example:
+        >>> len(_keystream(b"k", b"n", 16))
+        16
+    """
     out = bytearray()
     counter = 0
     while len(out) < length:
@@ -238,7 +419,21 @@ def _keystream(mac_key: bytes, nonce: bytes, length: int) -> bytes:
 
 
 def encrypt_secret(plaintext: str) -> str:
-    """Encrypt a secret; returns urlsafe-base64 blob. Empty input -> ''."""
+    """Encrypt a secret with machine-local keys (encrypt-then-MAC).
+
+    Args:
+        plaintext (str): Secret to encrypt; ``None`` or ``""`` yield ``""``.
+
+    Returns:
+        str: URL-safe base64 blob of ``nonce || tag || ciphertext``.
+
+    Raises:
+        OSError: When the machine key cannot be created.
+
+    Example:
+        >>> decrypt_secret(encrypt_secret("sk-123456"))
+        'sk-123456'
+    """
     if plaintext is None or plaintext == "":
         return ""
     master = _machine_key()
@@ -253,6 +448,19 @@ def encrypt_secret(plaintext: str) -> str:
 
 
 def decrypt_secret(blob: str) -> str:
+    """Decrypt a blob produced by :func:`encrypt_secret`.
+
+    Args:
+        blob (str): URL-safe base64 blob; empty input returns ``""``.
+
+    Returns:
+        str: The plaintext, or ``""`` when the blob is corrupt, truncated or
+            fails the authentication check.
+
+    Example:
+        >>> decrypt_secret(encrypt_secret("sk-123456"))
+        'sk-123456'
+    """
     if not blob:
         return ""
     try:
@@ -271,6 +479,19 @@ def decrypt_secret(blob: str) -> str:
 
 
 def mask_secret(plaintext: str) -> str:
+    """Mask a secret for display, keeping the first and last four characters.
+
+    Args:
+        plaintext (str): Secret to mask.
+
+    Returns:
+        str: ``""`` for empty input, ``"****"`` for secrets of 8 characters or
+            fewer, otherwise ``first4****last4``.
+
+    Example:
+        >>> mask_secret("sk-123456789")
+        'sk-1****6789'
+    """
     if not plaintext:
         return ""
     if len(plaintext) <= 8:
@@ -306,6 +527,13 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     user_agent TEXT NOT NULL DEFAULT ''
+);
+
+-- Tokens revoked by logout. Kept so a stateless (serverless) instance can no
+-- longer honour a token whose ``sessions`` row lived on another instance.
+CREATE TABLE IF NOT EXISTS revoked_sessions (
+    token      TEXT PRIMARY KEY,
+    revoked_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ontology_packs (
@@ -615,7 +843,26 @@ CREATE INDEX IF NOT EXISTS idx_studio_history_user
 
 
 def init_db(seed: bool = True) -> None:
-    """Create all tables (idempotent) and run first-run seed migration."""
+    """Create all tables (idempotent) and run the first-run seed migration.
+
+    Applies additive ``ALTER TABLE`` migrations for columns added after a
+    database was first created, then seeds the default settings. When ``seed``
+    is true the bundled ontology packs and the default administrator account
+    are ensured as well.
+
+    Args:
+        seed (bool): Also run the domain seed and default-admin provisioning.
+            Defaults to True.
+
+    Returns:
+        None: The schema is ready after this call.
+
+    Raises:
+        sqlite3.Error: When schema creation or migration fails.
+
+    Example:
+        >>> init_db(seed=False)
+    """
     _prepare_data_dir()
     with get_conn() as conn:
         conn.executescript(_SCHEMA)

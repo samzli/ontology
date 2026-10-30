@@ -84,6 +84,20 @@ sees this evidence and decides whether to approve or reject."""
 
 
 def _table_meta(conn, table_id: int) -> Optional[Dict[str, Any]]:
+    """Load one uploaded table with its ordered column definitions.
+
+    Args:
+        conn (Any): Open database connection.
+        table_id (int): Id in ``pack_tables``.
+
+    Returns:
+        Optional[Dict[str, Any]]: ``{"table": ..., "columns": [...]}``, or
+        ``None`` when the table does not exist.
+
+    Example:
+        >>> _table_meta(conn, 12)["table"]["key"]
+        'channel_monthly'
+    """
     row = conn.execute("SELECT * FROM pack_tables WHERE id=?", (table_id,)).fetchone()
     if row is None:
         return None
@@ -98,6 +112,19 @@ def _table_meta(conn, table_id: int) -> Optional[Dict[str, Any]]:
 
 
 def _ontology_context(pack: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Collect the existing ontology keys handed to the model.
+
+    Args:
+        pack (Dict[str, Any]): Loaded ontology pack.
+
+    Returns:
+        Dict[str, List[str]]: Key lists for entities, nodes, relations, edges,
+        formulas and tables.
+
+    Example:
+        >>> _ontology_context(pack)["nodes"][:1]
+        ['VNB']
+    """
     return {
         "entities": [e["key"] for e in pack.get("entities", [])],
         "nodes": [n["key"] for n in pack.get("nodes", [])],
@@ -113,6 +140,20 @@ def _build_user_prompt(
     meta: Dict[str, Any],
     sample_rows: List[Dict[str, Any]],
 ) -> str:
+    """Render the user prompt for one table's induction pass.
+
+    Args:
+        pack (Dict[str, Any]): Loaded ontology pack.
+        meta (Dict[str, Any]): Table and column metadata from ``_table_meta``.
+        sample_rows (List[Dict[str, Any]]): Sample rows shown to the model.
+
+    Returns:
+        str: User prompt listing existing keys, columns and sample values.
+
+    Example:
+        >>> _build_user_prompt(pack, meta, rows).startswith("Pack:")
+        True
+    """
     ctx = _ontology_context(pack)
     tbl = meta["table"]
     col_lines = []
@@ -140,6 +181,22 @@ _FENCE = re.compile(r"^```(?:json)?|```$", re.MULTILINE)
 
 
 def _parse_response(text: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Parse the model's JSON answer into normalised proposal lists.
+
+    Args:
+        text (str): Raw model response, possibly fenced in Markdown.
+
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: One list per kind, with items that
+        carry no ``key`` dropped.
+
+    Raises:
+        ValueError: If the text contains no JSON object.
+
+    Example:
+        >>> _parse_response('{"nodes": [{"key": "VNB"}]}')["node"]
+        [{'key': 'VNB'}]
+    """
     cleaned = _FENCE.sub("", text or "").strip()
     start, end = cleaned.find("{"), cleaned.rfind("}")
     if start == -1 or end == -1:
@@ -166,6 +223,19 @@ def _parse_response(text: str) -> Dict[str, List[Dict[str, Any]]]:
 
 
 def _existing_keys(conn, pack_id: int) -> Dict[str, set]:
+    """Load the ontology keys already present for a pack.
+
+    Args:
+        conn (Any): Open database connection.
+        pack_id (int): Pack id to load.
+
+    Returns:
+        Dict[str, set]: Known keys per kind, used to skip duplicates.
+
+    Example:
+        >>> _existing_keys(conn, 4)["node"]
+        {'VNB', 'APE'}
+    """
     pack = svc.load_pack(conn, pack_id)
     return {
         "entity": {e["key"] for e in pack.get("entities", [])},
@@ -186,8 +256,23 @@ def _build_evidence(
     sample_rows: List[Dict[str, Any]],
     dataset_id: Optional[int],
 ) -> Dict[str, Any]:
-    """Snapshot of what the model actually saw, shown beside each proposal so
-    an administrator can judge whether to approve or reject it."""
+    """Snapshot what the model actually saw for one proposal batch.
+
+    The evidence is stored beside each proposal so an administrator can judge
+    whether to approve or reject it.
+
+    Args:
+        meta (Dict[str, Any]): Table and column metadata.
+        sample_rows (List[Dict[str, Any]]): Sample rows shown to the model.
+        dataset_id (Optional[int]): Dataset the rows came from, if any.
+
+    Returns:
+        Dict[str, Any]: Table identity, column descriptors and sample rows.
+
+    Example:
+        >>> _build_evidence(meta, rows, 9)["table"]
+        'channel_monthly'
+    """
     tbl = meta["table"]
     return {
         "table": tbl.get("key"),
@@ -214,6 +299,24 @@ def _save_proposals(
     dataset_id: Optional[int],
     evidence: Optional[Dict[str, Any]] = None,
 ) -> int:
+    """Store new proposals as ``pending`` rows, skipping known duplicates.
+
+    Args:
+        conn (Any): Open database connection.
+        pack_id (int): Pack the proposals belong to.
+        items (Dict[str, List[Dict[str, Any]]]): Parsed proposals per kind.
+        table_id (Optional[int]): Source table id.
+        dataset_id (Optional[int]): Source dataset id.
+        evidence (Optional[Dict[str, Any]]): Snapshot shown beside proposals.
+
+    Returns:
+        int: Number of rows inserted.
+
+    Example:
+        >>> _save_proposals(conn, 4, items, table_id=12, dataset_id=9,
+        ...                 evidence=ev)
+        3
+    """
     existing = _existing_keys(conn, pack_id)
     pending = {
         row["kind"] + ":" + row["key"]
@@ -262,7 +365,23 @@ def induce_from_table(
     dataset_id: Optional[int] = None,
     actor: str = "system",
 ) -> Dict[str, Any]:
-    """Run one induction pass for a table; never raises for model problems."""
+    """Run one induction pass for a table; never raises for model problems.
+
+    Args:
+        conn (Any): Open database connection.
+        pack_id (int): Pack receiving the proposals.
+        table_id (int): Uploaded table to inspect.
+        dataset_id (Optional[int]): Dataset version to sample rows from.
+        actor (str): Audit actor label.
+
+    Returns:
+        Dict[str, Any]: ``status`` of ``"ok"``, ``"skipped"`` or ``"error"``,
+        a ``proposals`` count, and a ``reason`` when the status is not ``ok``.
+
+    Example:
+        >>> induce_from_table(conn, 4, 12)["status"]
+        'ok'
+    """
     model_cfg = llm.get_default_client_config(conn)
     if model_cfg is None:
         return {"status": "skipped", "reason": "no_model", "proposals": 0}
@@ -314,6 +433,20 @@ def induce_from_table(
 
 
 def list_proposals(conn, pack_id: int, status: str = "pending") -> List[Dict[str, Any]]:
+    """List proposals for a pack, newest first.
+
+    Args:
+        conn (Any): Open database connection.
+        pack_id (int): Pack to read.
+        status (str): Filter on proposal status; ``""`` returns all statuses.
+
+    Returns:
+        List[Dict[str, Any]]: Rows with ``payload`` and ``evidence`` decoded.
+
+    Example:
+        >>> len(list_proposals(conn, 4))
+        3
+    """
     sql = (
         "SELECT * FROM ontology_proposals WHERE pack_id=? "
         + ("AND status=? " if status else "")
@@ -333,6 +466,19 @@ def list_proposals(conn, pack_id: int, status: str = "pending") -> List[Dict[str
 
 
 def pending_count(conn, pack_id: int) -> int:
+    """Count the pending proposals of a pack.
+
+    Args:
+        conn (Any): Open database connection.
+        pack_id (int): Pack to count.
+
+    Returns:
+        int: Number of rows still awaiting review.
+
+    Example:
+        >>> pending_count(conn, 4)
+        3
+    """
     return conn.execute(
         "SELECT COUNT(*) n FROM ontology_proposals WHERE pack_id=? AND status='pending'",
         (pack_id,),
@@ -340,6 +486,18 @@ def pending_count(conn, pack_id: int) -> int:
 
 
 def _decide(conn, proposal_id: int, actor: str, status: str, result: str = "") -> None:
+    """Write the review verdict of one proposal.
+
+    Args:
+        conn (Any): Open database connection.
+        proposal_id (int): Proposal being decided.
+        actor (str): Administrator recorded as ``decided_by``.
+        status (str): New status, usually ``"approved"`` or ``"rejected"``.
+        result (str): Optional failure detail stored with the verdict.
+
+    Example:
+        >>> _decide(conn, 21, "admin", "approved")
+    """
     conn.execute(
         "UPDATE ontology_proposals SET status=?, decided_by=?, decided_at=?, result=? "
         "WHERE id=?",
@@ -348,7 +506,25 @@ def _decide(conn, proposal_id: int, actor: str, status: str, result: str = "") -
 
 
 def approve_proposal(conn, actor: str, proposal_id: int) -> Dict[str, Any]:
-    """Apply one proposal through the normal admin upsert path."""
+    """Apply one proposal through the normal admin upsert path.
+
+    Args:
+        conn (Any): Open database connection.
+        actor (str): Administrator approving the proposal.
+        proposal_id (int): Proposal to apply.
+
+    Returns:
+        Dict[str, Any]: ``id`` and the new ``status``.
+
+    Raises:
+        adm.AdminValueError: If the proposal is missing (404), already decided
+            (409) or invalid for the ontology (422); invalid proposals are left
+            marked rejected.
+
+    Example:
+        >>> approve_proposal(conn, "admin", 21)["status"]
+        'approved'
+    """
     row = conn.execute(
         "SELECT * FROM ontology_proposals WHERE id=?", (proposal_id,)
     ).fetchone()
@@ -375,6 +551,23 @@ def approve_proposal(conn, actor: str, proposal_id: int) -> Dict[str, Any]:
 
 
 def reject_proposal(conn, actor: str, proposal_id: int) -> Dict[str, Any]:
+    """Mark one proposal as rejected without touching the ontology.
+
+    Args:
+        conn (Any): Open database connection.
+        actor (str): Administrator rejecting the proposal.
+        proposal_id (int): Proposal to reject.
+
+    Returns:
+        Dict[str, Any]: ``id`` and the new ``status``.
+
+    Raises:
+        adm.AdminValueError: If the proposal does not exist (404).
+
+    Example:
+        >>> reject_proposal(conn, "admin", 21)["status"]
+        'rejected'
+    """
     row = conn.execute(
         "SELECT * FROM ontology_proposals WHERE id=?", (proposal_id,)
     ).fetchone()
@@ -386,7 +579,20 @@ def reject_proposal(conn, actor: str, proposal_id: int) -> Dict[str, Any]:
 
 
 def approve_all(conn, actor: str, pack_id: int) -> Dict[str, Any]:
-    """Approve every pending proposal in dependency order; skip invalid ones."""
+    """Approve every pending proposal in dependency order; skip invalid ones.
+
+    Args:
+        conn (Any): Open database connection.
+        actor (str): Administrator approving the batch.
+        pack_id (int): Pack whose pending proposals are processed.
+
+    Returns:
+        Dict[str, Any]: ``approved`` and ``rejected`` id lists.
+
+    Example:
+        >>> approve_all(conn, "admin", 4)["approved"]
+        [21, 22]
+    """
     rows = list_proposals(conn, pack_id, "pending")
     rows.sort(key=lambda r: KIND_ORDER.get(r["kind"], 99))
     approved, rejected = [], []

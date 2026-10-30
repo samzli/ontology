@@ -20,7 +20,6 @@ question bank and admin authorization.
 
 from __future__ import annotations
 
-import io
 import random
 import string
 import sys
@@ -63,9 +62,7 @@ def parse_sse(text: str):
 
 
 def main() -> int:
-    admin_pw = "AdminPass123!"
     user_pw = "UserPass123!"
-    admin_name = "smoke_" + suffix()
     user_name = "user_" + suffix()
     # Default administrator is pre-provisioned on first run so the platform is
     # usable immediately; the smoke test logs in as that admin.

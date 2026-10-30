@@ -73,6 +73,22 @@ def validate_expression(expr: str, allowed_names: Optional[Set[str]] = None) -> 
 
     Used both at evaluation time and (importantly) when an admin saves a
     formula — strings like ``__import__('os')`` are rejected with 400.
+
+    Args:
+        expr (str): Expression source text to validate.
+        allowed_names (Optional[Set[str]]): Names (variables and callables)
+            the expression may reference; ``None`` disables the name check.
+
+    Returns:
+        None: Validation is side-effect free; returning normally means the
+        expression is safe to compile.
+
+    Raises:
+        EvalError: If the expression is empty, cannot be parsed, or uses a
+        construct, name or literal type outside the whitelisted grammar.
+
+    Example:
+        >>> validate_expression("sum(rows('mix'), 'weight')", {"sum", "rows"})
     """
     if not expr or not expr.strip():
         raise EvalError("Empty expression.")
@@ -101,6 +117,29 @@ def validate_expression(expr: str, allowed_names: Optional[Set[str]] = None) -> 
 
 
 def _safe_eval(expr: str, namespace: Dict[str, Any]) -> Any:
+    """Evaluate a whitelisted expression against *namespace*.
+
+    The AST is re-checked here (defence in depth, since expressions also
+    arrive from stored formulas) and compiled with ``__builtins__`` stripped
+    so no builtin is reachable at runtime.
+
+    Args:
+        expr (str): Expression source text to evaluate.
+        namespace (Dict[str, Any]): Variables and callables visible to the
+            expression.
+
+    Returns:
+        Any: Value produced by the expression.
+
+    Raises:
+        EvalError: If the expression uses a forbidden construct, calls a
+            callable missing from *namespace*, or references an unknown name.
+        SyntaxError: If *expr* is not syntactically valid Python.
+
+    Example:
+        >>> _safe_eval("1 + 2", {})
+        3
+    """
     tree = ast.parse(expr, mode="eval")
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_NODES):
@@ -123,13 +162,38 @@ def _safe_eval(expr: str, namespace: Dict[str, Any]) -> Any:
 
 
 def _rows(conn: sqlite3.Connection, sql: str, params: Tuple = ()) -> List[sqlite3.Row]:
+    """Fetch every row of *sql* as a materialised list.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        sql (str): Query text.
+        params (Tuple): Positional parameters bound to the query.
+
+    Returns:
+        List[sqlite3.Row]: All result rows.
+    """
     return list(conn.execute(sql, params).fetchall())
 
 
 def load_pack(
     conn: sqlite3.Connection, pack_id: Optional[int] = None
 ) -> Optional[Dict[str, Any]]:
-    """Load a pack definition with all child collections. None if missing."""
+    """Load a pack definition together with all of its child collections.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        pack_id (Optional[int]): Pack to load; ``None`` uses the active pack.
+
+    Returns:
+        Optional[Dict[str, Any]]: Pack metadata plus ``entities``,
+        ``attributes``, ``relations``, ``nodes``, ``edges``, ``formulas``,
+        ``rules``, ``analysis`` and ``tables`` (each with columns and rows);
+        ``None`` when no pack id is available or the pack does not exist.
+
+    Example:
+        >>> with get_conn() as conn:
+        ...     pack = load_pack(conn)
+    """
     if pack_id is None:
         pack_id = active_pack_id(conn)
     if pack_id is None:
@@ -253,6 +317,17 @@ def load_pack(
 
 
 def _num(value: Any) -> float:
+    """Coerce *value* to ``float``, rejecting booleans and ``None``.
+
+    Args:
+        value (Any): Raw value taken from a row or an expression.
+
+    Returns:
+        float: The numeric value.
+
+    Raises:
+        EvalError: If *value* is ``None``, a bool, or not numeric.
+    """
     if isinstance(value, bool) or value is None:
         raise EvalError("a number is required")
     try:
@@ -273,6 +348,24 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
     because an input table has no rows evaluates to ``None`` instead of
     aborting the whole request; the failures are listed in
     ``metric_errors`` so authoring surfaces can still report them.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        strict (bool): Re-raise metric failures when True; otherwise record
+            them in ``metric_errors`` and store ``None`` for the metric.
+
+    Returns:
+        Dict[str, Any]: A mapping with ``tables`` (table key → row list),
+        ``metrics`` (metric key → value), ``functions`` (whitelisted callable
+        namespace) and ``metric_errors`` (non-fatal failure messages).
+
+    Raises:
+        EvalError: If a derived column cannot be resolved (unknown name or a
+        cycle), or, when ``strict`` is True, a metric fails to evaluate.
+
+    Example:
+        >>> data = compute_pack(pack)
+        >>> data["metrics"]["vnb"]
     """
     data: Dict[str, List[Dict[str, Any]]] = {}
     for tbl in pack["tables"]:
@@ -280,6 +373,7 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
         data[tbl["key"]] = rows
 
     def rows_of(name: Any) -> List[Dict[str, Any]]:
+        """Resolve a table name, row list or row wrapper to a list of rows."""
         # ``where`` / Jinja helpers already return plain row lists.
         if isinstance(name, list):
             return name
@@ -290,21 +384,25 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
         return data[name]
 
     def where(rows_: Any, col: str, value: Any) -> List[Dict[str, Any]]:
+        """Filter *rows_* down to the rows whose *col* equals *value*."""
         return [r for r in rows_of(rows_) if _eq(r.get(col), value)]
 
     def lookup(source: Any, key_col: str, key_val: Any, out_col: str) -> Any:
+        """Return *out_col* of the first row where *key_col* equals *key_val*."""
         for r in rows_of(source):
             if _eq(r.get(key_col), key_val):
                 return r.get(out_col)
         return None
 
     def cell(table: str, col: str) -> Any:
+        """Return the *col* value of the first row of *table*."""
         rs = rows_of(table)
         if not rs:
             raise EvalError(f"table {table!r} has no rows")
         return rs[0].get(col)
 
     def col_values(rows_: Any, col: str) -> List[float]:
+        """Return the numeric values of *col* for every row in *rows_*."""
         rs = rows_of(rows_)
         if not rs:
             return []
@@ -313,23 +411,29 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
         return [_num(r.get(col)) for r in rs]
 
     def s_sum(rows_: Any, col: str) -> float:
+        """Return the sum of *col* across *rows_*."""
         vals = col_values(rows_, col)
         return sum(vals)
 
     def s_avg(rows_: Any, col: str) -> float:
+        """Return the mean of *col* across *rows_* (0.0 for empty input)."""
         vals = col_values(rows_, col)
         return sum(vals) / len(vals) if vals else 0.0
 
     def s_min(rows_: Any, col: str) -> float:
+        """Return the minimum of *col* across *rows_*."""
         return min(col_values(rows_, col))
 
     def s_max(rows_: Any, col: str) -> float:
+        """Return the maximum of *col* across *rows_*."""
         return max(col_values(rows_, col))
 
     def s_count(rows_: Any) -> int:
+        """Return the number of rows in *rows_*."""
         return len(rows_of(rows_))
 
     def wavg(rows_: Any, val_col: str, weight_col: str) -> float:
+        """Return the weight-averaged *val_col* (0.0 when weights sum to zero)."""
         rs = rows_of(rows_)
         if not rs:
             return 0.0
@@ -341,12 +445,15 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
         return num / den if den else 0.0
 
     def money_k(value: Any) -> str:
+        """Format *value* as thousands of dollars, e.g. ``$12,345K``."""
         return f"${_num(value):,.0f}K"
 
     def s_round(value: Any, ndigits: int = 0) -> float:
+        """Round *value* to *ndigits* decimal places."""
         return round(_num(value), int(ndigits))
 
     def s_abs(value: Any) -> float:
+        """Return the absolute value of *value*."""
         return abs(_num(value))
 
     functions: Dict[str, Callable] = {
@@ -366,6 +473,7 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
     }
 
     def eval_for_row(expr: str, row: Dict[str, Any]) -> Any:
+        """Evaluate *expr* with the shared functions plus the row's columns."""
         ns = dict(functions)
         ns.update(row)
         return _safe_eval(expr, ns)
@@ -419,6 +527,16 @@ def compute_pack(pack: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
 
 
 def _eq(a: Any, b: Any) -> bool:
+    """Compare two values, treating numeric strings as numbers.
+
+    Args:
+        a (Any): Left-hand value.
+        b (Any): Right-hand value.
+
+    Returns:
+        bool: True when the values are equal, either directly or after
+        coercing one side to ``float``.
+    """
     if a == b:
         return True
     if isinstance(a, (int, float)) and isinstance(b, str):
@@ -440,14 +558,24 @@ def _eq(a: Any, b: Any) -> bool:
 
 
 def _fmt_money(v: Any, digits: int = 2) -> str:
+    """Format *v* as millions of dollars, e.g. ``$1.23M``."""
     return f"${_num(v):,.{digits}f}M"
 
 
 def _fmt_pct(v: Any, digits: int = 1) -> str:
+    """Format *v* as a percentage, e.g. ``0.5`` → ``50.0%``."""
     return f"{_num(v) * 100:.{digits}f}%"
 
 
 def _make_env() -> SandboxedEnvironment:
+    """Build the sandboxed Jinja environment used for all templates.
+
+    Registers the ``money``/``pct`` filters and exposes the month helpers as
+    globals so rule templates can call them directly.
+
+    Returns:
+        SandboxedEnvironment: Environment configured with strict undefined.
+    """
     env = SandboxedEnvironment(
         trim_blocks=True,
         lstrip_blocks=True,
@@ -468,6 +596,16 @@ def _make_env() -> SandboxedEnvironment:
 
 
 def _expanded_links(edges: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Expand multi-source edge definitions into one link per source.
+
+    Args:
+        edges (List[Dict[str, Any]]): Edge definitions; ``source_key`` may
+            hold a comma-separated list of sources.
+
+    Returns:
+        List[Dict[str, Any]]: Render-ready links with ``id``, ``source``,
+        ``target``, ``type``, ``label`` and ``description``.
+    """
     links: List[Dict[str, Any]] = []
     for e in edges:
         for src in [s.strip() for s in e["source_key"].split(",") if s.strip()]:
@@ -490,6 +628,16 @@ def _humanize(key: str) -> str:
     Keeps consecutive uppercase runs (acronyms like VNB, APE, KPI) together
     while still separating words: ``TotalVNB`` → ``Total VNB``,
     ``BlendedVNBMargin`` → ``Blended VNB Margin``.
+
+    Args:
+        key (str): Raw key such as ``TotalVNB`` or ``blended_vnb``.
+
+    Returns:
+        str: Space-separated, human-readable label.
+
+    Example:
+        >>> _humanize("BlendedVNBMargin")
+        'Blended VNB Margin'
     """
     s = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", key)
     s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", s)
@@ -497,19 +645,36 @@ def _humanize(key: str) -> str:
 
 
 def template_context(pack: Dict[str, Any], computed: Dict[str, Any]) -> Dict[str, Any]:
-    """Assemble the full Jinja namespace shared by rules and the narrative."""
+    """Assemble the full Jinja namespace shared by rules and the narrative.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        computed (Dict[str, Any]): Output of ``compute_pack`` for *pack*.
+
+    Returns:
+        Dict[str, Any]: Context exposing metrics, table rows, helper
+        callables, graph metadata and (when available) analytics values such
+        as ``ov``, ``ts``, ``attr`` and ``scenario``.
+
+    Example:
+        >>> ctx = template_context(pack, compute_pack(pack, strict=False))
+        >>> ctx["m"]["vnb"]
+    """
     data = computed["tables"]
     fns = dict(computed["functions"])
 
     def max_by(rows_: Any, col: str) -> Dict[str, Any]:
+        """Return the row in *rows_* with the largest numeric *col*."""
         rs = fns["rows"](rows_)
         return max(rs, key=lambda r: _num(r.get(col)))
 
     def min_by(rows_: Any, col: str) -> Dict[str, Any]:
+        """Return the row in *rows_* with the smallest numeric *col*."""
         rs = fns["rows"](rows_)
         return min(rs, key=lambda r: _num(r.get(col)))
 
     def mix_weight(channel_id: str, product_id: str) -> Any:
+        """Return the mix weight for a channel/product pair (0 when absent)."""
         for r in data.get("mix", []):
             if _eq(r.get("channel_id"), channel_id) and _eq(
                 r.get("product_id"), product_id
@@ -550,6 +715,7 @@ def template_context(pack: Dict[str, Any], computed: Dict[str, Any]) -> Dict[str
         ctx["astats"] = overview.get("agents")
 
         def _scenario(multiplier: float = 2.0, planned_active: Any = None):
+            """Run the what-if scenario for a multiplier and active-agent target."""
             return analytics.run_scenario(
                 data, float(multiplier), int(planned_active) if planned_active else None
             )
@@ -559,9 +725,19 @@ def template_context(pack: Dict[str, Any], computed: Dict[str, Any]) -> Dict[str
         ctx["month_label"] = analytics.month_label
 
         def _attr_for(question_text: Any):
-            """Month-aware MoM attribution: honours the month named in the
-            question (or inherited from history); falls back to the latest
-            month pair when no month is mentioned."""
+            """Resolve month-aware MoM attribution for the given question.
+
+            Honours the month named in the question (or inherited from
+            history); falls back to the latest month pair when no month is
+            mentioned.
+
+            Args:
+                question_text (Any): Raw user question text.
+
+            Returns:
+                Any: Attribution mapping for the requested month, or the
+                overview attribution when no month matches.
+            """
             tgt, _prev = _month_context(
                 str(question_text or ""), data.get("vnb_monthly") or []
             )
@@ -603,6 +779,7 @@ _EDGE_TYPE_LABELS = {
 
 
 def _group_map(nodes: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Map each graph group key present in *nodes* to its display label."""
     out: Dict[str, str] = {}
     for n in nodes:
         out.setdefault(n["grp"], _GROUP_LABELS.get(n["grp"], "Ontology concept node"))
@@ -610,6 +787,7 @@ def _group_map(nodes: List[Dict[str, Any]]) -> Dict[str, str]:
 
 
 def _edge_type_map(edges: List[Dict[str, Any]]) -> Dict[str, str]:
+    """Map each edge type present in *edges* to its display label."""
     out: Dict[str, str] = {}
     for e in edges:
         out.setdefault(
@@ -624,6 +802,19 @@ def _edge_type_map(edges: List[Dict[str, Any]]) -> Dict[str, str]:
 
 
 def _rule_matches(rule: Dict[str, Any], text: str) -> bool:
+    """Return True when *rule* applies to *text*.
+
+    A rule applies when none of its guards fire, all ``require_groups`` are
+    satisfied and at least one pattern (or group) matched.
+
+    Args:
+        rule (Dict[str, Any]): Rule definition with optional ``guards``,
+            ``patterns`` and ``require_groups`` regex lists.
+        text (str): Lower-cased user question.
+
+    Returns:
+        bool: True when the rule should answer the question.
+    """
     if any(re.search(p, text, re.IGNORECASE) for p in rule.get("guards", [])):
         return False
     if rule["patterns"]:
@@ -654,6 +845,30 @@ def answer_question(
     questions such as "How does it compare to the previous month?" inherit
     the month named in an earlier turn — the rules engine itself stays
     stateless.
+
+    Args:
+        question (str): Raw user question.
+        pack (Optional[Dict[str, Any]]): Pack definition; ``None`` loads the
+            active pack from the database.
+        computed (Optional[Dict[str, Any]]): Pre-computed pack data; ``None``
+            computes it with ``strict=False``.
+        raise_on_template_error (bool): Raise ``EvalError`` when a matched
+            rule's template fails instead of skipping the rule.
+        history (Optional[List[Dict[str, str]]]): Previous conversation turns
+            (oldest first) used for month inheritance.
+
+    Returns:
+        Optional[Dict[str, Any]]: Answer payload with ``rule_key``,
+        ``category``, ``answer``, ``nodes`` and optional ``path``; ``None``
+        when no rule matches.
+
+    Raises:
+        EvalError: If a rule template fails and ``raise_on_template_error``
+        is True.
+
+    Example:
+        >>> answer_question("What is the VNB?")
+        {'rule_key': 'kpi-vnb', 'answer': '...', ...}
     """
     if pack is None:
         with get_conn() as conn:
@@ -770,6 +985,17 @@ def _extract_month_prefixes(text: str) -> List[str]:
     compare to march?" returns ``['-03', '-04']`` and downstream matchers
     pick March as the target — completely ignoring April, which is
     obviously not what the user asked for.
+
+    Args:
+        text (str): Question text to scan.
+
+    Returns:
+        List[str]: Month prefixes in order of appearance — ``YYYY-MM`` when
+        a year is present, otherwise the year-less ``-MM`` sentinel.
+
+    Example:
+        >>> _extract_month_prefixes("VNB in April vs March 2024")
+        ['2024-04', '2024-03']
     """
     lowered = text.lower()
     years = re.findall(r"\b(20\d{2})\b", text)
@@ -804,106 +1030,20 @@ def _extract_month_prefixes(text: str) -> List[str]:
     return out
 
 
-def _make_month_matcher(
-    question: str,
-) -> Callable[[List[Any]], Tuple[Optional[str], Optional[str]]]:
-    """Return a helper usable inside rule templates.
-
-    Given a ``list`` of date-ish rows (or raw strings) the helper finds
-    months matching the question and returns
-    ``(target_prefix_or_None, prev_month_prefix_or_None)``.
-
-    When the question names *two or more* months, the helper picks the
-    **latest matching month in the data** as ``target`` so ``prev`` falls
-    out to the month immediately before it — which is always meaningful
-    even when the chosen month is the first keyword mentioned in the
-    question. A single-month question keeps the "first match" behaviour
-    so ``prev`` is its natural predecessor.
-
-    Example::
-
-        {% set tgt, prev = month_match(me) %}
-        {% if tgt %}
-          Sep 2024: … vs Aug 2024: …
-        {% else %}
-          Full-dataset summary.
-        {% endif %}
-    """
-    targets = _extract_month_prefixes(question)
-    pick_last_match = len(targets) >= 2
-
-    def _helper(rows: List[Any]) -> Tuple[Optional[str], Optional[str]]:
-        if not rows or not targets:
-            return None, None
-
-        # normalise row.report_month or row['report_month'] values
-        month_values: List[str] = []
-        for r in rows:
-            if isinstance(r, dict):
-                v = r.get("report_month") or r.get("month") or r.get("period")
-            else:
-                v = (
-                    getattr(r, "report_month", None)
-                    or getattr(r, "month", None)
-                    or getattr(r, "period", None)
-                )
-            if v is None:
-                continue
-            s = str(v).strip()
-            # strip time-of-day so 2024-09-01 00:00:00 → 2024-09
-            s = re.split(r"[ T]", s, maxsplit=1)[0][:7]
-            month_values.append(s)
-
-        distinct = sorted(set(month_values))
-        if not distinct:
-            return None, None
-
-        # find matching months
-        matches: List[str] = []
-        for mv in distinct:
-            for tgt in targets:
-                hit = False
-                if tgt.startswith("-"):
-                    if mv.endswith(tgt):
-                        hit = True
-                elif mv.startswith(tgt):
-                    hit = True
-                if hit:
-                    matches.append(mv)
-                    break
-
-        if not matches:
-            return None, None
-
-        chosen = matches[-1] if pick_last_match else matches[0]
-        idx = distinct.index(chosen)
-        prev = distinct[idx - 1] if idx > 0 else None
-        return chosen, prev
-
-    return _helper
-
-
 def _filter_rows_by_month(rows: List[Any], prefix: str) -> List[Any]:
-    """Return rows whose report_month normalised ``YYYY-MM`` equals *prefix*."""
+    """Return rows whose report_month normalised ``YYYY-MM`` equals *prefix*.
+
+    Args:
+        rows (List[Any]): Row dicts or objects exposing a month field.
+        prefix (str): Normalised ``YYYY-MM`` (or year-less ``-MM``) sentinel
+            to keep.
+
+    Returns:
+        List[Any]: Rows that belong to the requested month.
+    """
     if not rows or not prefix:
         return []
-    out: List[Any] = []
-    for r in rows:
-        if isinstance(r, dict):
-            v = r.get("report_month") or r.get("month") or r.get("period")
-        else:
-            v = (
-                getattr(r, "report_month", None)
-                or getattr(r, "month", None)
-                or getattr(r, "period", None)
-            )
-        if v is None:
-            continue
-        s = str(v).strip()
-        s = re.split(r"[ T]", s, maxsplit=1)[0][:7]
-        if s == prefix:
-            out.append(r)
-    return out
+    return [r for r in rows if _row_month_key(r) == prefix]
 
 
 def _month_context(
@@ -914,28 +1054,25 @@ def _month_context(
     Finds the month requested in *question* within *rows* and returns
     ``(target_prefix, prev_prefix)`` — or ``(None, None)`` when no
     explicit month was mentioned or nothing matches in the data.
+
+    Args:
+        question (str): Raw user question naming a month.
+        rows (List[Any]): Row dicts or objects exposing a month field.
+
+    Returns:
+        Tuple[Optional[str], Optional[str]]: The matched month and the
+        month immediately before it, both as normalised ``YYYY-MM``.
+
+    Example:
+        >>> _month_context("VNB in Sep 2024", rows)
+        ('2024-09', '2024-08')
     """
     targets = _extract_month_prefixes(question)
     if not targets or not rows:
         return None, None
     pick_last_match = len(targets) >= 2
-    # normalise month values
-    month_values: List[str] = []
-    for r in rows:
-        if isinstance(r, dict):
-            v = r.get("report_month") or r.get("month") or r.get("period")
-        else:
-            v = (
-                getattr(r, "report_month", None)
-                or getattr(r, "month", None)
-                or getattr(r, "period", None)
-            )
-        if v is None:
-            continue
-        s = str(v).strip()
-        s = re.split(r"[ T]", s, maxsplit=1)[0][:7]
-        month_values.append(s)
-    distinct = sorted(set(month_values))
+    # normalise month values (the shared helper keeps parsing in one place)
+    distinct = sorted({k for k in map(_row_month_key, rows) if k is not None})
     if not distinct:
         return None, None
 
@@ -977,7 +1114,16 @@ _COHORT_DIMS = ("plangroup", "product", "policy_year", "channel_nm", "channel")
 
 
 def _row_month_key(r: Any) -> Optional[str]:
-    """Normalised ``YYYY-MM`` of a row's month column, or None."""
+    """Return the normalised ``YYYY-MM`` of a row's month column, or None.
+
+    Args:
+        r (Any): Row dict or object exposing ``report_month``, ``month`` or
+            ``period``.
+
+    Returns:
+        Optional[str]: Normalised ``YYYY-MM`` key, or ``None`` when the row
+        carries no usable month value.
+    """
     if isinstance(r, dict):
         v = r.get("report_month") or r.get("month") or r.get("period")
     else:
@@ -993,6 +1139,15 @@ def _row_month_key(r: Any) -> Optional[str]:
 
 
 def _stated_rate(r: Dict[str, Any]) -> Optional[float]:
+    """Return the stated actual lapse rate of a row, if present.
+
+    Args:
+        r (Dict[str, Any]): Row holding ``actual_lapse_rate`` or
+            ``actual_rate``.
+
+    Returns:
+        Optional[float]: The stated rate, or ``None`` when the row has none.
+    """
     v = r.get("actual_lapse_rate")
     if v in (None, ""):
         v = r.get("actual_rate")
@@ -1000,6 +1155,15 @@ def _stated_rate(r: Dict[str, Any]) -> Optional[float]:
 
 
 def _expected_rate(r: Dict[str, Any]) -> Optional[float]:
+    """Return the expected lapse rate of a row, if present.
+
+    Args:
+        r (Dict[str, Any]): Row holding ``expected_lapse_rate`` or
+            ``expected_rate``.
+
+    Returns:
+        Optional[float]: The expected rate, or ``None`` when the row has none.
+    """
     v = r.get("expected_lapse_rate")
     if v in (None, ""):
         v = r.get("expected_rate")
@@ -1014,6 +1178,17 @@ def _month_aggregate(rs: List[Dict[str, Any]]) -> Dict[str, Any]:
     otherwise the stated rates are exposure-weighted; expected rate is a
     plain average; A/E falls back to actual ÷ expected when no explicit
     ``a_e_ratio`` column is present.
+
+    Args:
+        rs (List[Dict[str, Any]]): Lapse-style rows belonging to one month.
+
+    Returns:
+        Dict[str, Any]: ``rows``, ``exposure``, ``lapses``, ``actual_rate``,
+        ``expected_rate`` and ``a_e`` aggregates.
+
+    Example:
+        >>> _month_aggregate(rows_for_sep)
+        {'rows': 12, 'exposure': 1000.0, 'actual_rate': 0.08, ...}
     """
     exp = sum(_num(r.get("exposure")) for r in rs)
     lapses = sum(_num(r.get("actual_lapses")) for r in rs)
@@ -1059,6 +1234,19 @@ def _month_movement(
     When *tgt* is None (no month named in the question or inherited from
     history) the latest two distinct months in *rows* are used so the
     template still answers sensibly.
+
+    Args:
+        rows (List[Dict[str, Any]]): Lapse-style rows spanning several months.
+        tgt (Optional[str]): Target month prefix (``YYYY-MM`` or ``-MM``).
+        prev (Optional[str]): Previous month prefix; inferred when None.
+
+    Returns:
+        Dict[str, Any]: ``tgt``/``prev`` months, aggregate blocks ``cur`` and
+        ``prev_agg``, and the ranked ``movers`` list.
+
+    Example:
+        >>> _month_movement(rows, "2024-09", "2024-08")["movers"][0]
+        {'label': 'Agency · Term', 'delta_ppt': -2.4, ...}
     """
     if not tgt:
         months = sorted({m for m in (_row_month_key(r) for r in rows) if m})
@@ -1072,6 +1260,7 @@ def _month_movement(
     dims = [d for d in _COHORT_DIMS if any(d in r for r in cur + prv)]
 
     def _key_of(r: Dict[str, Any]) -> Tuple[str, ...]:
+        """Return the cohort dimension tuple identifying *r*."""
         return tuple(str(r.get(d, "")) for d in dims)
 
     cur_m: Dict[Tuple[str, ...], List[Dict[str, Any]]] = {}
@@ -1150,6 +1339,15 @@ _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def _tokens(text: str) -> Set[str]:
+    """Tokenise *text* for question similarity (stop words and CJK bigrams).
+
+    Args:
+        text (str): Question text to tokenise.
+
+    Returns:
+        Set[str]: Non-stopword latin tokens plus single CJK characters and
+        CJK bigrams.
+    """
     toks = {t for t in _TOKEN_RE.findall(text.lower()) if t not in _STOP and len(t) > 1}
     cjk = re.findall(r"[\u4e00-\u9fff]", text)
     toks.update(cjk)
@@ -1161,6 +1359,26 @@ def _tokens(text: str) -> Set[str]:
 def similar_questions(
     question: str, limit: int = 3, pack_id: Optional[int] = None
 ) -> List[Dict[str, Any]]:
+    """Suggest the closest questions from the pack's question bank.
+
+    Ranking is deterministic: token overlap ratio plus a bonus for
+    substring containment, with canonical questions preferred by the query
+    and remaining slots filled from the bank.
+
+    Args:
+        question (str): Question the user asked (or is typing).
+        limit (int): Maximum number of suggestions to return.
+        pack_id (Optional[int]): Pack whose bank is searched; ``None`` uses
+            the active pack.
+
+    Returns:
+        List[Dict[str, Any]]: Bank items (``question``, ``category``,
+        ``source``) ordered from most to least similar.
+
+    Example:
+        >>> similar_questions("What drives VNB?", limit=3)
+        [{'question': 'What is the VNB?', 'category': 'kpi', ...}, ...]
+    """
     q_tokens = _tokens(question)
     with get_conn() as conn:
         if pack_id is None:
@@ -1206,6 +1424,19 @@ def search_ontology(
 
     Matches key, label, description (and expression/template for formulas/rules).
     Results ranked by field weight (label > key > description).
+
+    Args:
+        pack (Dict[str, Any]): Pack definition to search.
+        query (str): Case-insensitive substring to look for.
+        limit (int): Maximum number of results to return.
+
+    Returns:
+        List[Dict[str, Any]]: Hits with ``kind``, ``key``, ``label`` and a
+        ``snippet``, deduplicated by ``(kind, key)`` and ranked by weight.
+
+    Example:
+        >>> search_ontology(pack, "lapse", limit=5)
+        [{'kind': 'attribute', 'key': 'actual_lapse_rate', ...}]
     """
     q = query.strip().lower()
     if not q:
@@ -1213,6 +1444,7 @@ def search_ontology(
     results: List[Tuple[float, Dict[str, Any]]] = []
 
     def add(kind: str, obj: Dict[str, Any], text: str, weight: float) -> None:
+        """Record *obj* as a hit when *text* contains the query."""
         if q in text.lower():
             results.append(
                 (
@@ -1261,6 +1493,18 @@ def search_ontology(
 
 
 def suggested_questions(pack_id: Optional[int] = None) -> List[str]:
+    """Return the pack's question bank, canonical questions first.
+
+    Args:
+        pack_id (Optional[int]): Pack to read; ``None`` uses the active pack.
+
+    Returns:
+        List[str]: Question texts in bank order; empty when no pack exists.
+
+    Example:
+        >>> suggested_questions()[:2]
+        ['What is the VNB?', 'How is the VNB calculated?']
+    """
     with get_conn() as conn:
         if pack_id is None:
             pack_id = active_pack_id(conn)
@@ -1280,12 +1524,36 @@ def suggested_questions(pack_id: Optional[int] = None) -> List[str]:
 
 
 def pack_tables(pack: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
-    """Instance rows keyed by table key — the input shape for analytics."""
+    """Return instance rows keyed by table key — the input shape for analytics.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: Table key → row list.
+
+    Example:
+        >>> pack_tables(pack)["kpi"][0]["vnb"]
+    """
     return {t["key"]: t.get("rows", []) for t in pack.get("tables", [])}
 
 
 def library_payload(pack: Dict[str, Any], pid: int) -> Dict[str, Any]:
-    """Read-only glossary + data inventory for the user portal library view."""
+    """Build the read-only glossary and data inventory for the library view.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        pid (int): Pack id reported in the payload.
+
+    Returns:
+        Dict[str, Any]: ``pack`` metadata, glossaries (``entities``,
+        ``attributes``, ``relations``, ``formulas``) and ``tables`` with
+        column metadata, row counts and a 50-row preview.
+
+    Example:
+        >>> payload = library_payload(pack, pack["id"])
+        >>> payload["tables"][0]["row_count"]
+    """
     tables = []
     for t in pack.get("tables", []):
         rows = t.get("rows", [])
@@ -1338,6 +1606,13 @@ def _auto_generate_graph(pack: Dict[str, Any]) -> None:
 
     Mutates *pack* in-place so that ``visual_graph`` has data to render even
     when the pack defines no explicit visual graph layer.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition; ``nodes`` and ``edges`` are
+            filled in when empty.
+
+    Returns:
+        None: The pack is updated in place.
     """
     entities = pack.get("entities", [])
     relations = pack.get("relations", [])
@@ -1373,6 +1648,22 @@ def _auto_generate_graph(pack: Dict[str, Any]) -> None:
 
 
 def visual_graph(pack: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the render-ready visual graph (nodes, links and their labels).
+
+    Graph nodes/edges are auto-generated from entities/relations when the
+    pack does not define them explicitly.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+
+    Returns:
+        Dict[str, Any]: ``nodes``, ``links``, ``groups``, ``edge_types`` and
+        ``edge_descriptions`` ready for the front-end force layout.
+
+    Example:
+        >>> graph = visual_graph(pack)
+        >>> len(graph["links"])
+    """
     _auto_generate_graph(pack)
     node_meta = {n["key"]: n for n in pack["nodes"]}
     ordered_keys = [n["key"] for n in pack["nodes"]]
@@ -1426,6 +1717,17 @@ def class_graph(pack: Dict[str, Any]) -> Dict[str, Any]:
     Unlike :func:`visual_graph` which uses the ``graph_nodes`` / ``graph_edges``
     tables, this view shows the ontology class structure directly — entities
     become nodes and ``relations`` become labelled edges with cardinality.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+
+    Returns:
+        Dict[str, Any]: ``nodes`` (entities), ``links`` (relations) and the
+        single ``RELATION`` edge type with per-edge descriptions.
+
+    Example:
+        >>> class_graph(pack)["edge_types"]
+        {'RELATION': 'Entity relationship'}
     """
     nodes: List[Dict[str, Any]] = []
     for e in pack.get("entities", []):
@@ -1467,7 +1769,18 @@ def class_graph(pack: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def graph_studio_sources(pack: Dict[str, Any]) -> Dict[str, Any]:
-    """List the building blocks a user can pick from in the graph studio."""
+    """List the building blocks a user can pick from in the graph studio.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+
+    Returns:
+        Dict[str, Any]: ``pack`` identity, ontology counts and per-table
+        column metadata (key, label, type, derived flag).
+
+    Example:
+        >>> graph_studio_sources(pack)["ontology"]["entities"]
+    """
     return {
         "pack": {"id": pack["id"], "name": pack["name"]},
         "ontology": {
@@ -1499,7 +1812,17 @@ def graph_studio_sources(pack: Dict[str, Any]) -> Dict[str, Any]:
 def _match_column_to_attribute(
     col_key: str, col_label: str, attributes: List[Dict[str, Any]]
 ) -> Optional[Dict[str, Any]]:
-    """Match a data column to an ontology attribute by key / label text."""
+    """Match a data column to an ontology attribute by key / label text.
+
+    Args:
+        col_key (str): Raw column key (e.g. ``channel_id``).
+        col_label (str): Human-readable column label.
+        attributes (List[Dict[str, Any]]): Candidate ontology attributes.
+
+    Returns:
+        Optional[Dict[str, Any]]: The first matching attribute, or ``None``
+        when no key or label matches.
+    """
     ck = (col_key or "").strip().lower()
     cl = (col_label or "").strip().lower()
     for a in attributes:
@@ -1519,7 +1842,15 @@ def _match_column_to_attribute(
 
 
 def _entity_nodes(entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Ontology entity nodes with provenance (schema view)."""
+    """Return ontology entity nodes with provenance for the schema view.
+
+    Args:
+        entities (List[Dict[str, Any]]): Entity definitions of the pack.
+
+    Returns:
+        List[Dict[str, Any]]: Graph nodes with ``id``, ``label``, ``group``
+        and a ``source`` provenance block.
+    """
     return [
         {
             "id": "ent:" + e["key"],
@@ -1558,6 +1889,22 @@ def build_studio_graph(
                        "Channel ID" in five tables) are aggregated into
                        ONE node whose provenance lists every source
                        table, so the graph never shows duplicates.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        view (str): One of ``schema``, ``lineage`` or ``columns`` (anything
+            else is treated as ``columns``).
+        table_ids (Optional[List[int]]): Restrict data tables to these ids;
+            ``None`` includes every table.
+        include_unmatched (bool): Keep column concepts that match no
+            ontology attribute (``columns`` view only).
+
+    Returns:
+        Dict[str, Any]: ``view``, ``nodes``, ``links``, ``groups``,
+        ``edge_types`` and ``sources_used`` (provenance summary lines).
+
+    Example:
+        >>> build_studio_graph(pack, view="lineage")["nodes"][0]["source"]
     """
     entities = pack.get("entities", [])
     attributes = pack.get("attributes", [])
@@ -1571,6 +1918,7 @@ def build_studio_graph(
     seen: Set[str] = set()
 
     def add_node(node: Dict[str, Any]) -> None:
+        """Append *node* to the result unless its id is already present."""
         if node["id"] not in seen:
             seen.add(node["id"])
             nodes.append(node)
@@ -1811,6 +2159,22 @@ def graph_from_upload(
 
     Nothing is written to the database — this is an in-memory preview that
     links the file's columns to whatever ontology attributes they match.
+
+    Args:
+        pack (Optional[Dict[str, Any]]): Active pack used for matching;
+            ``None`` yields a file-only graph.
+        filename (str): Display name of the uploaded file.
+        columns (List[str]): Column names found in the file.
+        row_count (int): Number of data rows in the upload.
+        sample (Optional[Dict[str, Any]]): Optional first-row sample keyed by
+            column name, shown as each column's preview value.
+
+    Returns:
+        Dict[str, Any]: ``nodes``, ``links``, ``groups``, ``edge_types`` and
+        ``sources_used`` describing the preview graph.
+
+    Example:
+        >>> graph_from_upload(pack, "kpi.csv", ["vnb", "ape"], 120)
     """
     attributes = (pack or {}).get("attributes", [])
     entities = (pack or {}).get("entities", [])
@@ -1931,9 +2295,18 @@ _STOP_TOKENS = {
 
 
 def _key_tokens(key: str) -> List[str]:
-    """Lightweight tokenizer for table/column key matching (singularized,
+    """Tokenise a table/column key for schema matching.
+
+    Lightweight tokenizer for table/column key matching (singularized,
     table-noise removed). Distinct from _tokens() which powers question
-    matching and keeps CJK support."""
+    matching and keeps CJK support.
+
+    Args:
+        key (str): Table or column key such as ``policy_details``.
+
+    Returns:
+        List[str]: Cleaned tokens; the raw split when everything was noise.
+    """
     toks = re.split(r"[^a-z0-9]+", (key or "").lower())
     out = []
     for t in toks:
@@ -1946,6 +2319,15 @@ def _key_tokens(key: str) -> List[str]:
 
 
 def _infer_data_type(values: List[Any]) -> str:
+    """Infer a column data type from its sample values.
+
+    Args:
+        values (List[Any]): Raw cell values of the column.
+
+    Returns:
+        str: ``NUMBER``, ``BOOL`` or ``DATE`` when at least 80% of the
+        non-empty values match, otherwise ``STRING``.
+    """
     n = nums = bools = dates = 0
     for v in values:
         if v is None or v == "":
@@ -1990,6 +2372,23 @@ def infer_ontology(
     columns and active dataset rows are copied into the payload, so
     importing it produces a working ontology that can answer questions
     immediately.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        table_ids (Optional[List[int]]): Tables to convert; ``None`` uses all.
+        name (str): Display name for the generated pack.
+        slug (str): URL slug for the generated pack.
+
+    Returns:
+        Dict[str, Any]: An ``onti-pack/v1`` payload with entities, attributes,
+        relations, graph nodes/edges and copied tables.
+
+    Raises:
+        EvalError: If no data table is selected.
+
+    Example:
+        >>> payload = infer_ontology(pack, name="Lapse pack")
+        >>> len(payload["entities"])
     """
     wanted = set(table_ids or [])
     tables = [t for t in pack.get("tables", []) if not wanted or t["id"] in wanted]
@@ -2170,11 +2569,23 @@ def recommended_questions(pack: Dict[str, Any], limit: int = 8) -> List[str]:
 
     Built from entities, numeric attributes and metric formulas; any
     question already present in the canonical question bank is skipped.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        limit (int): Maximum number of questions to return.
+
+    Returns:
+        List[str]: Suggested question texts in generation order.
+
+    Example:
+        >>> recommended_questions(pack, limit=3)
+        ['What is the VNB?', 'What is the total lapse rate?', ...]
     """
     existing = {q.strip().lower() for q in suggested_questions(pack.get("id"))}
     out: List[str] = []
 
     def add(q: str) -> None:
+        """Queue *q* unless it is a bank question or already queued."""
         if q.lower() not in existing and q not in out:
             out.append(q)
 
@@ -2199,7 +2610,22 @@ def retrieve_subgraph(
     answer_text: str = "",
     extra_nodes: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Alias-driven deterministic retrieval: matched nodes + 1-hop edges."""
+    """Alias-driven deterministic retrieval: matched nodes + 1-hop edges.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        question (str): User question searched for node keys/aliases.
+        answer_text (str): Rendered answer text, searched the same way.
+        extra_nodes (Optional[List[str]]): Additional node keys to seed.
+
+    Returns:
+        Dict[str, Any]: ``matched`` seed nodes, ``nodes`` (seeds plus their
+        1-hop neighbours, in pack order) and ``edge_ids`` to keep.
+
+    Example:
+        >>> retrieve_subgraph(pack, "What drives VNB?")
+        {'matched': ['vnb'], 'nodes': ['vnb', 'ape', ...], ...}
+    """
     haystack = f" {question} {answer_text} {' '.join(extra_nodes or [])} ".lower()
 
     matched: List[str] = []
@@ -2239,7 +2665,16 @@ def retrieve_subgraph(
 def _graph_adjacency(
     pack: Dict[str, Any],
 ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, List[Dict[str, Any]]]]:
-    """Out/in adjacency maps over the visual graph links (auto-generated)."""
+    """Build out/in adjacency maps over the visual graph links.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition; graph layers are
+            auto-generated when missing.
+
+    Returns:
+        Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, List[Dict[str, Any]]]]:
+        ``(outgoing, incoming)`` adjacency maps keyed by node key.
+    """
     _auto_generate_graph(pack)
     out: Dict[str, List[Dict[str, Any]]] = {}
     inc: Dict[str, List[Dict[str, Any]]] = {}
@@ -2264,7 +2699,24 @@ def _graph_adjacency(
 
 
 def shortest_path(pack: Dict[str, Any], source: str, target: str) -> Dict[str, Any]:
-    """BFS shortest path between two graph nodes (direction-aware, follows edges)."""
+    """BFS shortest path between two graph nodes (direction-aware).
+
+    Follows edge direction only, so ``source → target`` must be reachable
+    downstream.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        source (str): Starting node key.
+        target (str): Destination node key.
+
+    Returns:
+        Dict[str, Any]: ``found`` plus ``path`` (node keys) and ``edge_ids``;
+        when no path exists, ``found`` is False with a ``reason``.
+
+    Example:
+        >>> shortest_path(pack, "ape", "vnb")
+        {'found': True, 'path': ['ape', 'vnb'], 'edge_ids': ['ape-vnb']}
+    """
     out, _ = _graph_adjacency(pack)
     keys = {n["key"] for n in pack["nodes"]}
     if source not in keys or target not in keys:
@@ -2319,6 +2771,21 @@ def impact_analysis(
 
     ``downstream`` follows edge direction (what *node* influences);
     ``upstream`` walks against it (what influences *node*).
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        node (str): Root node key.
+        hops (int): Maximum hop count, clamped to 1–6.
+        direction (str): ``downstream`` (default) or ``upstream``.
+
+    Returns:
+        Dict[str, Any]: ``found``, ``root``, ``direction``, ``hops``,
+        ``levels`` (one sorted node list per hop), ``nodes`` in traversal
+        order, ``edge_ids`` and per-node ``labels``.
+
+    Example:
+        >>> impact_analysis(pack, "ape", hops=2)["levels"]
+        [['ape'], ['vnb'], ['blended_vnb_margin']]
     """
     out, inc = _graph_adjacency(pack)
     keys = {n["key"] for n in pack["nodes"]}
@@ -2376,13 +2843,26 @@ def impact_analysis(
 
 
 def detect_cycles(pack: Dict[str, Any]) -> Dict[str, Any]:
-    """Detect directed cycles in the visual graph (DFS with colouring)."""
+    """Detect directed cycles in the visual graph (DFS with colouring).
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+
+    Returns:
+        Dict[str, Any]: ``count`` of cycles found and ``cycles`` (up to ten
+        node-key paths, each returning to its start node).
+
+    Example:
+        >>> detect_cycles(pack)["count"]
+        0
+    """
     out, _ = _graph_adjacency(pack)
     color = {n["key"]: 0 for n in pack["nodes"]}  # 0 white 1 grey 2 black
     stack: List[str] = []
     cycles: List[List[str]] = []
 
     def dfs(u: str) -> None:
+        """Recursively colour *u* and record any back-edge as a cycle."""
         color[u] = 1
         stack.append(u)
         for link in out.get(u, []):
@@ -2409,11 +2889,25 @@ def ontology_health(pack: Dict[str, Any]) -> Dict[str, Any]:
     Returns a scored list of checks — ok / warn / error — covering schema
     completeness, graph connectivity, alias collisions and formula/rule
     quality.  Consumed by ``GET /api/admin/ontology/health``.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``;
+            graph layers are auto-generated when missing.
+
+    Returns:
+        Dict[str, Any]: ``score`` (``green``/``amber``/``red``), ``errors``
+        and ``warnings`` counts, the individual ``checks`` and pack ``stats``.
+
+    Example:
+        >>> report = ontology_health(pack)
+        >>> report["score"]
+        'green'
     """
     _auto_generate_graph(pack)
     checks: List[Dict[str, Any]] = []
 
     def add(cid: str, title: str, status: str, detail: str, items: List[str]) -> None:
+        """Append one check result (capped at 20 items) to the report."""
         checks.append(
             {
                 "id": cid,
@@ -2616,7 +3110,15 @@ def ontology_health(pack: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _expr_names(expr: str) -> Set[str]:
-    """Extract referenced identifiers (names) from a formula expression."""
+    """Extract referenced identifiers (names) from a formula expression.
+
+    Args:
+        expr (str): Expression source text.
+
+    Returns:
+        Set[str]: Names referenced via ``ast.Name`` nodes; empty when the
+        expression cannot be parsed.
+    """
     names: Set[str] = set()
     try:
         tree = ast.parse(str(expr or ""), mode="eval")
@@ -2635,6 +3137,19 @@ def formula_impact(pack: Dict[str, Any], formula_key: str) -> Dict[str, Any]:
     the key — plus a transitive closure of formulas (since formula B may call
     formula A which calls the target).  Use this in the admin formula editor
     to warn before saving.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        formula_key (str): Key of the formula being changed.
+
+    Returns:
+        Dict[str, Any]: ``found`` plus ``downstream_formulas`` (transitive
+        callers), ``direct_callers``, affected ``graph_nodes`` and ``rules``,
+        and ``total_affected``.
+
+    Example:
+        >>> formula_impact(pack, "vnb")["downstream_formulas"]
+        ['blended_vnb_margin']
     """
     formulas = pack.get("formulas", [])
     fkeys = {f["key"] for f in formulas}
@@ -2698,7 +3213,21 @@ def formula_impact(pack: Dict[str, Any], formula_key: str) -> Dict[str, Any]:
 def render_narrative(
     pack: Dict[str, Any], computed: Optional[Dict[str, Any]] = None
 ) -> str:
-    """Render the pack narrative template; auto-generate a basic one if empty."""
+    """Render the pack narrative template; auto-generate one when empty.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        computed (Optional[Dict[str, Any]]): Pre-computed pack data; ``None``
+            computes it with ``strict=False``.
+
+    Returns:
+        str: Markdown narrative; template failures are reported inline and a
+        generic relationship summary is produced when no template exists.
+
+    Example:
+        >>> render_narrative(pack).splitlines()[0]
+        '## VNB pack — relationship model'
+    """
     if computed is None:
         computed = compute_pack(pack, strict=False)
     graph = visual_graph(pack)
@@ -2733,33 +3262,18 @@ def render_narrative(
 # ===========================================================================
 
 
-def formal_schema(pack: Dict[str, Any]) -> Dict[str, Any]:
-    attrs_by_entity: Dict[str, List[Dict[str, Any]]] = {}
-    for a in pack["attributes"]:
-        attrs_by_entity.setdefault(a["entity_key"], []).append(a)
-    entities = []
-    for ent in pack["entities"]:
-        d = dict(ent)
-        d["attributes"] = attrs_by_entity.get(ent["key"], [])
-        entities.append(d)
-    return {
-        "pack": {
-            "id": pack["id"],
-            "name": pack["name"],
-            "slug": pack["slug"],
-            "description": pack["description"],
-        },
-        "entities": entities,
-        "relations": pack["relations"],
-        "stats": {
-            "entities": len(entities),
-            "attributes": len(pack["attributes"]),
-            "relations": len(pack["relations"]),
-        },
-    }
-
-
 def _metric_display(key: str, value: Any, formulas: List[Dict[str, Any]]) -> str:
+    """Format a computed metric using the formula's ``fmt``/``decimals``.
+
+    Args:
+        key (str): Metric key used to look up the formula definition.
+        value (Any): Computed metric value.
+        formulas (List[Dict[str, Any]]): Formula definitions of the pack.
+
+    Returns:
+        str: Display string; ``n/a (input data missing)`` when *value* is
+        ``None``.
+    """
     if value is None:
         return "n/a (input data missing)"
     f = next((x for x in formulas if x["key"] == key), None)
@@ -2775,6 +3289,16 @@ def _metric_display(key: str, value: Any, formulas: List[Dict[str, Any]]) -> str
 
 
 def _cell_display(value: Any, col: Dict[str, Any]) -> str:
+    """Format one table cell according to the column's ``fmt`` setting.
+
+    Args:
+        value (Any): Raw cell value.
+        col (Dict[str, Any]): Column definition (``fmt`` such as ``percent``,
+            ``currency_m`` or ``currency_k``).
+
+    Returns:
+        str: Display string; empty string for ``None``.
+    """
     if value is None:
         return ""
     if col.get("fmt") == "percent" and isinstance(value, (int, float)):
@@ -2809,11 +3333,21 @@ _SAMPLE_ROWS = 3
 
 
 def _is_month_like(col: Dict[str, Any]) -> bool:
+    """Return True when the column key/label looks like a month or period."""
     k = f"{col.get('key', '')} {col.get('label', '')}".lower()
     return any(h in k for h in _MONTH_HINTS)
 
 
 def _profile_number(v: Any) -> Optional[float]:
+    """Parse *v* as a number for column profiling.
+
+    Args:
+        v (Any): Raw cell value.
+
+    Returns:
+        Optional[float]: Numeric value, or ``None`` for booleans and values
+        that do not parse as numbers.
+    """
     if isinstance(v, bool):
         return None
     if isinstance(v, (int, float)):
@@ -2825,13 +3359,23 @@ def _profile_number(v: Any) -> Optional[float]:
 
 
 def _fmt_profile_num(f: float) -> str:
+    """Format a profile number: thousands separators, else six significant digits."""
     if abs(f - round(f)) < 1e-9 and abs(f) < 1e15:
         return f"{int(round(f)):,}"
     return f"{f:,.6g}"
 
 
 def _sorted_distinct(rows: List[Dict[str, Any]], key: str) -> List[str]:
-    """Distinct non-empty values, numerically sorted when they all parse."""
+    """Return distinct non-empty values, numerically sorted when possible.
+
+    Args:
+        rows (List[Dict[str, Any]]): Rows to scan.
+        key (str): Column key whose values are collected.
+
+    Returns:
+        List[str]: Deduplicated string values, sorted numerically when every
+        value parses as a number and lexically otherwise.
+    """
     seen: Dict[str, None] = {}
     for r in rows:
         v = r.get(key)
@@ -2848,7 +3392,14 @@ def _sorted_distinct(rows: List[Dict[str, Any]], key: str) -> List[str]:
 def _month_key(v: Any) -> str:
     """Normalise a period value for grouping/display: `2023-01-01 00:00:00`,
     `2023-01-01` and `2023-01` all collapse to `2023-01`; anything else is
-    passed through unchanged."""
+    passed through unchanged.
+
+    Args:
+        v (Any): Raw period value.
+
+    Returns:
+        str: Normalised ``YYYY-MM`` key, or the stripped value unchanged.
+    """
     s = str(v).strip()
     m = re.match(r"^(\d{4})-(\d{1,2})-\d{1,2}", s)
     if m:
@@ -2859,7 +3410,16 @@ def _month_key(v: Any) -> str:
 def _month_buckets(
     rows: List[Dict[str, Any]], key: str
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """Group rows by normalised month key in one pass."""
+    """Group rows by normalised month key in one pass.
+
+    Args:
+        rows (List[Dict[str, Any]]): Rows to group.
+        key (str): Month column key.
+
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: Normalised month → rows; rows with
+        no month value are skipped.
+    """
     buckets: Dict[str, List[Dict[str, Any]]] = {}
     for r in rows:
         v = r.get(key)
@@ -2872,7 +3432,16 @@ def _month_buckets(
 def _column_profile_line(
     col: Dict[str, Any], rows: List[Dict[str, Any]]
 ) -> Tuple[str, bool]:
-    """One profile line for a column; second value = is this the month column."""
+    """Build one profile line for a column.
+
+    Args:
+        col (Dict[str, Any]): Column definition.
+        rows (List[Dict[str, Any]]): All active rows of the table.
+
+    Returns:
+        Tuple[str, bool]: The markdown profile line and a flag telling the
+        caller whether this column is the table's month column.
+    """
     key = col["key"]
     dtype = (col.get("data_type") or "STRING").upper()
     nums = [x for x in (_profile_number(r.get(key)) for r in rows) if x is not None]
@@ -2934,6 +3503,14 @@ def _table_context_block(
     This answers 'what months/segments exist' over the FULL dataset (the old
     row-dump truncated at N rows and misled the model) while keeping the
     prompt an order of magnitude smaller, so AI answers are faster.
+
+    Args:
+        tbl (Dict[str, Any]): Table definition with its columns.
+        rows (List[Dict[str, Any]]): Computed rows of the table.
+        sample_rows (int): Number of raw sample rows to include.
+
+    Returns:
+        List[str]: Markdown lines describing the table (joined by the caller).
     """
     cols = tbl["columns"]
     lines = [f"## {tbl['label']} (table `{tbl['key']}`, {len(rows)} rows)"]
@@ -3022,6 +3599,18 @@ def build_llm_context(pack: Dict[str, Any], sample_rows: int = _SAMPLE_ROWS) -> 
     complete distinct month lists, per-month aggregates) instead of dumping a
     truncated row sample, so answers cover all months/segments and the prompt
     stays small enough for fast model responses.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        sample_rows (int): Number of raw sample rows to include per table.
+
+    Returns:
+        str: Markdown grounding block covering entities, relations, table
+        profiles, computed metrics and the ontology graph.
+
+    Example:
+        >>> build_llm_context(pack).startswith("# ")
+        True
     """
     computed = compute_pack(pack, strict=False)
     lines: List[str] = [f"# {pack['name']} — knowledge base", ""]
@@ -3090,6 +3679,17 @@ def build_table_profiles(pack: Dict[str, Any], sample_rows: int = 3) -> str:
     the "without ontology" side of the Ask comparison so the model can still
     reason over the uploaded data without seeing any of the pack's explicit
     structure or metric definitions.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        sample_rows (int): Number of raw sample rows to include per table.
+
+    Returns:
+        str: Markdown block containing only table profiles and samples.
+
+    Example:
+        >>> build_table_profiles(pack).splitlines()[0]
+        '# VNB pack — **uploaded data only (no ontology)**'
     """
     computed = compute_pack(pack, strict=False)
     lines: List[str] = [
@@ -3117,7 +3717,21 @@ def build_table_profiles(pack: Dict[str, Any], sample_rows: int = 3) -> str:
 def formula_namespace_names(
     pack: Dict[str, Any], include_metrics: bool = True, table: Optional[str] = None
 ) -> Set[str]:
-    """All names a formula/derived-column expression is allowed to reference."""
+    """Return all names a formula/derived-column expression may reference.
+
+    Args:
+        pack (Dict[str, Any]): Pack definition as returned by ``load_pack``.
+        include_metrics (bool): Also expose the pack's metric formula keys.
+        table (Optional[str]): When given, add that table's column keys (plus
+            every derived column key).
+
+    Returns:
+        Set[str]: Allowed function, metric and column names.
+
+    Example:
+        >>> formula_namespace_names(pack, table="kpi") >= {"sum", "vs"}
+        True
+    """
     names = {
         "rows",
         "where",
