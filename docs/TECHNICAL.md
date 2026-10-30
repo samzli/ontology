@@ -12,8 +12,19 @@
 Browser (vanilla JS)
   │  fetch / SSE
   ▼
-FastAPI (main.py)            ← thin HTTP layer only
+FastAPI app (main.py)        ← app assembly + exception handlers only
   │
+  ├── routes/                ← one APIRouter module per feature area
+  │     (auth, packs, config, graph, analytics, ask, reports,
+  │      admin_packs, admin_data, admin_models, admin_users,
+  │      graph_studio, my_models; shared helpers in routes/common.py)
+  ├── common/logger.py       ← AppLogger (dependency-free console logger)
+  ├── common/exceptions.py   ← UploadError — status-carrying I/O failure shared
+  │                              by importer, admin upload and batch paths
+  ├── common/io_utils.py     ← Pure file parsers (CSV / XLSX / XLS / JSON →
+  │                              pandas frames, workbook item expansion)
+  ├── common/values.py       ← Dependency-free value helpers (is_num,
+  │                              month_label) shared by analytics / charts
   ├── modules/auth.py        ← PBKDF2 accounts, signed session cookies
   ├── modules/ontology_service.py  ← rules engine, formulas, graphs,
   │                                    search, health, graph studio
@@ -30,6 +41,9 @@ FastAPI (main.py)            ← thin HTTP layer only
   │                            mapping + validation; single-file and
   │                            multi-file / folder batch import
   ├── modules/induction.py   ← AI ontology proposals (+ evidence)
+  ├── modules/constants.py   ← operational literals (truncation, snippet,
+  │                            report/import limits) — no magic numbers
+  ├── modules/run_log.py     ← append-only run/audit trail (JSONL)
   └── modules/db.py          ← SQLite schema, settings, audit, crypto
         ▼
       data/onti.db (SQLite, WAL; /tmp/onti-data on read-only hosts)
@@ -59,6 +73,7 @@ Core tables (selection):
 | --------------------------------------- | ----------------------------------------------- |
 | `users`                                 | accounts, PBKDF2 hashes, roles                  |
 | `sessions`                              | session tokens (signed + stored)                |
+| `revoked_sessions`                      | tokens revoked by logout (checked before use)   |
 | `ontology_packs`                        | one row per ontology (see origin note below)    |
 | `entities` / `attributes` / `relations` | the ontology schema                             |
 | `graph_nodes` / `graph_edges`           | the impact graph (auto-generated if empty)      |
@@ -141,7 +156,7 @@ including the table-level nodes X1–X8.
 ### 3.3 Per-user scenario packs
 
 `app_settings["user_pack:{uid}"]` stores the pack a user picked in
-the header dropdown. `main.py:user_pack_id` resolves it with fallback
+the header dropdown. `routes/common.py:user_pack_id` resolves it with fallback
 to the admin-activated pack, and every user-facing read (graph,
 dashboard, analytics, Ask, Graph studio, reports, memory) goes
 through `resolve_pack`. `GET /api/packs` lists the visible packs with
@@ -151,11 +166,12 @@ to the system default.
 
 ### 3.4 Ask memory (short + long term)
 
-`main.py:ask_stream` assembles the LLM `history` from:
+`routes/ask.py:ask_stream` assembles the LLM `history` from:
 
 1. the current session's turns (client-supplied, short-term);
 2. the four most recent `ask_history` answers for this user + pack
-   (long-term, cross-session), truncated to 600 chars each.
+   (long-term, cross-session), truncated to 600 chars each
+   (`constants.MEMORY_ANSWER_CHARS`).
 
 After the stream finishes, the question, answer excerpt, source,
 matched flag and token count are inserted into `ask_history`.
@@ -389,7 +405,7 @@ ever seeing a "rows omitted" note.
 - User models: `user_model_configs` (owner-scoped CRUD via
   `/api/my/models*`, encrypted keys, duplicate names rejected 409).
 - Selection: `app_settings["user_model:{uid}"]` stores `sys:N`,
-  `my:N` or empty. `main.py:_effective_model_cfg` resolves it at ask
+  `my:N` or empty. `routes/common.py:_effective_model_cfg` resolves it at ask
   time with fallback to the system default.
 - `.env` registration (`llm_client.append_env_model`): writes a
   self-contained block
@@ -477,7 +493,7 @@ accept `ai_enrich: bool`:
 1. Structural inference (`ontology_service.infer_ontology`): each
    table → entity; each column → typed attribute; `*_id` columns
    matching another table → ONE_TO_MANY relations.
-2. AI enrichment (`main.py:_ai_enrich_ontology`): sends columns and
+2. AI enrichment (`routes/graph_studio.py:_ai_enrich_ontology`): sends columns and
    sample rows to the effective model, expects strict JSON; fills
    empty entity descriptions and proposes up to eight starter
    questions. Failures degrade silently to the structural result.
@@ -488,7 +504,7 @@ accept `ai_enrich: bool`:
 `create-ontology` additionally records the creation in
 `studio_history`, lists the exact source tables in the pack's origin,
 and **generates a full report automatically**
-(`main.py:_auto_pack_report`): the response carries the report `uid`,
+(`routes/common.py:_auto_pack_report`): the response carries the report `uid`,
 and the title follows `<name> | Scenario: <pack> | Data: <sources>`.
 The report is linked from Graph studio's Generation history card
 (`GET /api/graph-studio/history`).
@@ -603,7 +619,7 @@ table.
 `GET /api/search/insight?q=` (Ontology workspace instant insight)
 returns the search chips, the matched graph nodes (`node_keys`), a
 1-hop neighbourhood sub-graph (`subgraph.nodes/links`) and a generated
-analysis card (`main.py:_insight_analysis`) describing the top match —
+analysis card (`routes/graph.py:_insight_analysis`) describing the top match —
 entity (attributes, backing tables, relations, formulas), KPI node
 (value, upstream/downstream), formula (expression, unit) or
 attribute/relation (mapped to its owner entity).
@@ -647,13 +663,15 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 ## 8. Security notes
 
 - Sessions are HttpOnly cookies whose value is an HMAC-signed
-  `user_id|expires` payload (`auth.issue_session_token`). The token is
-  also written to the `sessions` table so logout revokes it immediately
-  on the issuing instance; other serverless instances verify the
-  signature and load the user directly, so a cookie survives cold starts
-  and per-instance `/tmp` databases. `/api/admin/*` requires the admin
-  role; the admin UI is a separate page with no cross-links from the
-  user portal.
+  `user_id|expires|nonce` payload (`auth.issue_session_token`; the random
+  nonce keeps two logins in the same second from colliding on the
+  `sessions` primary key). The token is also written to the `sessions`
+  table and, on logout, to `revoked_sessions`, so logout revokes it
+  immediately; other serverless instances verify the signature and check
+  the revocation table before loading the user directly, so a cookie
+  survives cold starts and per-instance `/tmp` databases.
+  `/api/admin/*` requires the admin role; the admin UI is a separate page
+  with no cross-links from the user portal.
 - API keys (system and user) are encrypted with a machine-local key
   (`.onti.key`) and never returned unmasked by any API.
 - **Credential normalisation.** A key pasted from e-mail, a spreadsheet
@@ -683,7 +701,7 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 ## 9. Testing
 
 ```bat
-python -m py_compile main.py modules\*.py   :: syntax gate
+python -m py_compile main.py (Get-ChildItem routes\*.py, modules\*.py | ForEach-Object { $_.FullName })   :: syntax gate
 python tests\verify_t1.py ... verify_t6.py  :: layer checks (no server)
 python tests\verify_model_key.py            :: key paste hygiene + error text
 python tests\smoke_http.py                  :: end-to-end HTTP matrix
@@ -694,6 +712,31 @@ python tests\verify_login.py                :: 24 checks — auth flows
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report
 ```
+
+### Run log
+
+`tests\run_all.py` executes every `tests\*.py` script (or a filtered
+subset) as a subprocess and appends one JSON line per run to
+`data/run_log.jsonl` through `modules/run_log.py:record_run`:
+
+| Field                                                | Meaning                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------- |
+| `run_id`, `started_at`, `finished_at`, `duration_ms` | identity and timing                                     |
+| `actor`, `host`                                      | OS user and machine that executed the script            |
+| `script`                                             | `tests/<name>.py`                                       |
+| `status`                                             | `PASS` / `FAIL` (a 900 s timeout is recorded as `FAIL`) |
+| `summary`                                            | last non-empty output line of the script                |
+| `details`                                            | free-form extras (exit code, filters)                   |
+
+The path and the retention cap come from the `runtime` block of
+`config/config.json` (`run_log`, `run_log_max_entries`); older lines are
+trimmed when the cap is exceeded. `python -m modules.run_log` prints the
+ten most recent entries.
+
+Operational literals (truncation widths, snippet sizes, report/import
+limits) are centralised in `modules/constants.py`; deployment values
+(port, session, upload size, run-log path) live in `config/config.json`
+and reach the code through `modules/config.py`.
 
 The smoke suite covers the anonymous / user / admin cookie matrix,
 SSE answers, report generation, uploads and the admin API surface.

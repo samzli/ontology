@@ -630,7 +630,8 @@ UPGRADE_RELATIONS: List[Dict[str, Any]] = [
         "tgt": "distribution_channel",
         "src_attr": "channel_id",
         "tgt_attr": "id",
-        "desc": "Each Channel Monthly row carries the KPIs of one distribution " "channel for one month.",
+        "desc": "Each Channel Monthly row carries the KPIs of one distribution "
+        "channel for one month.",
     },
     {
         "key": "agent_monthly_describes_agent",
@@ -650,7 +651,8 @@ UPGRADE_RELATIONS: List[Dict[str, Any]] = [
         "tgt": "channel_monthly",
         "src_attr": "channel_id",
         "tgt_attr": "channel_id",
-        "desc": "Agent monthly APE aggregates (per month) into the channel monthly " "APE and active-agent counts.",
+        "desc": "Agent monthly APE aggregates (per month) into the channel monthly "
+        "APE and active-agent counts.",
     },
     {
         "key": "product_mix_monthly_sells_product",
@@ -671,7 +673,8 @@ UPGRADE_RELATIONS: List[Dict[str, Any]] = [
         "tgt": "channel_monthly",
         "src_attr": "channel_id",
         "tgt_attr": "channel_id",
-        "desc": "Product-mix rows belong to a channel-month; weights sum to 100% " "within each channel and month.",
+        "desc": "Product-mix rows belong to a channel-month; weights sum to 100% "
+        "within each channel and month.",
     },
     {
         "key": "vnb_monthly_feeds_vnb_summary",
@@ -692,7 +695,8 @@ UPGRADE_RELATIONS: List[Dict[str, Any]] = [
         "tgt": "vnb_summary",
         "src_attr": "item",
         "tgt_attr": "month",
-        "desc": "Scenario analysis back-solves from a target VNB Summary outcome " "to the operational levers.",
+        "desc": "Scenario analysis back-solves from a target VNB Summary outcome "
+        "to the operational levers.",
     },
 ]
 
@@ -762,7 +766,8 @@ UPGRADE_GRAPH_EDGES: List[Dict[str, Any]] = [
         "tgt": "AgencyVNB",
         "type": "STRUCTURAL",
         "label": "agency series",
-        "desc": "The agency_ape / agency_vnb columns of VNB Monthly are the " "Agency contribution series over time.",
+        "desc": "The agency_ape / agency_vnb columns of VNB Monthly are the "
+        "Agency contribution series over time.",
     },
     {
         "key": "X3",
@@ -795,7 +800,8 @@ UPGRADE_GRAPH_EDGES: List[Dict[str, Any]] = [
         "tgt": "ActiveAgentCount",
         "type": "OPERATIONAL",
         "label": "COUNT active",
-        "desc": "COUNT(Agent Monthly rows where status=Active) gives the monthly " "Active Agent Count.",
+        "desc": "COUNT(Agent Monthly rows where status=Active) gives the monthly "
+        "Active Agent Count.",
     },
     {
         "key": "X7",
@@ -812,7 +818,8 @@ UPGRADE_GRAPH_EDGES: List[Dict[str, Any]] = [
         "tgt": "TargetTotalVNB",
         "type": "CROSS_LINK",
         "label": "target input",
-        "desc": "Scenario Analysis supplies the target VNB and the back-solved " "levers used in target questions.",
+        "desc": "Scenario Analysis supplies the target VNB and the back-solved "
+        "levers used in target questions.",
     },
 ]
 
@@ -1496,6 +1503,27 @@ def _r(
     require_groups: List[List[str]] = None,
     guards: List[str] = None,
 ) -> Dict[str, Any]:
+    """Build one question-rule record from its individual parts.
+
+    Args:
+        sort: Ordering index of the rule within the question bank.
+        key: Stable rule key stored in ``question_rules``.
+        category: Display category, e.g. ``"Financial KPI"``.
+        question: Canonical question text banked for the rule.
+        template: Jinja answer template; a trailing newline is appended.
+        nodes: Evidence graph node keys cited in the answer.
+        path: Ordered path steps shown as the reasoning trail.
+        patterns: Regex patterns that trigger the rule.
+        require_groups: Groups of patterns that must all match.
+        guards: Patterns that veto the rule when present.
+
+    Returns:
+        Dict[str, Any]: Rule record with optional list fields defaulted to ``[]``.
+
+    Example:
+        >>> _r(1, "total_vnb", "Financial KPI", "What is the total VNB?",
+        ...    "{{ m.stated_vnb | money }}", ["TotalVNB"], ["TotalVNB"])
+    """
     return {
         "sort": sort,
         "key": key,
@@ -2234,7 +2262,29 @@ def _iso(v: Any) -> Any:
 
 
 def _make_sheet_rows(wb: Any):
+    """Create a reader that extracts rows from a workbook by header mapping.
+
+    Args:
+        wb: An open ``openpyxl`` workbook.
+
+    Returns:
+        Callable: A ``sheet_rows(name, mapping)`` helper closing over ``wb``.
+
+    Example:
+        >>> sheet_rows = _make_sheet_rows(openpyxl.load_workbook(path))
+        >>> sheet_rows("Product", {"id": "product_id"})
+    """
+
     def sheet_rows(name, mapping):
+        """Return a sheet's rows as dicts keyed by the target column names.
+
+        Args:
+            name: Worksheet name; a missing sheet yields an empty list.
+            mapping: Target key -> source header name in the first row.
+
+        Returns:
+            List[Dict[str, str]]: Row dicts with ISO-normalised values.
+        """
         ws = wb[name] if name in wb.sheetnames else None
         if ws is None:
             return []
@@ -2247,7 +2297,12 @@ def _make_sheet_rows(wb: Any):
             if row is None or all(c is None for c in row):
                 continue
             raw = dict(zip(headers, row))
-            data.append({k: (_iso(raw.get(src)) if raw.get(src) is not None else "") for k, src in mapping.items()})
+            data.append(
+                {
+                    k: (_iso(raw.get(src)) if raw.get(src) is not None else "")
+                    for k, src in mapping.items()
+                }
+            )
         return data
 
     return sheet_rows
@@ -2443,6 +2498,18 @@ _RAW_TABLES = [
 
 
 def _sheet_name(key: str) -> str:
+    """Workbook sheet title that stores a given raw table.
+
+    Args:
+        key: Raw-table key from ``_RAW_TABLES``.
+
+    Returns:
+        str: The sheet name holding that table's data.
+
+    Example:
+        >>> _sheet_name("vnb_monthly")
+        'VNB Monthly'
+    """
     return {
         "vnb_monthly": "VNB Monthly",
         "channel_monthly": "Channel Monthly",
@@ -2461,6 +2528,13 @@ def _load_monthly_pack(wb: Any):
     Channel / Product-Mix / Agent Master / KPI Linkage / Scenario sheets);
     this loader builds the canonical compat views plus the raw monthly tables
     used by the analytics layer.
+
+    Args:
+        wb: An open ``openpyxl`` workbook holding the monthly sheets.
+
+    Returns:
+        Dict[str, Any]: Compat views (products/kpi/channels/mix/agents) plus
+        ``__raw_tables__`` definitions for the analytics layer.
     """
     from . import analytics
 
@@ -2484,7 +2558,11 @@ def _load_monthly_pack(wb: Any):
                         "data_type": ctype,
                         "unit": cunit,
                         "fmt": cfmt or "raw",
-                        "decimals": (4 if cfmt == "percent" else 3 if cfmt in ("currency_m", "currency_k") else 0),
+                        "decimals": (
+                            4
+                            if cfmt == "percent"
+                            else 3 if cfmt in ("currency_m", "currency_k") else 0
+                        ),
                     }
                     for ck, clabel, ctype, cunit, cfmt in cols
                 ],
@@ -2530,7 +2608,9 @@ def _load_monthly_pack(wb: Any):
 
     # channels = latest month (active count + productivity + high-risk churn proxy)
     channels = []
-    for r in [x for x in raw["channel_monthly"] if analytics._month_key(x["month"]) == latest]:
+    for r in [
+        x for x in raw["channel_monthly"] if analytics._month_key(x["month"]) == latest
+    ]:
         cid = str(r["channel_id"])
         active_here = [
             a
@@ -2588,7 +2668,15 @@ def _load_monthly_pack(wb: Any):
 
 
 def _load_snapshot_pack(wb: Any) -> Dict[str, List[Dict[str, Any]]]:
-    """Original single-snapshot workbook loader (fallback for non-monthly books)."""
+    """Original single-snapshot workbook loader (fallback for non-monthly books).
+
+    Args:
+        wb: An open ``openpyxl`` workbook with snapshot sheets.
+
+    Returns:
+        Dict[str, List[Dict[str, Any]]]: Compat views keyed by table name, with
+        channel APE / blended margin / VNB derived in Python.
+    """
     out: Dict[str, List[Dict[str, Any]]] = {}
     sheet_rows = _make_sheet_rows(wb)
 
@@ -2669,7 +2757,8 @@ def _load_snapshot_pack(wb: Any) -> Dict[str, List[Dict[str, Any]]]:
         ws = [w for w in mix_rows if w["channel_id"] == cid]
         den = sum(float(w["weight"]) for w in ws) or 1.0
         ch["blended"] = round(
-            sum(float(w["weight"]) * float(pmargin.get(w["product_id"], 0)) for w in ws) / den,
+            sum(float(w["weight"]) * float(pmargin.get(w["product_id"], 0)) for w in ws)
+            / den,
             4,
         )
         ch["vnb"] = round(ch["ape"] * ch["blended"], 3)
@@ -2692,6 +2781,13 @@ def _discover_workbook() -> Optional[Path]:
 
     Returns ``None`` when no workbook is present — the pack then falls back to
     the in-code seed rows.
+
+    Returns:
+        Optional[Path]: Path to the chosen workbook, or ``None`` if none exists.
+
+    Example:
+        >>> _discover_workbook()
+        PosixPath('/srv/onti/data/sample.xlsx')
     """
     explicit = os.environ.get("ONTI_DATA_WORKBOOK")
     if explicit:
@@ -2783,26 +2879,45 @@ def _graph_node_value_overrides() -> Dict[str, str]:
         return {}
     co = comp[-1]
     month = co["month"]
-    chan = {c["channel_id"]: c for c in analytics.channel_series(raw) if c["month"] == month}
+    chan = {
+        c["channel_id"]: c for c in analytics.channel_series(raw) if c["month"] == month
+    }
     order = ["CH001", "CH002", "CH003"]
     present = [c for c in order if c in chan]
     agency = chan.get("CH001")
 
     # High churn-risk share among each channel's active agents (latest month).
     churn_share: Dict[str, float] = {}
-    am = [r for r in raw.get("agent_monthly", []) if analytics._month_key(r.get("month")) == month]
+    am = [
+        r
+        for r in raw.get("agent_monthly", [])
+        if analytics._month_key(r.get("month")) == month
+    ]
     for cid in order:
-        active = [r for r in am if str(r.get("channel_id")) == cid and str(r.get("status")).lower() == "active"]
-        churn_share[cid] = sum(1 for r in active if str(r.get("churn_risk")) == "High") / len(active) if active else 0.0
+        active = [
+            r
+            for r in am
+            if str(r.get("channel_id")) == cid
+            and str(r.get("status")).lower() == "active"
+        ]
+        churn_share[cid] = (
+            sum(1 for r in active if str(r.get("churn_risk")) == "High") / len(active)
+            if active
+            else 0.0
+        )
 
     ov: Dict[str, str] = {
         "TotalVNB": f"${co['total_vnb']:.2f}M",
         "TotalAPE": f"${co['total_ape']:.2f}M",
         "BlendedVNBMargin": f"{co['margin'] * 100:.1f}%",
         "ChannelAPE": " / ".join(f"${chan[c]['ape']:.2f}M" for c in present),
-        "ChannelBlendedMargin": " / ".join(f"{chan[c]['margin'] * 100:.1f}%" for c in present),
+        "ChannelBlendedMargin": " / ".join(
+            f"{chan[c]['margin'] * 100:.1f}%" for c in present
+        ),
         "AgentCount": " / ".join(str(int(chan[c]["active"])) for c in present),
-        "AgentProductivity": " / ".join(f"${chan[c]['avg_prod']:.1f}K" for c in present),
+        "AgentProductivity": " / ".join(
+            f"${chan[c]['avg_prod']:.1f}K" for c in present
+        ),
         "AgentChurnRate": " / ".join(f"{churn_share[c] * 100:.0f}%" for c in present),
     }
     if agency:
@@ -2817,7 +2932,11 @@ def _graph_node_value_overrides() -> Dict[str, str]:
         )
     # entity-level nodes (monthly data tables)
     ch_ids = {str(r.get("channel_id")) for r in raw.get("channel_monthly", [])}
-    mix_rows = [r for r in raw.get("mix_monthly", []) if analytics._month_key(r.get("month")) == month]
+    mix_rows = [
+        r
+        for r in raw.get("mix_monthly", [])
+        if analytics._month_key(r.get("month")) == month
+    ]
     ov.update(
         {
             "VnbMonthly": f"{len(comp)} months · latest {month}",
@@ -2831,8 +2950,25 @@ def _graph_node_value_overrides() -> Dict[str, str]:
 
 
 def ensure_seed(conn: sqlite3.Connection) -> int:
-    """Create the built-in sample pack once. Returns its pack id."""
-    row = conn.execute("SELECT id FROM ontology_packs WHERE slug=?", (PACK_SLUG,)).fetchone()
+    """Create the built-in sample pack once. Returns its pack id.
+
+    Args:
+        conn: Open SQLite connection with the ontology schema in place.
+
+    Returns:
+        int: Id of the built-in sample pack (created, or already present).
+
+    Raises:
+        sqlite3.Error: If any insert or update fails; the caller's transaction
+            decides whether the partial work is rolled back.
+
+    Example:
+        >>> ensure_seed(conn)
+        1
+    """
+    row = conn.execute(
+        "SELECT id FROM ontology_packs WHERE slug=?", (PACK_SLUG,)
+    ).fetchone()
     if row:
         pack_id = row["id"]
         if not get_setting(conn, "active_pack_id"):
@@ -2850,7 +2986,8 @@ def ensure_seed(conn: sqlite3.Connection) -> int:
     schema = _load_formal_schema()
     for i, ent in enumerate(schema.get("entities", []), 1):
         conn.execute(
-            "INSERT INTO entities(pack_id, key, label_en, layer, description, sort) " "VALUES(?,?,?,?,?,?)",
+            "INSERT INTO entities(pack_id, key, label_en, layer, description, sort) "
+            "VALUES(?,?,?,?,?,?)",
             (
                 pack_id,
                 ent["id"],
@@ -2951,9 +3088,10 @@ def ensure_seed(conn: sqlite3.Connection) -> int:
         )
 
     # ---- instance tables / columns / seed datasets --------------------------
-    for ti, tbl in enumerate(_build_tables(), 1):
+    for tbl in _build_tables():
         cur = conn.execute(
-            "INSERT INTO pack_tables(pack_id, key, label, entity_key, description) " "VALUES(?,?,?,?,?)",
+            "INSERT INTO pack_tables(pack_id, key, label, entity_key, description) "
+            "VALUES(?,?,?,?,?)",
             (
                 pack_id,
                 tbl["key"],
@@ -3020,9 +3158,16 @@ def ensure_seed(conn: sqlite3.Connection) -> int:
 def _insert_seed_graph(conn: sqlite3.Connection, pack_id: int) -> None:
     """Insert the rich KPI-chain graph (NODES + EDGES) plus the entity-level
     monthly-table nodes/edges for a pack. Used by ensure_seed (fresh DBs) and
-    by upgrade_sample_pack (repairing a degraded graph)."""
+    by upgrade_sample_pack (repairing a degraded graph).
+
+    Args:
+        conn: Open SQLite connection.
+        pack_id: Target ontology pack id; existing nodes/edges are skipped.
+    """
     node_overrides = _graph_node_value_overrides()
-    base = conn.execute("SELECT COUNT(*) AS c FROM graph_nodes WHERE pack_id=?", (pack_id,)).fetchone()["c"]
+    base = conn.execute(
+        "SELECT COUNT(*) AS c FROM graph_nodes WHERE pack_id=?", (pack_id,)
+    ).fetchone()["c"]
     all_nodes = NODES + UPGRADE_ENTITY_NODES
     all_edges = EDGES + UPGRADE_GRAPH_EDGES
     for i, node in enumerate(all_nodes, base + 1):
@@ -3045,9 +3190,13 @@ def _insert_seed_graph(conn: sqlite3.Connection, pack_id: int) -> None:
                 i,
             ),
         )
-    ebase = conn.execute("SELECT COUNT(*) AS c FROM graph_edges WHERE pack_id=?", (pack_id,)).fetchone()["c"]
+    ebase = conn.execute(
+        "SELECT COUNT(*) AS c FROM graph_edges WHERE pack_id=?", (pack_id,)
+    ).fetchone()["c"]
     for i, e in enumerate(all_edges, ebase + 1):
-        if conn.execute("SELECT 1 FROM graph_edges WHERE pack_id=? AND key=?", (pack_id, e["key"])).fetchone():
+        if conn.execute(
+            "SELECT 1 FROM graph_edges WHERE pack_id=? AND key=?", (pack_id, e["key"])
+        ).fetchone():
             continue
         conn.execute(
             "INSERT INTO graph_edges(pack_id, key, source_key, target_key, edge_type, "
@@ -3075,20 +3224,42 @@ def upgrade_sample_pack(conn: sqlite3.Connection, pack_id: int) -> None:
        5 auto-generated entity nodes (values wiped by a schema sync), the
        rich KPI causal chain is restored.
     3. Points the scenario_data table at the new scenario_analysis entity.
+
+    The upgrade runs at most once per pack (guarded by a setting flag) and is a
+    no-op for non-sample packs.
+
+    Args:
+        conn: Open SQLite connection.
+        pack_id: Id of the pack to upgrade.
+
+    Returns:
+        None: The upgrade is applied in place, or skipped when already applied.
+
+    Raises:
+        sqlite3.Error: If an insert or update fails; the caller's transaction
+            decides whether the partial work is rolled back.
+
+    Example:
+        >>> upgrade_sample_pack(conn, ensure_seed(conn))
     """
     flag = f"sample_pack_upgraded_v2:{pack_id}"
     if get_setting(conn, flag):
         return
-    row = conn.execute("SELECT slug FROM ontology_packs WHERE id=?", (pack_id,)).fetchone()
+    row = conn.execute(
+        "SELECT slug FROM ontology_packs WHERE id=?", (pack_id,)
+    ).fetchone()
     if row is None or row["slug"] != PACK_SLUG:
         return
 
     # 1. entities + attributes
     for si, ent in enumerate(UPGRADE_ENTITIES, 1):
-        exists = conn.execute("SELECT 1 FROM entities WHERE pack_id=? AND key=?", (pack_id, ent["key"])).fetchone()
+        exists = conn.execute(
+            "SELECT 1 FROM entities WHERE pack_id=? AND key=?", (pack_id, ent["key"])
+        ).fetchone()
         if not exists:
             conn.execute(
-                "INSERT INTO entities(pack_id, key, label_en, layer, description, " "sort) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO entities(pack_id, key, label_en, layer, description, "
+                "sort) VALUES(?,?,?,?,?,?)",
                 (pack_id, ent["key"], ent["label"], ent["layer"], ent["desc"], si),
             )
         for ai, (ak, alabel, atype, aunit) in enumerate(ent["attrs"], 1):
@@ -3121,7 +3292,9 @@ def upgrade_sample_pack(conn: sqlite3.Connection, pack_id: int) -> None:
 
     # 3. repair a degraded impact graph (only entity nodes, no values)
     degraded = (
-        conn.execute("SELECT COUNT(*) AS c FROM graph_nodes WHERE pack_id=?", (pack_id,)).fetchone()["c"]
+        conn.execute(
+            "SELECT COUNT(*) AS c FROM graph_nodes WHERE pack_id=?", (pack_id,)
+        ).fetchone()["c"]
         <= len(UPGRADE_ENTITY_NODES) + 5
         and conn.execute(
             "SELECT 1 FROM graph_nodes WHERE pack_id=? AND key='TotalVNB'",
@@ -3146,7 +3319,8 @@ def upgrade_sample_pack(conn: sqlite3.Connection, pack_id: int) -> None:
         conn,
         "system",
         "seed.pack_upgraded",
-        f"Sample pack upgraded to v2: monthly-table entities + rich graph " f"(pack_id={pack_id})",
+        f"Sample pack upgraded to v2: monthly-table entities + rich graph "
+        f"(pack_id={pack_id})",
     )
 
 
@@ -3178,6 +3352,17 @@ def migrate_legacy_model() -> None:
     ``.env`` line such as ``SILICONFLOW_API_KEY='sk-…'`` carries the quote
     characters into the database otherwise, and every later call would be
     rejected with ``Token is invalid`` although the key itself is good.
+
+    Returns:
+        None: The model is inserted in place when the database has none yet;
+        otherwise the function returns early without writing.
+
+    Raises:
+        sqlite3.Error: If the insert fails; the caller's transaction decides
+            whether the partial work is rolled back.
+
+    Example:
+        >>> migrate_legacy_model()
     """
     from modules.llm_client import normalize_api_key, normalize_base_url
 
@@ -3190,15 +3375,27 @@ def migrate_legacy_model() -> None:
                 continue
             k, v = line.split("=", 1)
             values[k.strip()] = _env_value(v)
-    values.update({k: v for k, v in os.environ.items() if k.startswith(("LLM_", "SILICONFLOW_", "NOVA_"))})
+    values.update(
+        {
+            k: v
+            for k, v in os.environ.items()
+            if k.startswith(("LLM_", "SILICONFLOW_", "NOVA_"))
+        }
+    )
 
-    api_key = normalize_api_key(values.get("LLM_API_KEY") or values.get("SILICONFLOW_API_KEY", ""))
+    api_key = normalize_api_key(
+        values.get("LLM_API_KEY") or values.get("SILICONFLOW_API_KEY", "")
+    )
     if not api_key:
         return
     base_url = normalize_base_url(
-        values.get("LLM_BASE_URL") or values.get("SILICONFLOW_BASE_URL") or "https://api.openai.com/v1"
+        values.get("LLM_BASE_URL")
+        or values.get("SILICONFLOW_BASE_URL")
+        or "https://api.openai.com/v1"
     )
-    model_name = (values.get("LLM_MODEL_NAME") or values.get("SILICONFLOW_MODEL_NAME", "")).strip()
+    model_name = (
+        values.get("LLM_MODEL_NAME") or values.get("SILICONFLOW_MODEL_NAME", "")
+    ).strip()
     if not model_name:
         return
 
@@ -3207,7 +3404,11 @@ def migrate_legacy_model() -> None:
     # (even when set to "0"), because it was designed as a standalone toggle.
     has_skip_trigger = bool(values.get("SKIP_SSL_VERIFY"))
     verify_raw = (
-        (values.get("LLM_VERIFY_SSL") or values.get("NOVA_VERIFY_SSL") or values.get("SILICONFLOW_VERIFY_SSL", ""))
+        (
+            values.get("LLM_VERIFY_SSL")
+            or values.get("NOVA_VERIFY_SSL")
+            or values.get("SILICONFLOW_VERIFY_SSL", "")
+        )
         .strip()
         .lower()
     )
@@ -3223,7 +3424,9 @@ def migrate_legacy_model() -> None:
         verify_ssl = True
 
     with get_conn() as conn:
-        existing = conn.execute("SELECT COUNT(*) AS n FROM model_configs").fetchone()["n"]
+        existing = conn.execute("SELECT COUNT(*) AS n FROM model_configs").fetchone()[
+            "n"
+        ]
         if existing:
             return
         conn.execute(

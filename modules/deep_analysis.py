@@ -32,21 +32,8 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-MONTH_NAMES = [
-    "",
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-]
+from common.values import month_label
+
 _MONTH_WORDS = {
     "jan": 1,
     "january": 1,
@@ -79,6 +66,7 @@ _MONTH_WORDS = {
 # Small numeric / format helpers
 # --------------------------------------------------------------------------- #
 def _num(v: Any, default: float = 0.0) -> float:
+    """Coerce ``v`` to a float, returning ``default`` for booleans or bad values."""
     if isinstance(v, bool):
         return default
     try:
@@ -88,32 +76,96 @@ def _num(v: Any, default: float = 0.0) -> float:
 
 
 def money(v: Any, digits: int = 3) -> str:
+    """Render a value as dollar millions with thousands separators.
+
+    Args:
+        v: Raw numeric value (int, float or numeric string) to format.
+        digits: Number of decimal places to keep.
+
+    Returns:
+        The value formatted as ``"$X.XXXM"``; bad input renders as zero.
+
+    Raises:
+        None: unparseable input is coerced to ``0.0`` instead of raised.
+
+    Example:
+        >>> money(12.3456)
+        '$12.346M'
+    """
     return f"${_num(v):,.{digits}f}M"
 
 
 def pct(v: Any, digits: int = 1) -> str:
+    """Render a decimal fraction as a percentage.
+
+    Args:
+        v: Fraction where ``1.0`` means 100%.
+        digits: Number of decimal places to keep.
+
+    Returns:
+        The percentage with a trailing ``"%"``; bad input renders as ``0%``.
+
+    Raises:
+        None: unparseable input is coerced to ``0.0`` instead of raised.
+
+    Example:
+        >>> pct(0.1234)
+        '12.3%'
+    """
     return f"{_num(v) * 100:.{digits}f}%"
 
 
 def pp(v: Any) -> str:
+    """Render a decimal fraction as a signed percentage-point delta.
+
+    Args:
+        v: Fraction where ``0.01`` means one percentage point.
+
+    Returns:
+        The delta with a leading sign and trailing ``"pp"``.
+
+    Raises:
+        None: unparseable input is coerced to ``0.0`` instead of raised.
+
+    Example:
+        >>> pp(0.0123)
+        '+1.23pp'
+    """
     return f"{_num(v) * 100:+.2f}pp"
 
 
 def signed_money(v: Any, digits: int = 3) -> str:
+    """Render a dollar-millions value with an explicit sign.
+
+    Args:
+        v: Raw numeric value to format.
+        digits: Number of decimal places to keep.
+
+    Returns:
+        ``"+$X.XXXM"`` for zero and positive values, ``"-$X.XXXM"`` for negative
+        values.
+
+    Raises:
+        None: unparseable input is coerced to ``0.0`` instead of raised.
+
+    Example:
+        >>> signed_money(-1.5)
+        '-$1.500M'
+    """
     x = _num(v)
     return f"{'+' if x >= 0 else '-'}${abs(x):,.{digits}f}M"
 
 
-def month_label(m: str) -> str:
-    """'2025-04' -> 'Apr 2025'."""
-    try:
-        y, mo = str(m).split("-")[:2]
-        return f"{MONTH_NAMES[int(mo)]} {y}"
-    except (ValueError, IndexError):
-        return str(m)
-
-
 def _month_key(v: Any) -> str:
+    """Normalise a month value to ``YYYY-MM``.
+
+    Args:
+        v: Raw month value, e.g. ``"2025-4"``, ``"Apr 2025"`` or ``None``.
+
+    Returns:
+        The key in ``YYYY-MM`` form when the value matches a known pattern,
+        otherwise the stripped input unchanged (possibly an empty string).
+    """
     s = str(v or "").strip()
     m = re.match(r"^(\d{4})-(\d{1,2})", s)
     if m:
@@ -125,7 +177,15 @@ def _month_key(v: Any) -> str:
 
 
 def _months_in(question: str) -> List[Tuple[str, int]]:
-    """Month mentions in the question, in order: [('04', 2025), ...]."""
+    """Extract every month mentioned in the question, in reading order.
+
+    Args:
+        question: Natural-language question text.
+
+    Returns:
+        List of ``(month_number, year)`` tuples such as ``[('04', 2025)]``;
+        the year is ``0`` when no four-digit year follows the month name.
+    """
     out: List[Tuple[str, int]] = []
     for m in re.finditer(r"(?i)\b(" + "|".join(_MONTH_WORDS) + r")\b", question):
         num = _MONTH_WORDS[m.group(1).lower()]
@@ -138,7 +198,17 @@ def _months_in(question: str) -> List[Tuple[str, int]]:
 
 
 def _pick_month(question: str, months: List[str]) -> str:
-    """Target month named in the question, else the latest available."""
+    """Pick the target month for the answer.
+
+    Args:
+        question: Natural-language question text.
+        months: Available months in ``YYYY-MM`` form, ascending.
+
+    Returns:
+        The month named in the question when one can be matched (latest
+        mention first), otherwise the latest available month, or ``""`` when
+        no months exist.
+    """
     if not months:
         return ""
     mentions = _months_in(question)
@@ -154,6 +224,16 @@ def _pick_month(question: str, months: List[str]) -> str:
 
 
 def _prev_month(month: str, months: List[str]) -> Optional[str]:
+    """Return the month immediately before ``month``.
+
+    Args:
+        month: Reference month in ``YYYY-MM`` form.
+        months: Available months in ``YYYY-MM`` form, ascending.
+
+    Returns:
+        The preceding month, or ``None`` when ``month`` is unknown or is the
+        first available month.
+    """
     if month not in months:
         return None
     i = months.index(month)
@@ -161,10 +241,28 @@ def _prev_month(month: str, months: List[str]) -> Optional[str]:
 
 
 def _mean(vals: Sequence[float]) -> float:
+    """Arithmetic mean of the sequence.
+
+    Args:
+        vals: Numeric values to average.
+
+    Returns:
+        The average of ``vals``, or ``0.0`` when the sequence is empty.
+    """
     return sum(vals) / len(vals) if vals else 0.0
 
 
 def _corr(xs: Sequence[float], ys: Sequence[float]) -> Optional[float]:
+    """Pearson correlation over the overlapping prefix of the two series.
+
+    Args:
+        xs: First series.
+        ys: Second series.
+
+    Returns:
+        The correlation coefficient in ``[-1, 1]``, or ``None`` when fewer
+        than three pairs exist or either series has zero variance.
+    """
     n = min(len(xs), len(ys))
     if n < 3:
         return None
@@ -178,7 +276,15 @@ def _corr(xs: Sequence[float], ys: Sequence[float]) -> Optional[float]:
 
 
 def _slope(ys: Sequence[float]) -> Tuple[float, float]:
-    """OLS slope + R² against the index 0..n-1."""
+    """Fit an ordinary-least-squares line against the index ``0..n-1``.
+
+    Args:
+        ys: Series to regress.
+
+    Returns:
+        ``(slope, r_squared)``; ``(0.0, 0.0)`` when there are fewer than two
+        points or the index carries no variance.
+    """
     n = len(ys)
     if n < 2:
         return 0.0, 0.0
@@ -196,6 +302,15 @@ def _slope(ys: Sequence[float]) -> Tuple[float, float]:
 
 
 def _hhi(shares: Sequence[float]) -> float:
+    """Herfindahl-Hirschman index: the sum of squared shares.
+
+    Args:
+        shares: Shares as fractions, each in ``[0, 1]``.
+
+    Returns:
+        The concentration index (``1/n`` for an even split, ``1.0`` for a
+        monopoly).
+    """
     return sum(s * s for s in shares)
 
 
@@ -203,6 +318,15 @@ def _hhi(shares: Sequence[float]) -> float:
 # Role resolution
 # --------------------------------------------------------------------------- #
 def _table(pack: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
+    """Look up a declared table by key.
+
+    Args:
+        pack: Active ontology pack.
+        key: Table key to find.
+
+    Returns:
+        The table descriptor, or ``None`` when the pack has no such table.
+    """
     for t in pack.get("tables", []):
         if t.get("key") == key:
             return t
@@ -210,6 +334,14 @@ def _table(pack: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
 
 
 def _numeric_columns(tbl: Dict[str, Any]) -> List[str]:
+    """List the column keys a table declares as ``INTEGER`` or ``FLOAT``.
+
+    Args:
+        tbl: Table descriptor from the pack.
+
+    Returns:
+        Column keys in declaration order; empty when the table has none.
+    """
     return [
         c["key"]
         for c in tbl.get("columns", [])
@@ -218,7 +350,30 @@ def _numeric_columns(tbl: Dict[str, Any]) -> List[str]:
 
 
 def resolve_spec(pack: Dict[str, Any], computed: Dict[str, Any]) -> Dict[str, Any]:
-    """Final role map: explicit ``pack['analysis']`` merged over inference."""
+    """Build the final role map that every analysis step reads from.
+
+    The pack's declarative ``analysis`` spec wins; anything it leaves unset is
+    inferred from the ontology (metric table, month column, metric column,
+    driver table, segment and label columns) using the computed rows.
+
+    Args:
+        pack: Active ontology pack with ``tables`` and optionally ``analysis``.
+        computed: Computed table rows keyed by table key.
+
+    Returns:
+        A role map carrying ``metric_table``, ``month_column``,
+        ``metric_column``, ``metric_label``, ``second_label`` and, when the
+        data allows, the driver/segment settings and the ``available`` flag.
+        When no monthly table exists the map is ``{"available": False}``.
+
+    Raises:
+        None: missing roles are reported through ``available`` instead of
+        raised.
+
+    Example:
+        >>> resolve_spec(pack, computed)["available"]
+        True
+    """
     spec = dict(pack.get("analysis") or {})
     tables = computed.get("tables") or {}
 
@@ -310,6 +465,17 @@ def resolve_spec(pack: Dict[str, Any], computed: Dict[str, Any]) -> Dict[str, An
 # Frames
 # --------------------------------------------------------------------------- #
 def _series(spec, computed) -> List[Dict[str, Any]]:
+    """Extract the company-level monthly metric series.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+
+    Returns:
+        Rows of ``{"month", "metric", "second"}`` sorted by month; ``second``
+        holds the base value when ``metric_second_column`` is declared, else
+        ``0.0``.
+    """
     rows = computed["tables"].get(spec["metric_table"]) or []
     mcol = spec["month_column"]
     mcol_metric = spec["metric_column"]
@@ -331,6 +497,19 @@ def _series(spec, computed) -> List[Dict[str, Any]]:
 
 
 def _segment_frame(spec, computed, month: str) -> Dict[str, Dict[str, Any]]:
+    """Aggregate the driver table into per-segment entries for one month.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+        month: Month in ``YYYY-MM`` form.
+
+    Returns:
+        Mapping of segment id to ``{"id", "label", "raw", "metric"}``, where
+        ``raw`` holds the segment's source rows and ``metric`` (when a segment
+        metric is declared) is their sum. Empty when the spec declares no
+        driver table or segment column.
+    """
     if not spec.get("driver_table") or not spec.get("segment_column"):
         return {}
     rows = computed["tables"].get(spec["driver_table"]) or []
@@ -359,15 +538,23 @@ def _segment_frame(spec, computed, month: str) -> Dict[str, Dict[str, Any]]:
     return frame
 
 
-def _all_months(spec, computed) -> List[str]:
-    ms = sorted({s["month"] for s in _series(spec, computed)})
-    return ms
-
-
 # --------------------------------------------------------------------------- #
 # Analyses
 # --------------------------------------------------------------------------- #
 def _reconciliation(spec, computed, months) -> List[Dict[str, Any]]:
+    """Check that segment rows add up to the company total each month.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+        months: Available months (accepted for call-site parity; the walk is
+            driven by the metric series itself).
+
+    Returns:
+        One dict per month with ``month``, ``company``, ``segments``,
+        ``residual`` (company minus segments), ``segments_count`` and
+        ``metric_key``; empty when no driver table or segment metric exists.
+    """
     out = []
     if not spec.get("driver_table") or not spec.get("segment_metric"):
         return out
@@ -390,6 +577,23 @@ def _reconciliation(spec, computed, months) -> List[Dict[str, Any]]:
 
 
 def _factor_bridge(spec, computed, cur: str, prev: str) -> Dict[str, Any]:
+    """Decompose the month-on-month move into exact per-segment factor effects.
+
+    Each segment's identity factors are evaluated in both periods and split
+    with sequential factor substitution, so the effects add up to the reported
+    move with no residual.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+        cur: Current month in ``YYYY-MM`` form.
+        prev: Previous month in ``YYYY-MM`` form.
+
+    Returns:
+        ``{"factors", "rows", "totals", "residual"}`` with one row per segment
+        (largest absolute move first); empty when the identity declares no
+        factors or the pack has no driver table.
+    """
     ident = spec.get("identity") or {}
     factors = ident.get("factors") or []
     if not factors or not spec.get("driver_table"):
@@ -455,6 +659,21 @@ def _factor_bridge(spec, computed, cur: str, prev: str) -> Dict[str, Any]:
 
 
 def _mix_analysis(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, Any]:
+    """Weight product margins by product mix and split the change.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+        cur: Current month in ``YYYY-MM`` form.
+        prev: Previous month in ``YYYY-MM`` form, or ``None`` to report the
+            current month only.
+
+    Returns:
+        ``{"cur", "cur_weighted_margin", "cur_parts"}`` plus, when ``prev`` is
+        given, ``prev_weighted_margin``, ``delta``, ``mix_effect``,
+        ``product_margin_effect`` and a per-product ``detail`` list. Empty when
+        the mix tables are missing or carry no rows.
+    """
     mix = spec.get("mix") or {}
     if not mix.get("mix_table"):
         return {}
@@ -469,6 +688,15 @@ def _mix_analysis(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, An
     }
 
     def weighted(m: str) -> Tuple[float, List[Dict[str, Any]]]:
+        """Compute the mix-weighted margin for month ``m`` and its parts.
+
+        Args:
+            m: Month in ``YYYY-MM`` form.
+
+        Returns:
+            ``(weighted_margin, parts)`` where each part carries the product
+            id, name, weight and product margin.
+        """
         parts = []
         for r in mix_rows:
             if _month_key(r.get(spec["month_column"])) != m:
@@ -525,6 +753,16 @@ def _mix_analysis(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, An
 
 
 def _tenure_months(join_date: Any, month: str) -> Optional[int]:
+    """Compute the whole months served between a join date and a month.
+
+    Args:
+        join_date: Join date in one of the accepted formats (``"01 Apr 2025"``,
+            ``"2025-04-01"``, ``"01/04/2025"``).
+        month: Reporting month in ``YYYY-MM`` form.
+
+    Returns:
+        The tenure in months, or ``None`` when either date cannot be parsed.
+    """
     s = str(join_date or "").strip()
     for fmt in ("%d %b %Y", "%d %B %Y", "%Y-%m-%d", "%d/%m/%Y"):
         try:
@@ -542,6 +780,20 @@ def _tenure_months(join_date: Any, month: str) -> Optional[int]:
 
 
 def _agent_cohorts(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, Any]:
+    """Group agents into churn-risk, certification and tenure cohorts.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+        cur: Current month in ``YYYY-MM`` form.
+        prev: Previous month in ``YYYY-MM`` form, or ``None`` for no comparison.
+
+    Returns:
+        A mapping of dimension name (``churn_risk``, ``certification`` and, when
+        join dates exist, ``tenure``) to ``{"dimension", "rows", "total_ape"}``,
+        plus the analysed ``month``. Empty when the pack has no agent monthly
+        table.
+    """
     ag = spec.get("agent") or {}
     if not ag.get("monthly_table"):
         return {}
@@ -556,6 +808,14 @@ def _agent_cohorts(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, A
     jd_col = ag.get("join_date_column") or "join_date"
 
     def month_rows(m: str) -> Dict[str, Dict[str, Any]]:
+        """Collect the agent rows for month ``m`` keyed by agent id.
+
+        Args:
+            m: Month in ``YYYY-MM`` form.
+
+        Returns:
+            Mapping of ``agent_id`` to the agent's monthly row.
+        """
         return {
             str(r.get("agent_id")): r
             for r in monthly
@@ -563,6 +823,16 @@ def _agent_cohorts(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, A
         }
 
     def analyse(dim: str) -> Dict[str, Any]:
+        """Aggregate productivity and APE for one cohort dimension.
+
+        Args:
+            dim: Master-table column to group by, or ``"tenure"`` for the
+                derived tenure bands.
+
+        Returns:
+            ``{"dimension", "rows", "total_ape"}`` with one row per cohort,
+            sorted by APE change ascending.
+        """
         cur_rows, prev_rows = month_rows(cur), month_rows(prev) if prev else {}
         groups: Dict[str, Dict[str, Any]] = {}
         for aid, r in cur_rows.items():
@@ -646,6 +916,20 @@ def _agent_cohorts(spec, computed, cur: str, prev: Optional[str]) -> Dict[str, A
 
 
 def _statistics(spec, computed, months, bridge, recon, cur) -> List[Dict[str, Any]]:
+    """Run the statistical diagnostics reported alongside the numbers.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key.
+        months: Available months in ``YYYY-MM`` form, ascending.
+        bridge: Output of :func:`_factor_bridge` (drives HHI and correlation).
+        recon: Output of :func:`_reconciliation` (drives the residual test).
+        cur: Current month in ``YYYY-MM`` form.
+
+    Returns:
+        A list of ``{"test", "value", "reading"}`` dicts; only tests whose
+        preconditions are met are included.
+    """
     series = _series(spec, computed)
     vals = [s["metric"] for s in series]
     tests: List[Dict[str, Any]] = []
@@ -746,10 +1030,32 @@ def _statistics(spec, computed, months, bridge, recon, cur) -> List[Dict[str, An
 
 
 def _chain(pack, spec, computed, cur, seg_frame) -> Dict[str, Any]:
+    """Walk the ontology graph upstream from the metric and annotate segments.
+
+    Args:
+        pack: Active ontology pack with ``nodes`` and ``edges``.
+        spec: Role map returned by :func:`resolve_spec`.
+        computed: Computed table rows keyed by table key (accepted for call-site
+            parity; the walk itself reads ``pack`` and ``seg_frame``).
+        cur: Current month in ``YYYY-MM`` form (accepted for call-site parity).
+        seg_frame: Segment frame for the current month.
+
+    Returns:
+        ``{"target", "steps", "segments", "node_count", "edge_count"}`` where
+        ``steps`` are breadth-first upstream edges (depth <= 4) and ``segments``
+        holds the frame entries sorted by metric, largest first.
+    """
     nodes = {n["key"]: n for n in pack.get("nodes", [])}
-    metric_key = "vnb"
 
     def find(pred):
+        """Return the first node key whose ``(key, node)`` pair matches ``pred``.
+
+        Args:
+            pred: Callable taking ``(key, node)`` and returning a bool.
+
+        Returns:
+            The matching node key, or ``""`` when nothing matches.
+        """
         for k, n in nodes.items():
             if pred(k, n):
                 return k
@@ -827,6 +1133,20 @@ def detect_focus(question: str) -> str:
     Drives which analysis block leads the answer, so a mix question opens with
     the mix proof and a cohort question opens with the cohort tables instead of
     every answer being the same generic report.
+
+    Args:
+        question: Natural-language question text (``None`` is tolerated).
+
+    Returns:
+        One of ``"mix"``, ``"cohort"``, ``"movement"``, ``"trend"`` or
+        ``"level"``.
+
+    Raises:
+        None: any text maps to a focus, with ``"level"`` as the fallback.
+
+    Example:
+        >>> detect_focus("Why did VNB move in April?")
+        'movement'
     """
     q = (question or "").lower()
     if re.search(r"mix|product|portfolio|allocation|weight", q):
@@ -843,6 +1163,15 @@ def detect_focus(question: str) -> str:
 
 
 def _series_block(series: List[Dict[str, Any]], label: str) -> List[str]:
+    """Render the monthly trajectory markdown table.
+
+    Args:
+        series: Rows from :func:`_series`.
+        label: Header label for the metric column.
+
+    Returns:
+        The markdown lines for the trajectory block, ending with a blank line.
+    """
     B = [
         "### Monthly trajectory",
         "",
@@ -862,7 +1191,24 @@ def _series_block(series: List[Dict[str, Any]], label: str) -> List[str]:
 def _lead(
     spec, cur, prev, series, bridge, mix, cohorts, stats, chain, focus
 ) -> List[str]:
-    """Opening paragraph that answers the question head-on."""
+    """Build the opening paragraph that answers the question head-on.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        cur: Current month in ``YYYY-MM`` form.
+        prev: Previous month in ``YYYY-MM`` form, or ``None``.
+        series: Rows from :func:`_series`.
+        bridge: Output of :func:`_factor_bridge`.
+        mix: Output of :func:`_mix_analysis`.
+        cohorts: Output of :func:`_agent_cohorts`.
+        stats: Output of :func:`_statistics`.
+        chain: Output of :func:`_chain`.
+        focus: Question focus from :func:`detect_focus`.
+
+    Returns:
+        Markdown lines: the assertion line, a blank line, then any
+        focus-specific paragraphs.
+    """
     label = spec.get("metric_label", "metric").upper()
     second = spec.get("second_label", "base")
     cur_row = next((s for s in series if s["month"] == cur), None) or {}
@@ -998,16 +1344,34 @@ def _render_body(
     chain,
     focus: str = "level",
 ) -> Tuple[str, List[str], List[Dict[str, Any]]]:
-    """Return (markdown body, findings list, reasoning steps)."""
+    """Assemble the analysis body in the block order implied by ``focus``.
+
+    Args:
+        spec: Role map returned by :func:`resolve_spec`.
+        pack: Active ontology pack (accepted for call-site parity).
+        computed: Computed table rows keyed by table key.
+        cur: Current month in ``YYYY-MM`` form.
+        prev: Previous month in ``YYYY-MM`` form, or ``None``.
+        series: Rows from :func:`_series`.
+        recon: Output of :func:`_reconciliation`.
+        bridge: Output of :func:`_factor_bridge`.
+        mix: Output of :func:`_mix_analysis`.
+        cohorts: Output of :func:`_agent_cohorts`.
+        stats: Output of :func:`_statistics`.
+        chain: Output of :func:`_chain`.
+        focus: Question focus from :func:`detect_focus`.
+
+    Returns:
+        ``(markdown_body, findings, reasoning_steps)`` where ``findings`` are
+        the ranked one-line conclusions and ``steps`` the numbered method
+        trace.
+    """
     label = spec.get("metric_label", "metric").upper()
     metric_label = label
     second_label = spec.get("second_label", "base")
     findings: List[str] = []
     steps: List[Dict[str, Any]] = []
     blocks: Dict[str, List[str]] = {}
-
-    cur_row = next((s for s in series if s["month"] == cur), None)
-    prev_row = next((s for s in series if s["month"] == prev), None) if prev else None
 
     # ---- Reconciliation ----
     if recon:
@@ -1309,9 +1673,27 @@ def analyze(
 ) -> Dict[str, Any]:
     """Run the full deterministic analysis for one question.
 
-    Returns a dict with ``available``, ``headline``, ``body``, ``full`` and the
-    structured evidence (``intent``, ``steps``, ``findings``, ``stats``,
-    ``chain``, ``depth``) used by the comparison panel and the test harness.
+    Args:
+        pack: Active ontology pack.
+        computed: Computed table rows keyed by table key.
+        question: Natural-language question text.
+        history: Prior chat turns (``{"role", "content"}``) used to inherit a
+            month named earlier in the conversation.
+
+    Returns:
+        A dict with ``available``, ``month``, ``prev_month``, ``headline``,
+        ``body``, ``full`` and the structured evidence (``intent``, ``steps``,
+        ``findings``, ``stats``, ``chain``, ``depth``, ``_spec``). When the pack
+        cannot support the analysis, an ``available=False`` stub is returned
+        instead.
+
+    Raises:
+        KeyError: if ``pack`` or ``computed`` is malformed for the resolved
+            role map (propagated from the individual analyses).
+
+    Example:
+        >>> analyze(pack, computed, "Why did VNB fall in April?")["available"]
+        True
     """
     spec = resolve_spec(pack, computed)
     if not spec.get("available"):
