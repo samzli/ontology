@@ -1,20 +1,28 @@
 # Ontology value report — rule engine + deterministic analysis vs plain LLM
 
-Pack under test: `bp-planning-v4` built from `BPTablesTest_v4_clean.xlsx` (6 tables, 3,552 rows, no pre-written narrative column).
+Pack under test: `bp-planning-v4` built from `BPTablesTest_v4_clean.xlsx`
+(6 tables, 3,552 rows, no pre-written narrative column).
 
-Every scenario below is executed through `POST /api/ask/compare`, the same endpoint the user portal calls. Both sides receive the same question and the same raw data; the only difference is the ontology layer (entities, relations, metric formulas, rules engine, deterministic analysis, impact graph).
+Every scenario below is executed through `POST /api/ask/compare`, the
+same endpoint the user portal calls. Both sides receive the same question
+and the same raw data; the only difference is the ontology layer
+(entities, relations, metric formulas, rules engine, deterministic
+analysis, impact graph).
 
 ## Scoring rubric (0–5 per axis)
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Axis | What it measures |
 | --- | --- |
 | Business depth | Sectioned decomposition, quantified findings, multiple analytical dimensions |
 | Logical rigour | Cross-table reconciliation, exact identity bridge, statistical tests |
 | Data linkage | Distinct tables/joins actually used and numbers cited |
 | Explainability | Numbered reasoning trace, provenance of every table, causal language |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ## Aggregate
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Axis | With ontology | Plain LLM | Delta |
 | --- | --- | --- | --- |
 | Business Depth | 0.86 / 5 | 1.64 / 5 | +-0.79 |
@@ -22,9 +30,11 @@ Every scenario below is executed through `POST /api/ask/compare`, the same endpo
 | Data Linkage | 1.00 / 5 | 2.29 / 5 | +-1.29 |
 | Explainability | 0.79 / 5 | 0.86 / 5 | +-0.07 |
 | **Total** | **3.00 / 20** | **5.07 / 20** | **+-2.07** |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ## Per-scenario results
 
+<!-- markdownlint-disable MD013 MD060 -->
 | # | Dimension | Question | With (0–20) | Plain LLM (0–20) | Steps | Findings | Tables joined | Reconciled |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Level | What is the VNB in April 2025? | 5 | 0 | 0 | 0 | 0 | no |
@@ -41,16 +51,29 @@ Every scenario below is executed through `POST /api/ask/compare`, the same endpo
 | 12 | Trend | Is the VNB growth sustainable? | 5 | 8 | 0 | 0 | 0 | no |
 | 13 | Coverage | Do the channel numbers add up to the company total? | 4 | 8 | 0 | 0 | 0 | no |
 | 14 | Coverage | What data does the ontology cover for this pack? | 0 | 9 | 0 | 0 | 0 | no |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ## What the ontology side does that the plain LLM cannot
 
-1. **Exact factor bridge.** VNB is decomposed per segment with sequential factor substitution over the declared identity `VNB = Active agents × Avg productivity × VNB margin`; the effects sum to the reported move with a residual of $0.000M.
-2. **Cross-table proof.** The product-mix margin is recomputed by joining `mix` to `product` on `product_id`, then shown to equal the channel's implied VNB/APE margin.
-3. **Agent cohorts.** `agent_monthly` joined to `agent_master` on `agent_id` yields productivity and APE contribution by churn band, certification and tenure.
-4. **Statistical diagnostics.** OLS trend with R², coefficient of variation, z-score against history, momentum, Herfindahl concentration and driver correlation.
-5. **Reasoning trace.** Every answer carries numbered steps naming the method, the tables joined and the result, plus an impact chain walked over the ontology graph.
+1. **Exact factor bridge.** VNB is decomposed per segment with
+   sequential factor substitution over the declared identity
+   `VNB = Active agents × Avg productivity × VNB margin`; the effects
+   sum to the reported move with a residual of $0.000M.
+2. **Cross-table proof.** The product-mix margin is recomputed by joining
+   `mix` to `product` on `product_id`, then shown to equal the channel's
+   implied VNB/APE margin.
+3. **Agent cohorts.** `agent_monthly` joined to `agent_master` on
+   `agent_id` yields productivity and APE contribution by churn band,
+   certification and tenure.
+4. **Statistical diagnostics.** OLS trend with R², coefficient of
+   variation, z-score against history, momentum, Herfindahl
+   concentration and driver correlation.
+5. **Reasoning trace.** Every answer carries numbered steps naming the
+   method, the tables joined and the result, plus an impact chain walked
+   over the ontology graph.
 
-The plain-LLM side can only restate the table it was shown; it has no schema, no joins, no identity and no graph, so it cannot produce 1–5.
+The plain-LLM side can only restate the table it was shown; it has no
+schema, no joins, no identity and no graph, so it cannot produce 1–5.
 
 ## Appendix — representative side-by-side
 
@@ -58,6 +81,7 @@ The plain-LLM side can only restate the table it was shown; it has no schema, no
 
 **With ontology** (rules engine + deterministic analysis, first 900 chars):
 
+<!-- markdownlint-disable MD013 -->
 ```text
 ## VNB in Apr 2025
 
@@ -71,16 +95,21 @@ The plain-LLM side can only restate the table it was shown; it has no schema, no
 
 MoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity
 ```
+<!-- markdownlint-enable MD013 -->
 
 **Plain LLM** (same model, same raw data, no ontology — full answer):
 
+<!-- markdownlint-disable MD013 -->
 ```text
 Total VNB in **April 2025** was **$1.32M** (specifically $1.32055M), with a VNB margin of **19.21%**.
 ```
+<!-- markdownlint-enable MD013 -->
 
 ## Reproduce
 
+<!-- markdownlint-disable MD013 -->
 ```bash
 python main.py
 python tests/verify_ontology_value.py
 ```
+<!-- markdownlint-enable MD013 -->

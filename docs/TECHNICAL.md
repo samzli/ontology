@@ -8,6 +8,7 @@
 
 ## 1. Architecture
 
+<!-- markdownlint-disable MD013 -->
 ```text
 Browser (vanilla JS)
   │  fetch / SSE
@@ -48,6 +49,7 @@ FastAPI app (main.py)        ← app assembly + exception handlers only
         ▼
       data/onti.db (SQLite, WAL; /tmp/onti-data on read-only hosts)
 ```
+<!-- markdownlint-enable MD013 -->
 
 No external services: one Python process, one SQLite file. The
 frontend is server-rendered Jinja2 plus four static JS files
@@ -83,6 +85,7 @@ for durable multi-user state.
 
 Core tables (selection):
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Table | Purpose |
 | --------------------------------------- | ----------------------------------------------- |
 | `users` | accounts, PBKDF2 hashes, roles |
@@ -102,6 +105,7 @@ Core tables (selection):
 | `llm_calls` | token metering: caller, model, success, latency |
 | `audit` | append-only write log |
 | `app_settings` | key/value store: user model + pack selections |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Four columns deserve detail:
 
@@ -216,6 +220,7 @@ one question twice and returns both sides plus a value summary. The
 same model config answers both; the difference is what context each
 side receives:
 
+<!-- markdownlint-disable MD013 -->
 ```json
 {
   "question": "...",
@@ -272,6 +277,7 @@ side receives:
   }
 }
 ```
+<!-- markdownlint-enable MD013 -->
 
 * **With ontology** runs the normal pipeline synchronously
   ( `qa_service.compare_answers` ) in three stages:
@@ -363,12 +369,14 @@ portals render the same **Use ontology ON / OFF** control from
 `localStorage` under `onti.useOntology` (default `"on"` ) and broadcasts
 an `onti:ontology` DOM event on every change.
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Key     | `onti.useOntology` |
 | ------- | ---------------------------------------------------------------- |
 | Default | ON                                                               |
 | Scope   | Per browser; both portals on the same origin share it            |
 | Toggle  | `Onti.ontology.mount()` in the header of `app.js` and `admin.js` |
 | Read    | `Onti.ontology.enabled()` |
+<!-- markdownlint-enable MD013 MD060 -->
 
 With the switch OFF, no data is sent anywhere different — the front end
 simply refuses to render ontology-derived output and says so:
@@ -404,12 +412,14 @@ answered from a January-only slice of a 24-month table — and inflated the
 prompt (slow answers). The profile-first builder summarises each table over
 its **full active dataset**:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Block                | Content                                                                                                                                                   | Cap                       |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
 | Column profile       | per column: type, `sum` / `avg` / `min` / `max` for numerics (percent-formatted columns render as %), full sorted distinct values otherwise                     | distinct list ≤ 48 values |
 | Month coverage       | month-like columns (key/label contains `month` , `period` or `date` ) always list their values, normalised to `YYYY-MM` ( `2023-01-01 00:00:00` → `2023-01` ) | ≤ 36 distinct             |
 | Per-month aggregates | one markdown table of month vs `sum` / `avg` per numeric column, computed in one pass ( `_month_buckets` )                                                    | ≤ 36 groups × 8 measures  |
 | Sample rows          | 3 verbatim rows for format illustration only                                                                                                              | 3                         |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Everything else (entities, relations, formulas, graph edges) is unchanged.
 Callers: `qa_service.stream_answer` / `compare_answers` and
@@ -432,6 +442,7 @@ ever seeing a "rows omitted" note.
 * `.env` registration (`llm_client.append_env_model`): writes a
   self-contained block
 
+<!-- markdownlint-disable MD013 -->
 ```text
   # >>> onti model: my_azure_gpt >>>
   ONTI_MODEL_MY_AZURE_GPT_NAME="My Azure GPT"
@@ -440,6 +451,7 @@ ever seeing a "rows omitted" note.
   ONTI_MODEL_MY_AZURE_GPT_MODEL="gpt-4o"
   # <<< onti model: my_azure_gpt <<<
   ```
+<!-- markdownlint-enable MD013 -->
 
   Existing blocks with the same slug are replaced; the DB stays the
   source of truth.
@@ -518,7 +530,8 @@ accept `ai_enrich: bool` :
 1. Structural inference (`ontology_service.infer_ontology`): each
    table → entity; each column → typed attribute; `*_id` columns
    matching another table → ONE_TO_MANY relations.
-2. AI enrichment (`routes/graph_studio.py:_ai_enrich_ontology`): sends columns and
+2. AI enrichment (`routes/graph_studio.py:_ai_enrich_ontology`): sends columns
+and
    sample rows to the effective model, expects strict JSON; fills
    empty entity descriptions and proposes up to eight starter
    questions. Failures degrade silently to the structural result.
@@ -662,6 +675,7 @@ attribute/relation (mapped to its owner entity).
 The MoM decomposition is exact (sequential factor substitution, no
 residual), per channel:
 
+<!-- markdownlint-disable MD013 -->
 ```text
 VNB = active_agents × avg_productivity / 1000 × weighted_margin
 
@@ -669,6 +683,7 @@ agent effect  = (A1 − A0) × P0/1000 × M0
 prod effect   = A1 × (P1 − P0)/1000 × M0
 mix effect    = A1 × P1/1000 × (M1 − M0)
 ```
+<!-- markdownlint-enable MD013 -->
 
 Endpoints: `/api/analytics/timeseries` , `/attribution` , `/scenario` ,
 `/agent-stats` . The driver-attribution, scenario and agent views read the
@@ -740,6 +755,7 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 
 ## 9. Testing
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 python -m py_compile main.py (Get-ChildItem routes\*.py, modules\*.py | ForEach-Object { $_.FullName })   :: syntax gate
 python tests\verify_t1.py ... verify_t6.py  :: layer checks (no server)
@@ -755,6 +771,7 @@ python tests\verify_login.py                :: 24 checks — auth flows
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report
 ```
+<!-- markdownlint-enable MD013 -->
 
 Tests that talk to the server need the same database the server uses, so run
 them against `python main.py` on `127.0.0.1:8010` (not against a container
@@ -771,6 +788,7 @@ helper modules such as `_seed_synthetic.py` , which tests import rather than
 execute — (or a filtered subset) as a subprocess and appends one JSON line per
 run to `data/run_log.jsonl` through `modules/run_log.py:record_run` :
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Field | Meaning |
 | ---------------------------------------------------- | ------------------------------------------------------- |
 | `run_id` , `started_at` , `finished_at` , `duration_ms` | identity and timing |
@@ -779,6 +797,7 @@ run to `data/run_log.jsonl` through `modules/run_log.py:record_run` :
 | `status` | `PASS` / `FAIL` (a 900 s timeout is recorded as `FAIL` ) |
 | `summary` | last non-empty output line of the script |
 | `details` | free-form extras (exit code, filters) |
+<!-- markdownlint-enable MD013 MD060 -->
 
 The path and the retention cap come from the `runtime` block of
 `config/config.json` ( `run_log` , `run_log_max_entries` ); older lines are
@@ -835,6 +854,7 @@ definitions, no metric formulas, no graph).
 **Test matrix** (each question answered twice by the same model — once
 grounded in the full ontology, once grounded in raw uploaded tables):
 
+<!-- markdownlint-disable MD013 MD060 -->
 | #   | Pack           | Question                                                |
 | --- | -------------- | ------------------------------------------------------- |
 | 1   | 6 · VNB        | What is the VNB in April?                               |
@@ -843,9 +863,11 @@ grounded in the full ontology, once grounded in raw uploaded tables):
 | 4   | 23 · Lapse Exp | What is the lapse experience in September?              |
 | 5   | 23 · Lapse Exp | How does September lapse compare to the previous month? |
 | 6   | 23 · Lapse Exp | Why is there such a movement in lapse during September? |
+<!-- markdownlint-enable MD013 MD060 -->
 
 **Results (all 6 scenarios completed successfully):**
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Dimension                                         |               With Ontology                |     Without Ontology     |
 | ------------------------------------------------- | :----------------------------------------: | :----------------------: |
 | Answer source                                     | **Rules engine (6/6, 100% deterministic)** | LLM AI (6/6, stochastic) |
@@ -855,6 +877,7 @@ grounded in the full ontology, once grounded in raw uploaded tables):
 | Matched ontology concepts                         |               4–6 per answer               |          **—**           |
 | Metric definitions used                           |                7–9 per pack                |          **0**           |
 | Admits data limitation ("cannot determine cause") |           **0/3** why-questions            | 2/3 lapse why-questions  |
+<!-- markdownlint-enable MD013 MD060 -->
 
 **Key findings.**
 
@@ -918,6 +941,7 @@ answered twice through `POST /api/ask/compare` by the same model.
 **Scored rubric (0–5 per axis):** business depth, logical rigour, data
 linkage, explainability.
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Axis           | With ontology  |   Plain LLM   |   Delta    |
 | -------------- | :------------: | :-----------: | :--------: |
 | Business depth |    4.14 / 5    |   2.14 / 5    |   +2.00    |
@@ -925,6 +949,7 @@ linkage, explainability.
 | Data linkage   |    5.00 / 5    |   3.14 / 5    |   +1.86    |
 | Explainability |    5.00 / 5    |   1.00 / 5    |   +4.00    |
 | **Total**      | **19.14 / 20** | **6.71 / 20** | **+12.43** |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Every scenario scored 19–20 for the ontology side; the baseline ranged
 1–10. The numbers are reproduced per question in

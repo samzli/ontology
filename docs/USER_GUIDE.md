@@ -100,6 +100,7 @@ answers and full reports.
 orange banner at the top of every page says **“Ontology is OFF.”** Nothing is
 broken; this is the deliberate demonstration state:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Area                           | What you see with the ontology OFF                                                                                                                                                       |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dashboard                      | KPI cards and the knowledge graph are replaced by a short “Ontology is OFF — text-only mode” panel                                                                                       |
@@ -107,6 +108,7 @@ broken; this is the deliberate demonstration state:
 | Knowledge graph / Graph studio | A panel explaining that graph views need the ontology                                                                                                                                    |
 | Ask                            | Answers are grounded in the uploaded data tables but with **no ontology layer** — no metric formulas, no impact chain, no entity linking. A “Without ontology” badge marks every answer. |
 | My reports                     | Reports are still generated and downloadable, but **text-only**: the graph, evidence, chart and analytics sections are removed and the title is suffixed “— No ontology (text-only)”     |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Turn the switch back to **ON** — or press **Turn ontology back on** in the
 banner or panel — to restore every visual immediately. This is the fastest
@@ -205,11 +207,13 @@ the results.
 
 The **badge colour** next to an answer tells you its source:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Badge | Meaning                                     | Trust level       |
 | ----- | ------------------------------------------- | ----------------- |
 | Green | Deterministic rule (configured by an admin) | Highest — cite it |
 | Amber | No matching rule                            | Only suggestions  |
 | Blue  | AI model answer                             | Reference only    |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Every answer includes an **impact chain graph** showing which factors
 make up the number — handy for screenshots when presenting to
@@ -287,12 +291,14 @@ Two extra section checkboxes make reports self-contained:
    pack declares on the **Dashboard**, and explore how they connect in the
    **Knowledge graph** or **Graph studio**.
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Required table | Key columns | What it powers |
 | ----------------- | ---------------------- | ----------------------------------------------------- |
 | `vnb_monthly` | `month` | Company trend chart and the month-on-month VNB bridge |
 | `channel_monthly` | `month, channel_id` | Channel breakdown and the driver attribution |
 | `agent_monthly` | `month, channel_id` | Agent productivity table |
 | `agent_master` | `agent_id, channel_id` | Agent names and reporting lines for the agent view |
+<!-- markdownlint-enable MD013 MD060 -->
 
 No questions yet? Press **⚡ Sample report** — the platform answers
 the ontology's recommended questions instantly with the rules engine
