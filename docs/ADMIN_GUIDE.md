@@ -511,8 +511,8 @@ share the user portal URL: `http://onti.local:8010/app` after the
 hosts mapping in the README, otherwise `http://localhost:8010/app` .
 Self-registration and accounts created there need a persistent disk; on
 Vercel the function filesystem is per-instance, so registration is
-disabled ( `/api/auth/status` → `ephemeral: true` ) and the sign-in pages
-explain it. The Docker deployment keeps the volume, so registration is
+disabled ( `/api/auth/status` → `ephemeral: true` ). The Docker
+deployment keeps the volume, so registration is
 open there ( `ephemeral: false` ) — use it (README → Deploying with Docker)
 for a real multi-user workspace. On Vercel use the project's production
 URL ( `https://…/app` ) and make sure **Deployment Protection → Vercel
