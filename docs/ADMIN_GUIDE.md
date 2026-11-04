@@ -5,7 +5,7 @@
 > oversight, canonical questions, models and usage monitoring. The
 > end-user perspective lives in `docs/USER_GUIDE.md` ; architecture in
 > `docs/TECHNICAL.md` ; the ontology JSON file format in
-> `docs/ONTOLOGY_JSON_REFERENCE.md` ; setup in the root `README.md` .
+> `docs/ONTOLOGY_JSON_REFERENCE.md`; setup in the root`README.md` .
 
 ---
 
@@ -21,7 +21,7 @@ The two portals have strictly separated responsibilities:
 
 The portals stay separate: the admin console header has a one-way
 **← User portal** button back to `/app` , while the user portal has no
-link into `/admin` . The default administrator ( `admin` /
+link into `/admin`. The default administrator (`admin` /
 `Onti@2026` — change the password after first login) can enter both;
 self-registered users only ever see `/app` .
 
@@ -47,10 +47,10 @@ self-registered users only ever see `/app` .
    (bulk import from TXT / CSV / XLSX).
 6. **Knowledge graph** — Schema / Impact / Instance layers plus the
    one-click **Sync impact graph from ontology** action.
-7. **Models & usage** — system model endpoints, **User-created
-   models** oversight table, the **User portal settings** table (each
+7. **Models & usage**— system model endpoints,**User-created
+   models**oversight table, the**User portal settings** table (each
    user's current scenario pack and model), token usage.
-8. **AI proposals** — review queue for AI-generated **ontology
+8. **AI proposals**— review queue for AI-generated**ontology
    additions** (entities, graph nodes/edges, metric formulas). A
    proposal never edits or deletes existing content and never touches
    application code: approving one only adds the described element to
@@ -60,7 +60,7 @@ self-registered users only ever see `/app` .
 
 ## 3. Ontology provenance — always know where a pack came from
 
-Every pack carries an **origin** record, shown as the **🧾 badge**
+Every pack carries an **origin**record, shown as the**🧾 badge**
 next to the selected pack in Ontology governance and visible to users
 in Graph studio:
 
@@ -110,12 +110,12 @@ and the data sources behind them
 
 > **A user reports an empty Performance analytics page.** The page first
 > checks the user's active pack for a monthly table. If the pack declares
-> one (a `report_month` / `month` column of `YYYY-MM` values), the page
+> one (a `report_month`/`month`column of`YYYY-MM` values), the page
 > auto-renders a **Monthly trend from this pack** card — no action needed,
 > and this is expected for any pack, including a lapse experience study.
 > The empty state appears only when the pack has **no** monthly table: the
 > driver / scenario / agent cards need the built-in VNB/APE schema
-> ( `vnb_monthly` , `channel_monthly` , `agent_monthly` , `agent_master` ). In
+> ( `vnb_monthly`,`channel_monthly`,`agent_monthly`,`agent_master` ). In
 > that case the page itself lists which tables are missing and how to fix
 > it. Point the user either at the **Scenario** selector (switch to a pack
 > that has the schema) or at **Data centre** (upload a workbook whose sheet
@@ -138,7 +138,7 @@ scenario.
 **Data oversight → pick a table → ⬆ Upload data.** The flow is
 deliberately preview-first: nothing is written until you commit.
 
-1. **Drop a `.csv` / `.xlsx` / `.xls` / `.json`** (max 10 MB) and give
+1. **Drop a `.csv`/`.xlsx`/`.xls`/`.json`** (max 10 MB) and give
    the dataset a name.
 2. **One workbook, many tabs.** A `.xlsx` with several sheet tabs is a
    single upload — you do **not** upload one file per table. After the
@@ -161,7 +161,7 @@ deliberately preview-first: nothing is written until you commit.
    columns were read, how many stayed unmapped, and the exact errors
    per Excel row. A single invalid row blocks the commit — fix the file
    first.
-5. **Commit.** Press **✓ Looks good — commit import**; the dataset is
+5. **Commit.**Press**✓ Looks good — commit import**; the dataset is
    stored and activated, metrics recompute from it, and the AI induction
    pass runs in the background (review the result in **AI proposals**,
    console map item 8).
@@ -170,10 +170,10 @@ Every write is versioned: the previous dataset stays and can be
 re-activated from the Datasets list at any time.
 
 > **Match column types to the data.** Every target column has a data
-> type ( `INTEGER` , `FLOAT` , `TEXT` ) and the preview validates each cell
+> type ( `INTEGER`,`FLOAT`,`TEXT` ) and the preview validates each cell
 > against it. A column typed `INTEGER` rejects decimal values — e.g. an
 > `exposure` column that holds fractional policy-months such as
-> `534.483826` must be `FLOAT` , or every row with a decimal fails with
+> `534.483826`must be`FLOAT` , or every row with a decimal fails with
 > "is not an integer". When a large share of rows is rejected with type
 > errors, fix the column type in Ontology governance (Attributes) and
 > re-upload; changing the type does not touch the already-stored data.
@@ -186,21 +186,21 @@ file and the background AI induction pass — not the database write.
 
 ### 4.6 Batch import — many files, a folder, or every sheet at once
 
-The **Batch import** area of the same **⬆ Upload data** card brings in
+The **Batch import**area of the same**⬆ Upload data** card brings in
 a lot at once without losing track of what is what. Nothing is written
 until you commit, exactly like the single-file flow.
 
 1. **Pick the input.** **＋ Select files…** accepts many `.csv`,
-`.xlsx` / `.xls` and `.json` files at once; **📁 Select folder…**
+`.xlsx`/`.xls`and`.json` files at once; **📁 Select folder…**
    uploads every supported file inside a folder (and its subfolders) in
    one go. A folder may mix formats — that is fine.
-2. **Every file is split into items.** A workbook becomes **one item
-   per sheet**; a `.csv` or data `.json` becomes a single item. So a
+2. **Every file is split into items.**A workbook becomes**one item
+   per sheet**; a `.csv`or data`.json` becomes a single item. So a
    5-sheet workbook appears as 5 separate, clearly named rows — nothing
    is merged.
 3. **Each item is routed to a table.** By name: a sheet called
-`Monthly_Experience` routes to the table keyed `experience` , and a
-`region_sales.csv` routes to a table keyed `region_sales` . When no
+`Monthly_Experience`routes to the table keyed`experience` , and a
+`region_sales.csv`routes to a table keyed`region_sales` . When no
    table matches, the item is offered as **＋ Create new table** — on
    commit the platform creates the table, its columns, a matching
    ontology entity and attributes, and syncs the impact graph. Change
@@ -215,8 +215,8 @@ until you commit, exactly like the single-file flow.
    written** — so a partially-bad folder never leaves a half-imported
    state. Untick **skip** on an item you do not want to import.
 
-Data-shaped `.json` (an array of records, or `{"records" | "data" |
-"rows": […]}`) imports like a table. A `.json` that is an *ontology*
+Data-shaped `.json`(an array of records, or`{"records" | "data" |
+"rows": […]}`) imports like a table. A`.json` that is an *ontology*
 definition (it contains `entities` ) is rejected here with a pointer to
 **Import pack** — that is the right entry for ontology files.
 
@@ -247,14 +247,26 @@ fields verbatim. Other OpenAI-compatible gateways (Azure, Ollama, vLLM,
 Together, …) only need their own base URL + model id + API key; the
 form fields are the same for every provider.
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Field          | SiliconFlow                     | Deloitte Nova (D. Nova)            | Azure OpenAI                                                  |
-| -------------- | ------------------------------- | --------------------------------- | ------------------------------------------------------------- |
-| **Base URL**   | `https://api.siliconflow.cn/v1` | `https://nova.deloitte.com.cn/v1` | `https://<region>.openai.azure.com/openai/deployments/<name>` |
-| **Model id**   | `deepseek-ai/DeepSeek-V4-Flash` | `DeepSeek-V4-Flash` | `gpt-4o-mini` (your deployment name)                          |
-| **API key**    | `sk-...` | `ak-...` | `...` |
-| **Verify SSL** | ✅ keep on                       | ❌ **uncheck** (self-signed cert)  | ✅ keep on                                                     |
-<!-- markdownlint-enable MD013 MD060 -->
+|Field|SiliconFlow|
+|---|---|
+|**Base URL**|`https://api.siliconflow.cn/v1`|
+|**Model id**|`deepseek-ai/DeepSeek-V4-Flash`|
+|**API key**|`sk-...`|
+|**Verify SSL**|✅ keep on|
+
+|Field|Deloitte Nova (D. Nova)|
+|---|---|
+|**Base URL**|`https://nova.deloitte.com.cn/v1`|
+|**Model id**|`DeepSeek-V4-Flash`|
+|**API key**|`ak-...`|
+|**Verify SSL**|❌**uncheck** (self-signed cert)|
+
+|Field|Azure OpenAI|
+|---|---|
+|**Base URL**|`https://<region>.openai.azure.com/openai/deployments/<name>`|
+|**Model id**|`gpt-4o-mini` (your deployment name)|
+|**API key**|`...`|
+|**Verify SSL**|✅ keep on|
 
 > **Important — model ids differ across gateways.** DeepSeek V4 Flash
 > is `deepseek-ai/DeepSeek-V4-Flash` on SiliconFlow but
@@ -272,11 +284,11 @@ apply identically to system models (this console) and to user models
 **The Base URL must be the full API prefix, not the bare host.**
 The platform sends requests to `{base_url}/chat/completions` , so the
 URL must include the provider's API prefix — for most gateways that
-is `/v1` . `https://nova.deloitte.com.cn/v1` works; the bare host
+is `/v1`.`https://nova.deloitte.com.cn/v1` works; the bare host
 `https://nova.deloitte.com.cn` does **not** (Nova's gateway answers
 *405 Not Allowed* because it only exposes routes under `/v1` ), and
-neither do invented paths such as `/del/v1` or `/api/v1` . Trailing
-slashes are harmless ( `/v1/` , `/v1///` are normalised away), but the
+neither do invented paths such as `/del/v1`or`/api/v1` . Trailing
+slashes are harmless ( `/v1/`,`/v1///` are normalised away), but the
 platform deliberately **never auto-appends `/v1`** — only a minority
 of gateways use that prefix (Azure and most on-prem servers do not),
 so guessing would break more setups than it fixes. If in doubt, copy
@@ -302,26 +314,51 @@ fix.
 
 Symptom → cause → fix:
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Symptom when testing / asking                              | Most likely cause                                         | Fix                                                                |
-| ---------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| "The provider returned HTTP 405"                           | Base URL missing the API prefix (bare host, wrong path)   | Use the full prefix, e.g. `https://nova.deloitte.com.cn/v1` |
-| "The provider could not find this model"                   | Model id wrong for this gateway (case, prefix, hyphens)   | Copy the exact id from the provider's catalogue; re-test           |
-| "The provider rejected the API key" (401/403/30014)        | Key revoked/expired, or pasted with quotes/Bearer prefix  | Re-issue or re-paste the bare key; placeholders are never stored   |
-| "The gateway's TLS certificate could not be verified"      | Self-signed or untrusted certificate (e.g. Nova, on-prem) | Uncheck **Verify SSL certificate** on that model's configuration   |
-| "The TLS handshake with the gateway failed"                | TLS version/cipher mismatch, or `http://` vs `https://` | Check the scheme and whether the gateway expects an internal proxy |
-| "The gateway's host name could not be resolved"            | DNS failure — URL typo, no VPN, or missing hosts entry    | Check the URL character by character and test from the server host |
-| "The provider closed the connection without a valid reply" | Host answered, but not with a chat-completions response   | Base URL must be the full API prefix; confirm the model id exists  |
-| "The gateway refused the connection"                       | Nothing listening on that host/port, or a proxy blocks it | Check scheme and port; test from the server host                   |
-| "The provider did not answer in time"                      | Slow or queueing gateway; short timeout                   | Raise the model's **Timeout**, then retry — this one is transient  |
-| "The provider could not be reached"                        | Network path blocked; cause not otherwise classifiable    | Check the base URL, network and any corporate proxy                |
-<!-- markdownlint-enable MD013 MD060 -->
+**Symptom:** "The provider returned HTTP 405"
+**Cause:** Base URL missing the API prefix (bare host, wrong path)
+**Fix:** Use the full prefix, e.g. `https://nova.deloitte.com.cn/v1`
+
+**Symptom:** "The provider could not find this model"
+**Cause:** Model id wrong for this gateway (case, prefix, hyphens)
+**Fix:** Copy the exact id from the provider's catalogue; re-test
+
+**Symptom:** "The provider rejected the API key" (401/403/30014)
+**Cause:** Key revoked/expired, or pasted with quotes/Bearer prefix
+**Fix:** Re-issue or re-paste the bare key; placeholders never stored
+
+**Symptom:** "The gateway's TLS certificate could not be verified"
+**Cause:** Self-signed or untrusted cert (e.g. Nova, on-prem)
+**Fix:** Uncheck **Verify SSL certificate** on that model's config
+
+**Symptom:** "The TLS handshake with the gateway failed"
+**Cause:** TLS version/cipher mismatch, or `http://` vs `https://`
+**Fix:** Check the scheme and whether an internal proxy is expected
+
+**Symptom:** "The gateway's host name could not be resolved"
+**Cause:** DNS failure — URL typo, no VPN, or missing hosts entry
+**Fix:** Check the URL character by character; test from server host
+
+**Symptom:** "The provider closed the connection without a valid reply"
+**Cause:** Host answered, but not with a chat-completions response
+**Fix:** Base URL must be the full API prefix; confirm model id exists
+
+**Symptom:** "The gateway refused the connection"
+**Cause:** Nothing listening on that host/port, or a proxy blocks it
+**Fix:** Check scheme and port; test from the server host
+
+**Symptom:** "The provider did not answer in time"
+**Cause:** Slow or queueing gateway; short timeout
+**Fix:** Raise the model's **Timeout**, then retry — transient
+
+**Symptom:** "The provider could not be reached"
+**Cause:** Network path blocked; cause not otherwise classifiable
+**Fix:** Check the base URL, network and any corporate proxy
 
 > **How a test result is reported.** Every *completed* connection test
 > answers **HTTP 200**. The verdict lives in the payload: `ok: true` for
-> a green result, `ok: false` plus `error` (what went wrong), `hint`
+> a green result, `ok: false`plus`error`(what went wrong),`hint`
 > (what to do), `provider_error` (the gateway's own wording) and
-> `category` / `retryable` . `retryable: true` marks a transient failure
+> `category`/`retryable`.`retryable: true` marks a transient failure
 > (timeout, rate limit, 5xx) where pressing **Test** again is
 > worthwhile; `retryable: false` marks a configuration fault that will
 > fail identically every time until it is fixed. HTTP 4xx is reserved
@@ -350,13 +387,11 @@ gateway can be configured independently.
 From `.env` , the same flag can be set with any of these variables
 (applied once at first startup, when the model table is empty):
 
-<!-- markdownlint-disable MD013 -->
 ```bash
 NOVA_VERIFY_SSL=false      # canonical Nova-specific name
 LLM_VERIFY_SSL=false       # generic
 SKIP_SSL_VERIFY=1          # standalone trigger — presence alone means skip
 ```
-<!-- markdownlint-enable MD013 -->
 
 ### Updating an API key
 
@@ -418,7 +453,7 @@ of a good key now succeeds.
 > questions go to the model. The Actuarial Lapse Experience pack now
 > carries 18 rules including data-driven ones (**Data coverage** —
 > lists every month in the data; **Monthly lapse experience** — the
-> per-month lapse table; **Trend analysis** and **Lapse variance** —
+> per-month lapse table; **Trend analysis**and**Lapse variance** —
 > month-on-month comparison and movement drivers), and all adapt
 > automatically to whatever dataset is activated. A second, trimmed
 > copy of the lapse study (3 rules over the synthetic demo extract)
@@ -434,7 +469,7 @@ of a good key now succeeds.
 ## 6. Safety rails
 
 * **Version snapshots** — Ontology governance → select a pack →
-  **🕘 History** → **📸 Save snapshot**; restore any time (the restore
+  **🕘 History**→**📸 Save snapshot**; restore any time (the restore
   itself auto-saves a `before-restore` snapshot). 20 snapshots per
   pack.
 * **Import preview** — importing a pack JSON runs a dry-run first;
@@ -450,7 +485,7 @@ of a good key now succeeds.
   admin" message instead of silently overwriting; refresh the page
   and re-apply the edit.
 * **AI proposal evidence** — every element the AI proposes (Admin →
-  **AI proposals**) carries a **rationale** plus a **Proposing
+  **AI proposals**) carries a **rationale**plus a**Proposing
   against** panel showing the exact table, its columns and the sample
   rows the model saw. Read this evidence before you **Approve** or
   **Reject** — nothing is applied until you approve.
@@ -467,15 +502,13 @@ of a good key now succeeds.
 
 ## 7. Recommended routines
 
-<!-- markdownlint-disable MD013 MD060 -->
-| When                        | Do                                                         |
-| --------------------------- | ---------------------------------------------------------- |
-| New ontology made by a user | Health check → review graph → decide on activation         |
-| New model added             | Test connection; watch failures on the dashboard for a day |
-| Weekly                      | Skim the audit feed and token-by-user table for anomalies  |
-| Before big edits            | Save a pack snapshot (History)                             |
-| Monthly                     | Review canonical questions; prune ones that never match    |
-<!-- markdownlint-enable MD013 MD060 -->
+|When|Do|
+|---------------------------|----------------------------------------------------------|
+|New ontology made by a user|Health check → review graph → decide on activation|
+|New model added|Test connection; watch failures on the dashboard for a day|
+|Weekly|Skim the audit feed and token-by-user table for anomalies|
+|Before big edits|Save a pack snapshot (History)|
+|Monthly|Review canonical questions; prune ones that never match|
 
 ## 8. FAQ
 
@@ -503,7 +536,7 @@ compare to the previous month?"?
 Yes. When the current question names no month, the rules engine
 inherits the most recent month mentioned earlier in the conversation
 (recent session turns plus the user's four most recent stored answers
-for the pack). Rules built on the `month_context` / `month_movement`
+for the pack). Rules built on the `month_context`/`month_movement`
 
 helpers — such as the lapse pack's *comparison* and *movement* rules —
 then answer for that inherited month. This applies to the Ask view,
@@ -515,7 +548,7 @@ share the user portal URL: `http://onti.local:8010/app` after the
 hosts mapping in the README, otherwise `http://localhost:8010/app` .
 Self-registration works on every host, but accounts created at runtime
 need a persistent disk to survive: on Vercel the function filesystem is
-per-instance ( `/api/auth/status` → `ephemeral: true` ), so a registered
+per-instance ( `/api/auth/status`→`ephemeral: true` ), so a registered
 account lives on one instance only. The Docker deployment keeps the
 volume, so accounts persist there ( `ephemeral: false` ) — use it
 (README → Deploying with Docker)
@@ -539,12 +572,12 @@ Recommended setup:
 1. Keep self-registration off on shared deployments.
 2. Create **one regular account per person** (or one shared demo account
    for a short demo) in **Users & audit**.
-3. Share `<domain>/app` — not `/admin`.
+3. Share `<domain>/app`— not`/admin`.
 4. On Vercel, accounts created at runtime live only in that instance's
 `/tmp` : create them on a local or Docker instance, commit the updated
 `data/onti.db` , and push. The image/deployment then starts every
    instance with those accounts.
 
-A demo account ( `giteam` / `GiDemo@2026` , role `user` ) ships in the
+A demo account ( `giteam`/`GiDemo@2026`, role`user` ) ships in the
 committed database for exactly this purpose; rename it or replace it with
 per-person accounts before a long-lived rollout.
