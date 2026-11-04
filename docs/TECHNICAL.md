@@ -71,7 +71,7 @@ file (multi-replica or stateless deployments).
 instances* — it is true only when the `VERCEL` environment variable is
 present, or when `ONTI_EPHEMERAL=1` is set explicitly. It is **not**
 derived from the data-directory path: a Docker container points
-`ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent, 
+`ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent,
 so registration stays open there. On an ephemeral host writes live only
 for that instance, so `auth.register_account` refuses to create accounts
 and `/api/auth/status` reports `ephemeral: true` ; the sign-in pages then
@@ -83,25 +83,25 @@ for durable multi-user state.
 
 Core tables (selection):
 
-| Table                                   | Purpose                                         |
+| Table | Purpose |
 | --------------------------------------- | ----------------------------------------------- |
-| `users` | accounts, PBKDF2 hashes, roles                  |
-| `sessions` | session tokens (signed + stored)                |
-| `revoked_sessions` | tokens revoked by logout (checked before use)   |
-| `ontology_packs` | one row per ontology (see origin note below)    |
-| `entities` / `attributes` / `relations` | the ontology schema                             |
-| `graph_nodes` / `graph_edges` | the impact graph (auto-generated if empty)      |
-| `metric_formulas` / `question_rules` | computation + rules engine                      |
+| `users` | accounts, PBKDF2 hashes, roles |
+| `sessions` | session tokens (signed + stored) |
+| `revoked_sessions` | tokens revoked by logout (checked before use) |
+| `ontology_packs` | one row per ontology (see origin note below) |
+| `entities` / `attributes` / `relations` | the ontology schema |
+| `graph_nodes` / `graph_edges` | the impact graph (auto-generated if empty) |
+| `metric_formulas` / `question_rules` | computation + rules engine |
 | `tables` / `datasets` | logical data tables and their versioned sources |
-| `question_bank` | canonical questions                             |
-| `user_questions` | per-user private question lists                 |
+| `question_bank` | canonical questions |
+| `user_questions` | per-user private question lists |
 | `ask_history` | one row per answered question (see memory note) |
-| `studio_history` | Graph studio generation history log             |
-| `model_configs` | admin-registered models (keys encrypted)        |
-| `user_model_configs` | per-user Model centre entries (keys encrypted)  |
+| `studio_history` | Graph studio generation history log |
+| `model_configs` | admin-registered models (keys encrypted) |
+| `user_model_configs` | per-user Model centre entries (keys encrypted) |
 | `llm_calls` | token metering: caller, model, success, latency |
-| `audit` | append-only write log                           |
-| `app_settings` | key/value store: user model + pack selections   |
+| `audit` | append-only write log |
+| `app_settings` | key/value store: user model + pack selections |
 
 Four columns deserve detail:
 
@@ -114,16 +114,16 @@ Four columns deserve detail:
   HTTP 409 when another session already moved the pack forward, so
   concurrent admin edits never overwrite each other.
 * `ontology_proposals.evidence` — the JSON snapshot of *what the model
-  was shown* when it drafted the proposal: target table key/label, 
+  was shown* when it drafted the proposal: target table key/label,
   dataset id, the table's column specs and the sample rows
   ( `modules/induction.py:_build_evidence` ). Returned by
 `list_proposals` alongside `rationale` so the admin review queue can
   render the "Proposing against" panel.
-* `ask_history` — user, pack, question, answer excerpt, source, 
+* `ask_history` — user, pack, question, answer excerpt, source,
   matched flag and token count. Powers the Recent asks chips, the
   History view and the AI's cross-session memory.
 
-`studio_history` records every Graph studio action per user: pack, 
+`studio_history` records every Graph studio action per user: pack,
 action ( `ontology` / `preview` / `data-upload` / `ontology-upload` /
 `report` ), title and detail (for reports, the report uid). It powers
 the user-facing Generation history card.
@@ -141,9 +141,9 @@ guards, so older databases upgrade in place.
 
 Every write path that creates a pack records `origin` :
 
-* Graph studio: `Generated from data in Graph studio (tables: t1, 
-  t2) by <username> ` (plus ` + AI enrichment` when requested); 
-* Admin import: `Imported from JSON file by <admin>`; 
+* Graph studio: `Generated from data in Graph studio (tables: t1,
+  t2) by <username>` (plus `+ AI enrichment` when requested);
+* Admin import: `Imported from JSON file by <admin>`;
 * seed packs carry a descriptive origin.
 
 The value is surfaced as the 🧾 badge in the admin pack bar.
@@ -151,7 +151,7 @@ The value is surfaced as the 🧾 badge in the admin pack bar.
 The built-in sample pack ( `vnb-ape-sample` ) is auto-upgraded by
 `seed.upgrade_sample_pack` on every startup (idempotent, flagged
 `sample_pack_upgraded_v2:{pack_id}` ): it adds the five monthly
-data-table entities (VNB Monthly, Channel Monthly, Agent Monthly, 
+data-table entities (VNB Monthly, Channel Monthly, Agent Monthly,
 Product Mix Monthly, Scenario Analysis) with attributes and relations
 (10 entities / 13 relations in total, one relation per table-to-table
 link such as channel aggregates VNB, agent rolls up to channel), and
@@ -162,21 +162,21 @@ including the table-level nodes X1–X8.
 ### 3.2 Graph studio provenance
 
 * `GET /api/graph-studio/sources` annotates every ontology table with
-  its source dataset ( `dataset_name` , `dataset_file` , `dataset_kind` , 
+  its source dataset ( `dataset_name` , `dataset_file` , `dataset_kind` ,
 `dataset_updated` from the newest `datasets` row).
 * Every graph node carries `source {kind, detail}`; the UI provenance
   panel and the per-view "Sources used" list render it.
-* Views: `lineage` (default),  `schema`,  `columns` — built by
+* Views: `lineage` (default),    `schema`,  `columns` — built by
 `ontology_service.build_studio_graph` .
 
 ### 3.3 Per-user scenario packs
 
 `app_settings["user_pack:{uid}"]` stores the pack a user picked in
 the header dropdown. `routes/common.py:user_pack_id` resolves it with fallback
-to the admin-activated pack, and every user-facing read (graph, 
+to the admin-activated pack, and every user-facing read (graph,
 dashboard, analytics, Ask, Graph studio, reports, memory) goes
 through `resolve_pack` . `GET /api/packs` lists the visible packs with
-`is_active` / `selected` flags, origin and data-source summaries; 
+`is_active` / `selected` flags, origin and data-source summaries;
 `POST /api/my/pack` sets the selection, `{"pack_id": null}` resets it
 to the system default.
 
@@ -189,7 +189,7 @@ to the system default.
    (long-term, cross-session), truncated to 600 chars each
    ( `constants.MEMORY_ANSWER_CHARS` ).
 
-After the stream finishes, the question, answer excerpt, source, 
+After the stream finishes, the question, answer excerpt, source,
 matched flag and token count are inserted into `ask_history` .
 `GET /api/ask/history` returns the last 30 asks per active pack.
 
@@ -287,8 +287,9 @@ side receives:
 `source` is `rules+analysis` , `rules` , or `analysis` accordingly. The
   analysis alone is enough to answer, so the grounded side still works
   when no model is configured. `analysis.depth` carries the counters
-  quoted in `value` (steps, statistical tests, findings, tables joined, 
+  quoted in `value` (steps, statistical tests, findings, tables joined,
   dimensions, reconciliation).
+
 * **Second wheel (`narrative`).** When a model is configured, the same
   model is called a second time with
 `llm.build_synthesis_prompt(analysis, ontology_context, rules_answer)` .
@@ -344,7 +345,7 @@ auditable. It runs in a fixed order:
    question type leads), a ranked finding list, a numbered reasoning
    trace and an annotated impact chain walked over the pack's graph.
 
-`detect_focus(question)` selects one of `level` , `movement` , `mix` , 
+`detect_focus(question)` selects one of `level` , `movement` , `mix` ,
 `cohort` , `trend` ; follow-up questions inherit the month named earlier
 in the conversation, mirroring the rules engine's own memory.
 
@@ -425,13 +426,11 @@ ever seeing a "rows omitted" note.
 * System models: `model_configs` (admin CRUD, encrypted keys).
 * User models: `user_model_configs` (owner-scoped CRUD via
 `/api/my/models*` , encrypted keys, duplicate names rejected 409).
-* Selection: `app_settings["user_model:{uid}"]` stores `sys:N`, 
+* Selection: `app_settings["user_model:{uid}"]` stores `sys:N`,
 `my:N` or empty. `routes/common.py:_effective_model_cfg` resolves it at ask
   time with fallback to the system default.
 * `.env` registration (`llm_client.append_env_model`): writes a
   self-contained block
-
-  
 
 ```text
   # >>> onti model: my_azure_gpt >>>
@@ -444,6 +443,7 @@ ever seeing a "rows omitted" note.
 
   Existing blocks with the same slug are replaced; the DB stays the
   source of truth.
+
 * Testing: `POST /api/my/models/test` accepts `config_id: "my:N"`
   (resolves the user's stored config server-side) or ad-hoc fields.
 * Oversight: `GET /api/admin/user-models` returns every user-created
@@ -504,7 +504,7 @@ only wrong setting was **Verify SSL certificate**.
 
 The probe sends one `POST {base_url}/chat/completions` with a 5-token
 `ping` and **waits as long as the model's own `timeout` allows** — a
-busy gateway can legitimately queue a trivial prompt for over a minute, 
+busy gateway can legitimately queue a trivial prompt for over a minute,
 and a shorter hard-coded ceiling turned that into a false "did not
 answer in time". Only the *connect* phase is capped (10 s), so a dead
 host or closed port still fails fast.
@@ -527,14 +527,15 @@ accept `ai_enrich: bool` :
    automatic.
 
 `create-ontology` additionally records the creation in
-`studio_history` , lists the exact source tables in the pack's origin, 
+`studio_history` , lists the exact source tables in the pack's origin,
 and **generates a full report automatically**
-( `routes/common.py:_auto_pack_report` ): the response carries the report `uid` , 
-and the title follows `<name> | Scenario: <pack> | Data: <sources>` .
+( `routes/common.py:_auto_pack_report` ): the response carries the
+report `uid` , and the title follows
+`<name> | Scenario: <pack> | Data: <sources>` .
 The report is linked from Graph studio's Generation history card
 ( `GET /api/graph-studio/history` ).
 
-### 5.1 Data import and AI proposals ( `modules/importer.py` , `modules/induction.py` )
+### 5.1 Data import and AI proposals ( `importer.py` , `induction.py` )
 
 `POST /api/admin/data/upload` carries the whole import in one endpoint
 and one shared pipeline ( `importer.analyse_upload` , used by both the
@@ -555,7 +556,7 @@ preview and the commit):
   re-validates every override and maps `__ignore__` / blank / unknown
   targets to "not imported", so they drop into `unmapped_headers` .
 * **Preview vs commit** — `preview_upload` returns the report (valid /
-  invalid counts, headers, sheets, `instance_columns` , mapping, 
+  invalid counts, headers, sheets, `instance_columns` , mapping,
   unmapped headers) without writing. `commit_upload` re-runs the same
   analysis, refuses to write when any row is invalid, and stores the
   valid rows as a new activated dataset ( `admin_service.create_dataset` ).
@@ -580,7 +581,7 @@ ontology definition ( `entities` / `node_types` ) is rejected with an
 single-table pipeline for every unit of work. One *item* is a sheet of
 a workbook (via `importer.list_items` ) or the whole of a CSV/JSON file.
 
-* **Expansion** — `list_items` splits each uploaded file into items; 
+* **Expansion** — `list_items` splits each uploaded file into items;
   folder uploads keep the browser's relative paths and `_basename` /
 `_stem` normalise the names before matching.
 * **Routing** — `analyse_batch` resolves each item's target table in
@@ -599,8 +600,8 @@ a workbook (via `importer.list_items` ) or the whole of a CSV/JSON file.
   per column and runs `sync_visual_graph` , so a batch-created table is
   a first-class part of the ontology, not just a data table.
 * **Preview vs commit** — `analyse_batch(with_rows=False)` powers the
-  preview and reports per item `{file, item, table key, mapping, 
-  valid/invalid counts, skip} `;  ` commit_batch` refuses the whole
+  preview and reports per item `{file, item, table key, mapping,
+  valid/invalid counts, skip}`;  `commit_batch` refuses the whole
   request ( `UploadError` , 4xx, nothing written) when any non-skipped
   item is empty or invalid, otherwise writes one activated dataset per
   item and returns `items` plus the `created_tables` it built.
@@ -612,26 +613,26 @@ Markdown, HTML (print-friendly, base64 charts) and PDF. Section
 numbering adjusts to what is present. Notable sections:
 
 * `ontology` — pack nodes/links rendered via
-`report_charts.render_chain_graph` into `charts/ontology_graph.png` ; 
+`report_charts.render_chain_graph` into `charts/ontology_graph.png` ;
 * `analytics` — `analytics.mom_attribution` (headcount / productivity
   / mix effects vs. prior month) and `analytics.agent_stats`
 
-  (per-channel registered/active/avg productivity) tables; 
+  (per-channel registered/active/avg productivity) tables;
 * AI interpretation is appended only when a model is configured.
 
 `POST /api/reports/sample` answers the pack's recommended questions
 with the rules engine ( `raise_on_template_error=False` ), then builds a
 report with all sections — no AI cost. Its title carries the scenario
 and data sources (`Sample Analytics Report | Scenario: <pack> |
-Data: <sources> `). ` GET /api/reports/{uid}/view` serves the HTML
+Data: <sources>`). `GET /api/reports/{uid}/view` serves the HTML
 inline.
 
 `GET /api/dashboard` assembles the user-portal dashboard in one call:
 the resolved pack (name, description, origin), its data sources (kind
 and row count), KPI cards and the monthly timeseries. **KPI cards are
-driven by the pack's own `metric_formulas` ** — each formula whose input
+driven by the pack's own `metric_formulas`** — each formula whose input
 table has rows becomes one card, formatted by its `fmt` / `decimals` —
-so any ontology shows its own metrics (VNB/APE, IFRS 17 CSM / ISR / EV, 
+so any ontology shows its own metrics (VNB/APE, IFRS 17 CSM / ISR / EV,
 lapse rates, …) instead of a fixed VNB/APE key list. The response also
 returns `formula_count` , letting the UI tell "no formulas declared"
 apart from "formulas declared but their tables are still empty". When
@@ -639,7 +640,7 @@ the pack carries a compatible monthly series, `analytics.company_series`
 
 adds latest-month APE / VNB / margin / MoM cards. On first call per
 user + pack it also generates a full
-**"Full Analytics Report"** via `_ensure_auto_report` (idempotent, 
+**"Full Analytics Report"** via `_ensure_auto_report` (idempotent,
 flagged `auto_report:<user>:<pack>` in `app_settings` ) and returns it
 as `auto_report` — the dashboard banner links to
 `/api/reports/{uid}/view` .
@@ -669,7 +670,7 @@ prod effect   = A1 × (P1 − P0)/1000 × M0
 mix effect    = A1 × P1/1000 × (M1 − M0)
 ```
 
-Endpoints: `/api/analytics/timeseries` , `/attribution` , `/scenario` , 
+Endpoints: `/api/analytics/timeseries` , `/attribution` , `/scenario` ,
 `/agent-stats` . The driver-attribution, scenario and agent views read the
 built-in VNB/APE monthly schema ( `analytics.REQUIRED_TABLES` :
 `vnb_monthly` , `channel_monthly` , `agent_monthly` , `agent_master` ) and
@@ -716,20 +717,20 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   or `.env` routinely carries wrapper quotes, a `Bearer` prefix or a
   trailing newline. Sent verbatim, the provider answers
 `{"code":30014,"message":"Token is invalid."}` even though the key is
-  valid. `llm_client.normalize_api_key` therefore strips whitespace, 
+  valid. `llm_client.normalize_api_key` therefore strips whitespace,
   quotes (straight, back-tick, typographic), a leading `Bearer` scheme
   and collapses known placeholders ( `sk-...` , `your-api-key` , …) to an
   empty string; `normalize_base_url` trims spaces and trailing slashes.
-  Both run at **every boundary** — `create_config` / `update_config` , 
+  Both run at **every boundary** — `create_config` / `update_config` ,
   the per-user equivalents, `resolve_test_config` (including legacy rows
-  written before normalisation existed) and `ConfiguredLLM.__init__` , 
+  written before normalisation existed) and `ConfiguredLLM.__init__` ,
   the last gate before the `Authorization` header is built. Dirty values
   are never persisted, and an empty key sends no `Authorization` header
   at all.
 * **Provider errors are translated.** `llm_client.describe_provider_error`
   maps the provider's status/body into `error` (human cause), `hint`
 
-  (next step) and `provider_error` (raw body, 300 chars, for support), 
+  (next step) and `provider_error` (raw body, 300 chars, for support),
   plus `provider_code` . The model form renders all three, so the admin
   never has to read raw provider JSON.
 * Formula evaluation runs in a sandboxed expression parser; arbitrary
@@ -757,7 +758,7 @@ Tests that talk to the server need the same database the server uses, so run
 them against `python main.py` on `127.0.0.1:8010` (not against a container
 whose volume is a separate copy). For a container, use the HTTP-only scripts
 ( `smoke_http.py` , `verify_giteam.py` ) and the checks in
-README → Deploying with Docker. `verify_ontology_value.py` needs a live model; 
+README → Deploying with Docker. `verify_ontology_value.py` needs a live model;
 when the gateway is slow it reports `SKIP` instead of failing, because that is
 an environment condition, not an application defect.
 
@@ -768,14 +769,14 @@ helper modules such as `_seed_synthetic.py` , which tests import rather than
 execute — (or a filtered subset) as a subprocess and appends one JSON line per
 run to `data/run_log.jsonl` through `modules/run_log.py:record_run` :
 
-| Field                                                | Meaning                                                 |
+| Field | Meaning |
 | ---------------------------------------------------- | ------------------------------------------------------- |
-| `run_id` , `started_at` , `finished_at` , `duration_ms` | identity and timing                                     |
-| `actor` , `host` | OS user and machine that executed the script            |
+| `run_id` , `started_at` , `finished_at` , `duration_ms` | identity and timing |
+| `actor` , `host` | OS user and machine that executed the script |
 | `script` | `tests/<name>.py` |
 | `status` | `PASS` / `FAIL` (a 900 s timeout is recorded as `FAIL` ) |
-| `summary` | last non-empty output line of the script                |
-| `details` | free-form extras (exit code, filters)                   |
+| `summary` | last non-empty output line of the script |
+| `details` | free-form extras (exit code, filters) |
 
 The path and the retention cap come from the `runtime` block of
 `config/config.json` ( `run_log` , `run_log_max_entries` ); older lines are
@@ -788,7 +789,7 @@ limits) are centralised in `modules/constants.py` ; deployment values
 
 and reach the code through `modules/config.py` .
 
-The smoke suite covers the anonymous / user / admin cookie matrix, 
+The smoke suite covers the anonymous / user / admin cookie matrix,
 SSE answers, report generation, uploads and the admin API surface.
 It activates the built-in sample pack for its pack-specific assertions
 and restores the previously active pack afterwards.
@@ -802,7 +803,7 @@ and restores the previously active pack afterwards.
 
 `verify_t7.py` runs against the live server and covers the data-import
 path end to end: workbook
-sheet listing and default first-sheet pick, explicit sheet selection, 
+sheet listing and default first-sheet pick, explicit sheet selection,
 the unknown-sheet 4xx error, manual column-mapping overrides
 (force-map and force-ignore → unmapped), a sheet + mapping commit
 round-trip (dataset deleted afterwards), and AI-proposal evidence
@@ -862,13 +863,13 @@ grounded in the full ontology, once grounded in raw uploaded tables):
 
 2. **Impact-chain graphs are ontology-exclusive.** Across 6 scenarios
    the ontology side visualised **59 graph nodes / 50 edges** that
-   matched concepts like `TotalVNB` , `AgentProductivity` , 
+   matched concepts like `TotalVNB` , `AgentProductivity` ,
 `ActiveAgentCount` , `WeightedVNBMargin` , etc. The baseline side has
    no graph and no matched concepts — it treats every column literally.
 
 3. **Lapse why-question is the clearest contrast.** With ontology:
    cohort-level breakdown (WP PY1 Agency +3.0 pp, WP PY1 Worksite
-   Marketing +2.0 pp…) plus a **financial bridge table** showing CSM, 
+   Marketing +2.0 pp…) plus a **financial bridge table** showing CSM,
    Insurance Service Result, and EV impact in $M by framework
    (IFRS17 / EV). Without ontology the model replies
    *"I cannot determine a definitive cause … the uploaded tables
@@ -883,7 +884,7 @@ grounded in the full ontology, once grounded in raw uploaded tables):
    a movement in VNB"* before `mom_attribution` 's `movement` pattern
    could run. Fix: raised `mom_attribution` to `sort=1` , dropped
 `vnb_gap` to `sort=28` . Post-fix the why-question now returns a
-   proper attribution table — *Active-agent effect +$0.045M, 
+   proper attribution table — *Active-agent effect +$0.045M,
    Productivity +$0.042M, Mix/margin +$0.012M, per-channel breakdown*
    — and 20 graph nodes instead of a 173-char gap paragraph.
 
@@ -932,11 +933,11 @@ Every scenario scored 19–20 for the ontology side; the baseline ranged
 the exact per-segment factor bridge (residual $0.000M), the mix-weighted
 margin proven against the channel's implied VNB/APE margin, three
 agent-cohort tables from a second join, seven statistical tests (OLS
-trend + R², CV, z-score, momentum, HHI, driver correlation, 
-reconciliation), a numbered reasoning trace naming each method and table, 
+trend + R², CV, z-score, momentum, HHI, driver correlation,
+reconciliation), a numbered reasoning trace naming each method and table,
 and an annotated impact chain from the graph. The baseline, given the
 same raw tables, could restate the headline figure — correctly, at
-2, 907 chars in its longest answer — but never joined a second table, 
+2, 907 chars in its longest answer — but never joined a second table,
 never decomposed the move and never reconciled anything.
 
 **Why the earlier comparison was not fair.** With the `NARRATIVE DRIVER`
@@ -944,5 +945,5 @@ never decomposed the move and never reconciled anything.
 column present, the baseline's answer was essentially a copy of the
 human-written explanation, so it read more fluently than the ontology
 answer at that time. Removing the column also required no ontology
-change: the pack's column keys, relations and formulas are schema-level, 
+change: the pack's column keys, relations and formulas are schema-level,
 so explanatory text never had to be modelled.

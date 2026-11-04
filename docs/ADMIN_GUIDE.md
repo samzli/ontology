@@ -286,7 +286,7 @@ underlying model has different ids on different gateways (see the
 table above), and ids must match the provider's catalogue exactly,
 including capitalisation and hyphens.
 **Self-signed gateways need Verify SSL off** — see the next section.
-**Paste the API key clean** — quotes,  `Bearer` prefixes and stray
+**Paste the API key clean** — quotes, `Bearer` prefixes and stray
 whitespace are stripped automatically; placeholder text such as
 `sk-...` is treated as "no key" and never stored (details in
 *Updating an API key* below).
