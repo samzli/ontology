@@ -4,16 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any, Dict, List, Optional
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi.responses import JSONResponse
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from modules import admin_service as adm
@@ -21,14 +15,13 @@ from modules import auth
 from modules import llm_client as llm
 from modules import ontology_service as svc
 from modules import qa_service as qa
-from modules.constants import AUDIT_ANSWER_CHARS
-from modules.constants import AUDIT_QUESTION_CHARS
-from modules.constants import MEMORY_ANSWER_CHARS
+from modules.constants import (
+    AUDIT_ANSWER_CHARS,
+    AUDIT_QUESTION_CHARS,
+    MEMORY_ANSWER_CHARS,
+)
 from modules.db import get_conn
-from routes.common import logger
-
-from routes.common import _effective_model_cfg
-from routes.common import user_pack_id
+from routes.common import _effective_model_cfg, logger, user_pack_id
 
 router = APIRouter()
 

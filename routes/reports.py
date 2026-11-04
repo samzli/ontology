@@ -2,24 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi.responses import FileResponse
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from modules import auth
 from modules import report_builder as rb
 from modules.db import get_conn
-
-from routes.common import _auto_pack_report
-from routes.common import resolve_pack
+from routes.common import _auto_pack_report, resolve_pack
 
 router = APIRouter()
 

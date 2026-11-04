@@ -1,0 +1,17 @@
+services:
+  onti:
+    build: .
+    container_name: onti
+    ports:
+      - "8010:8010"
+    environment:
+      ONTI_DATA_DIR: /data
+      # Pin one key on multi-replica deployments so session cookies and
+      # encrypted model secrets are identical on every container.
+      # ONTI_SECRET_KEY: replace-with-a-long-random-string
+    volumes:
+      - onti-data:/data
+    restart: unless-stopped
+
+volumes:
+  onti-data:

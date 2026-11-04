@@ -22,22 +22,23 @@ from modules import db as db_mod
 from modules import importer as imp
 from modules import llm_client as llm
 from modules import report_builder as rb
-
-from routes import admin_data
-from routes import admin_models
-from routes import admin_packs
-from routes import admin_users
+from routes import (
+    admin_data,
+    admin_models,
+    admin_packs,
+    admin_users,
+    ask,
+    common,
+    graph,
+    graph_studio,
+    my_models,
+    packs,
+    pages,
+    reports,
+)
 from routes import analytics as analytics_routes
-from routes import ask
 from routes import auth as auth_routes
-from routes import common
 from routes import config as config_routes
-from routes import graph
-from routes import graph_studio
-from routes import my_models
-from routes import packs
-from routes import pages
-from routes import reports
 
 BASE_DIR = cfg.BASE_DIR
 

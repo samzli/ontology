@@ -32,7 +32,9 @@ def _scripts(filters: Sequence[str]) -> List[Path]:
 
     Args:
         filters (Sequence[str]): Substrings matched against the file name. An
-            empty sequence selects every ``*.py`` script except this runner.
+            empty sequence selects every ``*.py`` script except this runner and
+            the ``_``-prefixed helper modules (``_seed_synthetic.py``), which are
+            imported by tests rather than executed on their own.
 
     Returns:
         List[Path]: Sorted script paths.
@@ -41,7 +43,11 @@ def _scripts(filters: Sequence[str]) -> List[Path]:
         >>> [p.name for p in _scripts(["t1"])]
         ['verify_t1.py']
     """
-    scripts = sorted(p for p in TESTS.glob("*.py") if p.name != Path(__file__).name)
+    scripts = sorted(
+        p
+        for p in TESTS.glob("*.py")
+        if p.name != Path(__file__).name and not p.name.startswith("_")
+    )
     if filters:
         scripts = [
             p for p in scripts if any(f.lower() in p.name.lower() for f in filters)

@@ -17,10 +17,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from jinja2 import Environment, BaseLoader
+from jinja2 import BaseLoader, Environment
 
-from modules.db import DATA_DIR as _DATA_DIR, BUNDLED_DATA_DIR
-from modules.db import audit, get_conn, now
 from modules import analytics as an
 from modules import ontology_service as svc
 from modules import report_charts as rc
@@ -35,6 +33,8 @@ from modules.constants import (
     REPORT_SUMMARY_METRICS,
     REPORT_UID_CHARS,
 )
+from modules.db import BUNDLED_DATA_DIR, audit, get_conn, now
+from modules.db import DATA_DIR as _DATA_DIR
 
 DATA_ROOT = str(_DATA_DIR)
 BUNDLED_ROOT = str(BUNDLED_DATA_DIR)
@@ -328,14 +328,14 @@ def md_to_flowables(md: str, styles, image_loader, full_width):
     """
     from reportlab.lib import colors
     from reportlab.platypus import (
+        HRFlowable,
+        KeepTogether,
+        ListFlowable,
+        ListItem,
         Paragraph,
         Spacer,
         Table,
         TableStyle,
-        ListFlowable,
-        ListItem,
-        HRFlowable,
-        KeepTogether,
     )
 
     flows = []
@@ -643,7 +643,7 @@ def _ai_interpretation(
         context = svc.build_llm_context(pack)
         system = build_system_prompt(context)
         qa_blob = "\n".join(
-            f"Q: {q.get('question','')}\nA: {q.get('answer','')[:REPORT_QA_ANSWER_CHARS]}"
+            f"Q: {q.get('question', '')}\nA: {q.get('answer', '')[:REPORT_QA_ANSWER_CHARS]}"
             for q in qa_items[:REPORT_QA_ITEMS]
         )
         prompt = (
@@ -895,12 +895,12 @@ def build_report(
         ]
         onto_edges = [
             {
-                "source": l.get("source"),
-                "target": l.get("target"),
-                "label": l.get("label") or l.get("edge_type") or "",
+                "source": link.get("source"),
+                "target": link.get("target"),
+                "label": link.get("label") or link.get("edge_type") or "",
             }
-            for l in pack.get("links", [])
-            if l.get("source") and l.get("target")
+            for link in pack.get("links", [])
+            if link.get("source") and link.get("target")
         ]
         try:
             with open(os.path.join(cdir, "ontology_graph.png"), "wb") as f:
@@ -1286,13 +1286,13 @@ def _render_pdf(
         BaseDocTemplate,
         Frame,
         Image,
+        NextPageTemplate,
         PageBreak,
         PageTemplate,
         Paragraph,
         Spacer,
         Table,
         TableStyle,
-        NextPageTemplate,
     )
 
     navy = colors.HexColor(BRAND_NAVY)

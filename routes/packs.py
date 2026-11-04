@@ -3,30 +3,23 @@
 from __future__ import annotations
 
 import re
+from typing import Any, Dict, List, Optional
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from modules import admin_service as adm
-from modules import analytics
-from modules import auth
+from modules import analytics, auth
 from modules import ontology_service as svc
-from modules.db import audit
-from modules.db import get_conn
-from modules.db import set_setting
+from modules.db import audit, get_conn, set_setting
 from modules.seed import PACK_SLUG as SAMPLE_PACK_SLUG
-
-from routes.common import _ensure_auto_report
-from routes.common import pack_data_sources
-from routes.common import resolve_pack
-from routes.common import user_pack_id
+from routes.common import (
+    _ensure_auto_report,
+    pack_data_sources,
+    resolve_pack,
+    user_pack_id,
+)
 
 router = APIRouter()
 

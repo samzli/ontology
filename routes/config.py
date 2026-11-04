@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
 
-from typing import Any
-from typing import Dict
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -18,7 +14,6 @@ from modules import config as cfg
 from modules import llm_client as llm
 from modules import ontology_service as svc
 from modules.db import get_conn
-
 from routes.common import user_pack_id
 
 router = APIRouter()

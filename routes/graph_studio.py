@@ -4,38 +4,29 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Any, Dict, List, Optional
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import File
-from fastapi import UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from modules import admin_service as adm
 from modules import auth
+from modules import db as db_mod
 from modules import importer as imp
 from modules import llm_client as llm
 from modules import ontology_service as svc
-from modules.constants import STUDIO_MAX_COLUMNS
-from modules.constants import STUDIO_MAX_QUESTIONS
-from modules.constants import STUDIO_RUN_DETAIL_CHARS
-from modules.constants import STUDIO_RUN_TITLE_CHARS
-from modules.constants import STUDIO_SAMPLE_CHARS
-from modules.constants import STUDIO_SLUG_BASE
-from modules.constants import STUDIO_SLUG_MAX
-from modules import db as db_mod
-from modules.db import audit
-from modules.db import get_conn
-
-from routes.common import _auto_pack_report
-from routes.common import _err
-from routes.common import resolve_pack
+from modules.constants import (
+    STUDIO_MAX_COLUMNS,
+    STUDIO_MAX_QUESTIONS,
+    STUDIO_RUN_DETAIL_CHARS,
+    STUDIO_RUN_TITLE_CHARS,
+    STUDIO_SAMPLE_CHARS,
+    STUDIO_SLUG_BASE,
+    STUDIO_SLUG_MAX,
+)
+from modules.db import audit, get_conn
+from routes.common import _auto_pack_report, _err, resolve_pack
 
 router = APIRouter()
 

@@ -30,9 +30,10 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from _seed_synthetic import delete_pack, ensure_synthetic_pack  # noqa: E402
+
 from modules import admin_service as adm  # noqa: E402
 from modules.db import get_conn  # noqa: E402
-from _seed_synthetic import delete_pack, ensure_synthetic_pack  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 XLSX = (

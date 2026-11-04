@@ -3007,8 +3007,8 @@ def ontology_health(pack: Dict[str, Any]) -> Dict[str, Any]:
         seen.add(n["key"])
         while queue:
             cur = queue.popleft()
-            for nb in {l["target"] for l in out.get(cur, [])} | {
-                l["source"] for l in inc.get(cur, [])
+            for nb in {edge["target"] for edge in out.get(cur, [])} | {
+                edge["source"] for edge in inc.get(cur, [])
             }:
                 for x in {y.strip() for y in str(nb).split(",")}:
                     if x in out and x not in seen:

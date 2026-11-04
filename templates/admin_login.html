@@ -31,6 +31,8 @@
           <div class="sub">Restricted area — administrators only.</div>
         </div>
         <div class="admin-body">
+          <div class="env-notice" id="envNotice"
+            style="display:none;background:#fff7e6;border:1px solid #f0c36d;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:#7a5b00"></div>
           <div class="auth-error" id="errBox"></div>
           <form id="adminForm" autocomplete="off">
             <label class="fld">
@@ -63,6 +65,16 @@
       const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
       const qs = new URLSearchParams(location.search);
       if (qs.get('expired')) showErr('Your session expired — please sign in again.');
+
+      api.get('/api/auth/status').then((s) => {
+        if (!s.ephemeral) return;
+        const n = document.getElementById('envNotice');
+        n.textContent =
+          'Preview deployment: serverless storage is per-instance, so accounts '
+          + 'and sessions created here are not kept. For a persistent workspace '
+          + 'run Onti with a disk (README → Deployment).';
+        n.style.display = 'block';
+      }).catch(() => {});
 
       // If already signed in, route appropriately.
       api.get('/api/auth/me').then((d) => {

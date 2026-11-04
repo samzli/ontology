@@ -29,6 +29,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
 
+from common.logger import AppLogger
+
+_BOOT_LOG = AppLogger("db")
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 BUNDLED_DATA_DIR = BASE_DIR / "data"
 
@@ -65,6 +69,11 @@ DB_PATH = DATA_DIR / "onti.db"
 # model API keys remain decryptable across instances (``/tmp`` is per-instance).
 KEY_PATH = BUNDLED_DATA_DIR / ".onti.key"
 _BUNDLED_DB_PATH = BUNDLED_DATA_DIR / "onti.db"
+# ``/tmp`` on serverless hosts is per-instance and wiped on cold starts, so
+# accounts, sessions, uploads and settings written there never reach another
+# instance. Callers use this flag to degrade safely instead of silently
+# losing state (see ``auth.register_account``).
+EPHEMERAL_STORAGE = str(DATA_DIR) != str(BUNDLED_DATA_DIR)
 _READY = False
 
 
@@ -346,9 +355,12 @@ def _read_master_key(path: Path) -> Optional[bytes]:
 def _machine_key() -> bytes:
     """Load, or create, the 32-byte machine-local master key.
 
-    The key is looked up in ``KEY_PATH`` first and then in the writable data
-    directory; when neither exists a fresh key is generated and written with
-    owner-only permissions (best effort).
+    ``ONTI_SECRET_KEY`` wins when set, so a multi-host or serverless
+    deployment can pin one key (and therefore one set of session cookies and
+    encrypted model secrets) without shipping a key file. Otherwise the key is
+    looked up in ``KEY_PATH`` and then in the writable data directory; when
+    neither exists a fresh key is generated and written with owner-only
+    permissions (best effort).
 
     Returns:
         bytes: The 32-byte master key.
@@ -360,6 +372,9 @@ def _machine_key() -> bytes:
         >>> len(_machine_key())
         32
     """
+    secret = os.environ.get("ONTI_SECRET_KEY", "").strip()
+    if secret:
+        return hashlib.sha256(b"onti-secret:" + secret.encode("utf-8")).digest()
     for candidate in (KEY_PATH, DATA_DIR / ".onti.key"):
         key = _read_master_key(candidate)
         if key is not None:
@@ -864,6 +879,12 @@ def init_db(seed: bool = True) -> None:
         >>> init_db(seed=False)
     """
     _prepare_data_dir()
+    if EPHEMERAL_STORAGE:
+        _BOOT_LOG.warn(
+            "Ephemeral storage in use (%s): new accounts, sessions and uploads "
+            "are per-instance and lost on cold starts. Point ONTI_DATA_DIR at a "
+            "persistent volume for multi-user deployments." % DATA_DIR
+        )
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
         for key, value in DEFAULT_SETTINGS.items():
@@ -919,8 +940,8 @@ def init_db(seed: bool = True) -> None:
                 )
     if seed:
         # Local import keeps db.py free of domain dependencies.
-        from modules.seed import ensure_seed, migrate_legacy_model
         from modules.auth import seed_default_admin
+        from modules.seed import ensure_seed, migrate_legacy_model
 
         with get_conn() as conn:
             ensure_seed(conn)

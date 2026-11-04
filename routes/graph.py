@@ -2,26 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from modules import auth
 from modules import ontology_service as svc
+from modules.constants import (
+    GRAPH_SNIPPET_ATTRS,
+    GRAPH_SNIPPET_EDGES,
+    GRAPH_SNIPPET_METRICS,
+    GRAPH_SNIPPET_RELATIONS,
+)
 from modules.db import get_conn
-
-from routes.common import resolve_pack
-from routes.common import user_pack_id
-from modules.constants import GRAPH_SNIPPET_ATTRS
-from modules.constants import GRAPH_SNIPPET_EDGES
-from modules.constants import GRAPH_SNIPPET_METRICS
-from modules.constants import GRAPH_SNIPPET_RELATIONS
+from routes.common import resolve_pack, user_pack_id
 
 router = APIRouter()
 

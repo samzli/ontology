@@ -13,7 +13,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.db import get_conn, set_setting
 from modules.auth import (
     AuthError,
     authenticate,
@@ -27,6 +26,7 @@ from modules.auth import (
     user_by_token,
     verify_password,
 )
+from modules.db import get_conn, set_setting
 
 failures = []
 SUFFIX = f"{int(time.time())}"
