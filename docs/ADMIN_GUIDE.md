@@ -1,11 +1,11 @@
 # Onti — Ontology Governance Console · Administrator Guide
 
-> This guide is for **administrators**. The admin console (`/admin`,
+> This guide is for **administrators**. The admin console ( `/admin` ,
 > deep-navy page) is for governance only: accounts, ontologies, data
 > oversight, canonical questions, models and usage monitoring. The
-> end-user perspective lives in `docs/USER_GUIDE.md`; architecture in
-> `docs/TECHNICAL.md`; the ontology JSON file format in
-> `docs/ONTOLOGY_JSON_REFERENCE.md`; setup in the root `README.md`.
+> end-user perspective lives in `docs/USER_GUIDE.md` ; architecture in
+> `docs/TECHNICAL.md` ; the ontology JSON file format in
+> `docs/ONTOLOGY_JSON_REFERENCE.md` ; setup in the root `README.md` .
 
 ---
 
@@ -13,17 +13,17 @@
 
 The two portals have strictly separated responsibilities:
 
-- **User portal** (`/app`, light page) — users ask questions, upload
+* **User portal** (`/app`, light page) — users ask questions, upload
   data, build ontologies in Graph studio and generate reports.
-- **Admin console** (`/admin`, navy page) — administrators govern:
+* **Admin console** (`/admin`, navy page) — administrators govern:
   accounts and access, oversight of every ontology and dataset, the
   canonical question list, model configuration and token spend.
 
 The portals stay separate: the admin console header has a one-way
-**← User portal** button back to `/app`, while the user portal has no
-link into `/admin`. The default administrator (`admin` /
+**← User portal** button back to `/app` , while the user portal has no
+link into `/admin` . The default administrator ( `admin` /
 `Onti@2026` — change the password after first login) can enter both;
-self-registered users only ever see `/app`.
+self-registered users only ever see `/app` .
 
 ## 2. Console map
 
@@ -64,11 +64,11 @@ Every pack carries an **origin** record, shown as the **🧾 badge**
 next to the selected pack in Ontology governance and visible to users
 in Graph studio:
 
-- **Generated in Graph studio** — "Generated from data in Graph
+* **Generated in Graph studio** — "Generated from data in Graph
   studio (tables: …) by \<username> \[+ AI enrichment]" — the exact
   tables the user picked are listed.
-- **Imported from JSON** — "Imported from JSON file by \<admin>".
-- Built-in seed packs carry their own descriptive origin.
+* **Imported from JSON** — "Imported from JSON file by \<admin>".
+* Built-in seed packs carry their own descriptive origin.
 
 Use the badge when a user asks *"where does this ontology come
 from?"* — the answer is on screen, no database digging.
@@ -106,7 +106,7 @@ full layout with charts — including the optional **ontology graph**
 and **performance analytics** sections — when a user forwards a
 number you cannot reproduce. Report titles state the scenario pack
 and the data sources behind them
-(`<title> | Scenario: <pack> | Data: <sources>`).
+( `<title> | Scenario: <pack> | Data: <sources>` ).
 
 > **A user reports an empty Performance analytics page.** The page first
 > checks the user's active pack for a monthly table. If the pack declares
@@ -115,7 +115,7 @@ and the data sources behind them
 > and this is expected for any pack, including a lapse experience study.
 > The empty state appears only when the pack has **no** monthly table: the
 > driver / scenario / agent cards need the built-in VNB/APE schema
-> (`vnb_monthly`, `channel_monthly`, `agent_monthly`, `agent_master`). In
+> ( `vnb_monthly` , `channel_monthly` , `agent_monthly` , `agent_master` ). In
 > that case the page itself lists which tables are missing and how to fix
 > it. Point the user either at the **Scenario** selector (switch to a pack
 > that has the schema) or at **Data centre** (upload a workbook whose sheet
@@ -156,7 +156,7 @@ deliberately preview-first: nothing is written until you commit.
    the preview re-runs automatically. Headers that match nothing in the
    target table are shown as unmapped and simply ignored, so a wide
    workbook never produces a hard error; only genuinely required
-   columns (`*`) must be mapped.
+   columns ( `*` ) must be mapped.
 4. **Read the preview.** It reports valid / invalid rows, how many
    columns were read, how many stayed unmapped, and the exact errors
    per Excel row. A single invalid row blocks the commit — fix the file
@@ -170,16 +170,16 @@ Every write is versioned: the previous dataset stays and can be
 re-activated from the Datasets list at any time.
 
 > **Match column types to the data.** Every target column has a data
-> type (`INTEGER`, `FLOAT`, `TEXT`) and the preview validates each cell
+> type ( `INTEGER` , `FLOAT` , `TEXT` ) and the preview validates each cell
 > against it. A column typed `INTEGER` rejects decimal values — e.g. an
 > `exposure` column that holds fractional policy-months such as
-> `534.483826` must be `FLOAT`, or every row with a decimal fails with
+> `534.483826` must be `FLOAT` , or every row with a decimal fails with
 > "is not an integer". When a large share of rows is rejected with type
 > errors, fix the column type in Ontology governance (Attributes) and
 > re-upload; changing the type does not touch the already-stored data.
 
 **Upload performance.** Imports scale linearly and are fast: a 96-row
-sheet commits in a fraction of a second, and validating 20,000 rows
+sheet commits in a fraction of a second, and validating 20, 000 rows
 takes under a second. Rows are written in one batched transaction, so
 if a very large workbook feels slow the time goes into reading the
 file and the background AI induction pass — not the database write.
@@ -191,7 +191,7 @@ a lot at once without losing track of what is what. Nothing is written
 until you commit, exactly like the single-file flow.
 
 1. **Pick the input.** **＋ Select files…** accepts many `.csv`,
-   `.xlsx` / `.xls` and `.json` files at once; **📁 Select folder…**
+`.xlsx` / `.xls` and `.json` files at once; **📁 Select folder…**
    uploads every supported file inside a folder (and its subfolders) in
    one go. A folder may mix formats — that is fine.
 2. **Every file is split into items.** A workbook becomes **one item
@@ -199,8 +199,8 @@ until you commit, exactly like the single-file flow.
    5-sheet workbook appears as 5 separate, clearly named rows — nothing
    is merged.
 3. **Each item is routed to a table.** By name: a sheet called
-   `Monthly_Experience` routes to the table keyed `experience`, and a
-   `region_sales.csv` routes to a table keyed `region_sales`. When no
+`Monthly_Experience` routes to the table keyed `experience` , and a
+`region_sales.csv` routes to a table keyed `region_sales` . When no
    table matches, the item is offered as **＋ Create new table** — on
    commit the platform creates the table, its columns, a matching
    ontology entity and attributes, and syncs the impact graph. Change
@@ -217,25 +217,25 @@ until you commit, exactly like the single-file flow.
 
 Data-shaped `.json` (an array of records, or `{"records" | "data" |
 "rows": […]}`) imports like a table. A `.json` that is an *ontology*
-definition (it contains `entities`) is rejected here with a pointer to
+definition (it contains `entities` ) is rejected here with a pointer to
 **Import pack** — that is the right entry for ontology files.
 
 ## 5. Models and token spend
 
 Onti is **provider-neutral**. Any OpenAI-compatible endpoint works —
-OpenAI, SiliconFlow, DeepSeek direct, Deloitte Nova (D.Nova), Azure
+OpenAI, SiliconFlow, DeepSeek direct, Deloitte Nova (D. Nova), Azure
 OpenAI, Together, Ollama-OpenAI, vLLM — there is **no hardcoded list**
 in the backend and adding a new provider never requires a code change.
 The UI only asks for three values: base URL, model id, API key (plus
 the optional **Verify SSL certificate** toggle).
 
-- **System models** (Models & usage): add or disable any
+* **System models** (Models & usage): add or disable any
   OpenAI-compatible endpoint, set the default, test connections. The
   default is what every user gets unless they pick otherwise.
-- **User-created models**: private per user; you can see but not use
+* **User-created models**: private per user; you can see but not use
   them. Users register their own in the **Model centre** of the user
   portal — each entry is scoped to its owner only.
-- **Token metering**: every AI answer writes a row (caller, model,
+* **Token metering**: every AI answer writes a row (caller, model,
   success, latency, tokens). The System dashboard summarises the last
   30 days — totals, average latency, failures — by model and by user.
   A failing endpoint shows up as a failure spike; disable it there.
@@ -248,11 +248,11 @@ Together, …) only need their own base URL + model id + API key; the
 form fields are the same for every provider.
 
 <!-- markdownlint-disable MD060 -->
-| Field          | SiliconFlow                     | Deloitte Nova (D.Nova)            | Azure OpenAI                                                  |
+| Field          | SiliconFlow                     | Deloitte Nova (D. Nova)            | Azure OpenAI                                                  |
 | -------------- | ------------------------------- | --------------------------------- | ------------------------------------------------------------- |
 | **Base URL**   | `https://api.siliconflow.cn/v1` | `https://nova.deloitte.com.cn/v1` | `https://<region>.openai.azure.com/openai/deployments/<name>` |
-| **Model id**   | `deepseek-ai/DeepSeek-V4-Flash` | `DeepSeek-V4-Flash`               | `gpt-4o-mini` (your deployment name)                          |
-| **API key**    | `sk-...`                        | `ak-...`                          | `...`                                                         |
+| **Model id**   | `deepseek-ai/DeepSeek-V4-Flash` | `DeepSeek-V4-Flash` | `gpt-4o-mini` (your deployment name)                          |
+| **API key**    | `sk-...` | `ak-...` | `...` |
 | **Verify SSL** | ✅ keep on                       | ❌ **uncheck** (self-signed cert)  | ✅ keep on                                                     |
 <!-- markdownlint-enable MD060 -->
 
@@ -269,47 +269,47 @@ Five rules cover every configuration mistake seen in practice. They
 apply identically to system models (this console) and to user models
 (Model centre in the user portal):
 
-1. **The Base URL must be the full API prefix, not the bare host.**
-   The platform sends requests to `{base_url}/chat/completions`, so the
-   URL must include the provider's API prefix — for most gateways that
-   is `/v1`. `https://nova.deloitte.com.cn/v1` works; the bare host
-   `https://nova.deloitte.com.cn` does **not** (Nova's gateway answers
-   *405 Not Allowed* because it only exposes routes under `/v1`), and
-   neither do invented paths such as `/del/v1` or `/api/v1`. Trailing
-   slashes are harmless (`/v1/`, `/v1///` are normalised away), but the
-   platform deliberately **never auto-appends `/v1`** — only a minority
-   of gateways use that prefix (Azure and most on-prem servers do not),
-   so guessing would break more setups than it fixes. If in doubt, copy
-   the base URL verbatim from the provider's API documentation.
-2. **Model ids are case-sensitive and gateway-specific.** The same
-   underlying model has different ids on different gateways (see the
-   table above), and ids must match the provider's catalogue exactly,
-   including capitalisation and hyphens.
-3. **Self-signed gateways need Verify SSL off** — see the next section.
-4. **Paste the API key clean** — quotes, `Bearer` prefixes and stray
-   whitespace are stripped automatically; placeholder text such as
-   `sk-...` is treated as "no key" and never stored (details in
-   *Updating an API key* below).
-5. **Always press Test connection before Save and before setting a
-   default.** The test calls the exact URL + model id + key combination
-   and translates the provider's answer into an actionable message, so
-   every mistake above surfaces immediately instead of at the next
-   user question. The test waits up to the model's own **Timeout** —
-   a busy gateway can take a minute or more for a one-word prompt, so
-   a red "did not answer in time" means *raise the Timeout*, not
-   "the endpoint is down". Every other red message names a setting to
-   fix.
+**The Base URL must be the full API prefix, not the bare host.**
+The platform sends requests to `{base_url}/chat/completions` , so the
+URL must include the provider's API prefix — for most gateways that
+is `/v1` . `https://nova.deloitte.com.cn/v1` works; the bare host
+`https://nova.deloitte.com.cn` does **not** (Nova's gateway answers
+*405 Not Allowed* because it only exposes routes under `/v1` ), and
+neither do invented paths such as `/del/v1` or `/api/v1` . Trailing
+slashes are harmless ( `/v1/` , `/v1///` are normalised away), but the
+platform deliberately **never auto-appends `/v1`** — only a minority
+of gateways use that prefix (Azure and most on-prem servers do not),
+so guessing would break more setups than it fixes. If in doubt, copy
+the base URL verbatim from the provider's API documentation.
+**Model ids are case-sensitive and gateway-specific.** The same
+underlying model has different ids on different gateways (see the
+table above), and ids must match the provider's catalogue exactly,
+including capitalisation and hyphens.
+**Self-signed gateways need Verify SSL off** — see the next section.
+**Paste the API key clean** — quotes,  `Bearer` prefixes and stray
+whitespace are stripped automatically; placeholder text such as
+`sk-...` is treated as "no key" and never stored (details in
+*Updating an API key* below).
+**Always press Test connection before Save and before setting a
+default.** The test calls the exact URL + model id + key combination
+and translates the provider's answer into an actionable message, so
+every mistake above surfaces immediately instead of at the next
+user question. The test waits up to the model's own **Timeout** —
+a busy gateway can take a minute or more for a one-word prompt, so
+a red "did not answer in time" means *raise the Timeout*, not
+"the endpoint is down". Every other red message names a setting to
+fix.
 
 Symptom → cause → fix:
 
 <!-- markdownlint-disable MD060 -->
 | Symptom when testing / asking                              | Most likely cause                                         | Fix                                                                |
 | ---------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| "The provider returned HTTP 405"                           | Base URL missing the API prefix (bare host, wrong path)   | Use the full prefix, e.g. `https://nova.deloitte.com.cn/v1`        |
+| "The provider returned HTTP 405"                           | Base URL missing the API prefix (bare host, wrong path)   | Use the full prefix, e.g. `https://nova.deloitte.com.cn/v1` |
 | "The provider could not find this model"                   | Model id wrong for this gateway (case, prefix, hyphens)   | Copy the exact id from the provider's catalogue; re-test           |
 | "The provider rejected the API key" (401/403/30014)        | Key revoked/expired, or pasted with quotes/Bearer prefix  | Re-issue or re-paste the bare key; placeholders are never stored   |
 | "The gateway's TLS certificate could not be verified"      | Self-signed or untrusted certificate (e.g. Nova, on-prem) | Uncheck **Verify SSL certificate** on that model's configuration   |
-| "The TLS handshake with the gateway failed"                | TLS version/cipher mismatch, or `http://` vs `https://`   | Check the scheme and whether the gateway expects an internal proxy |
+| "The TLS handshake with the gateway failed"                | TLS version/cipher mismatch, or `http://` vs `https://` | Check the scheme and whether the gateway expects an internal proxy |
 | "The gateway's host name could not be resolved"            | DNS failure — URL typo, no VPN, or missing hosts entry    | Check the URL character by character and test from the server host |
 | "The provider closed the connection without a valid reply" | Host answered, but not with a chat-completions response   | Base URL must be the full API prefix; confirm the model id exists  |
 | "The gateway refused the connection"                       | Nothing listening on that host/port, or a proxy blocks it | Check scheme and port; test from the server host                   |
@@ -321,7 +321,7 @@ Symptom → cause → fix:
 > answers **HTTP 200**. The verdict lives in the payload: `ok: true` for
 > a green result, `ok: false` plus `error` (what went wrong), `hint`
 > (what to do), `provider_error` (the gateway's own wording) and
-> `category` / `retryable`. `retryable: true` marks a transient failure
+> `category` / `retryable` . `retryable: true` marks a transient failure
 > (timeout, rate limit, 5xx) where pressing **Test** again is
 > worthwhile; `retryable: false` marks a configuration fault that will
 > fail identically every time until it is fixed. HTTP 4xx is reserved
@@ -341,13 +341,13 @@ Symptom → cause → fix:
 ### Self-signed gateways (Nova, on-prem proxies)
 
 Gateways that present a self-signed TLS certificate — Deloitte Nova
-(`https://nova.deloitte.com.cn/v1`), internal enterprise proxies, some
+( `https://nova.deloitte.com.cn/v1` ), internal enterprise proxies, some
 on-prem deployments — require the **Verify SSL certificate** toggle
 to be unchecked. Each model configuration (admin and per-user) carries
 an individual toggle; it is stored per-model in the database so each
 gateway can be configured independently.
 
-From `.env`, the same flag can be set with any of these variables
+From `.env` , the same flag can be set with any of these variables
 (applied once at first startup, when the model table is empty):
 
 ```bash
@@ -359,13 +359,13 @@ SKIP_SSL_VERIFY=1          # standalone trigger — presence alone means skip
 ### Updating an API key
 
 1. Open **Edit model**; the key field is empty and shows
-   `stored: sk-s****tlhn — leave blank to keep it`. A blank field
+`stored: sk-s****tlhn — leave blank to keep it` . A blank field
    **keeps the current key** — you only paste a key when rotating it.
 2. Paste the key exactly as the provider issued it. Surrounding quotes,
    a `Bearer` prefix, a line break or trailing spaces are removed
    automatically before the key is saved and sent, so a key copied out
    of an e-mail or spreadsheet still works. Placeholder text such as
-   `sk-...` is treated as "no key" and is never stored.
+`sk-...` is treated as "no key" and is never stored.
 3. Click **Test connection** before saving. A rejection now reads
    **"The provider rejected the API key (code 30014 — Token is
    invalid.)"** with a hint underneath, and the provider's original
@@ -393,7 +393,7 @@ of a good key now succeeds.
 >
 > **The global "Use ontology" ON / OFF switch.** Both the user portal and
 > this console carry the same switch in the top bar. It is a **per-browser
-> preference stored in localStorage** (`onti.useOntology`) — not a
+> preference stored in localStorage** ( `onti.useOntology` ) — not a
 > server-side role, licence or data permission, and it does not alter any
 > stored data. ON is the default. While it is OFF the portal runs in
 > text-only demo mode: KPI cards, graphs, performance charts and impact
@@ -431,28 +431,28 @@ of a good key now succeeds.
 
 ## 6. Safety rails
 
-- **Version snapshots** — Ontology governance → select a pack →
+* **Version snapshots** — Ontology governance → select a pack →
   **🕘 History** → **📸 Save snapshot**; restore any time (the restore
   itself auto-saves a `before-restore` snapshot). 20 snapshots per
   pack.
-- **Import preview** — importing a pack JSON runs a dry-run first;
+* **Import preview** — importing a pack JSON runs a dry-run first;
   blocking issues keep the Import button disabled, so a green preview
   never fails at commit time. Three file shapes are accepted
-  (`onti-pack/v1` exports, BP2 raw definitions, relationship-graph
+  ( `onti-pack/v1` exports, BP2 raw definitions, relationship-graph
   ontologies) and validation errors name the exact item and field.
   Field-by-field requirements: see
   [ONTOLOGY_JSON_REFERENCE.md](ONTOLOGY_JSON_REFERENCE.md).
-- **Concurrent editing protection** — every pack has a version number
+* **Concurrent editing protection** — every pack has a version number
   (badge in the pack bar). If two administrators edit the same pack,
   the second save is rejected with a clear "modified by another
   admin" message instead of silently overwriting; refresh the page
   and re-apply the edit.
-- **AI proposal evidence** — every element the AI proposes (Admin →
+* **AI proposal evidence** — every element the AI proposes (Admin →
   **AI proposals**) carries a **rationale** plus a **Proposing
   against** panel showing the exact table, its columns and the sample
   rows the model saw. Read this evidence before you **Approve** or
   **Reject** — nothing is applied until you approve.
-- **What a proposal changes** — each card spells it out in plain
+* **What a proposal changes** — each card spells it out in plain
   language ("What approving this will do — …"): an *entity* proposal
   adds an entity (and its attributes), a *relation / edge* proposal
   adds a relationship between two existing nodes, a *formula*
@@ -460,7 +460,7 @@ of a good key now succeeds.
   existing ontology content and never changes application code; the
   raw `{…}` payload is kept under a collapsed **Technical payload**
   twisty for audit only.
-- **Audit log** — every write operation (packs, elements, models,
+* **Audit log** — every write operation (packs, elements, models,
   users, datasets, activations) is recorded with actor and detail.
 
 ## 7. Recommended routines
@@ -500,6 +500,7 @@ Yes. When the current question names no month, the rules engine
 inherits the most recent month mentioned earlier in the conversation
 (recent session turns plus the user's four most recent stored answers
 for the pack). Rules built on the `month_context` / `month_movement`
+
 helpers — such as the lapse pack's *comparison* and *movement* rules —
 then answer for that inherited month. This applies to the Ask view,
 the Dashboard chat and the with/without ontology comparison alike.
@@ -507,25 +508,38 @@ the Dashboard chat and the with/without ontology comparison alike.
 **Q:** How do I give a new colleague access?
 Users & audit → create the account (or enable self-registration) and
 share the user portal URL: `http://onti.local:8010/app` after the
-hosts mapping in the README, otherwise `http://localhost:8010/app`.
+hosts mapping in the README, otherwise `http://localhost:8010/app` .
 Self-registration and accounts created there need a persistent disk; on
 Vercel the function filesystem is per-instance, so registration is
-disabled (`/api/auth/status` → `ephemeral: true`) and the sign-in pages
-explain it. Use the Docker deployment (README → Deploying with Docker)
+disabled ( `/api/auth/status` → `ephemeral: true` ) and the sign-in pages
+explain it. The Docker deployment keeps the volume, so registration is
+open there ( `ephemeral: false` ) — use it (README → Deploying with Docker)
 for a real multi-user workspace. On Vercel use the project's production
-URL (`https://…/app`) and make sure **Deployment Protection → Vercel
+URL ( `https://…/app` ) and make sure **Deployment Protection → Vercel
 Authentication** is disabled, otherwise only members of your Vercel team
-can open it.
+can open it. Mind the URL: `vercel.com/<team>/<project>/<url>` is a
+dashboard path that always answers 404; the app lives on its own domain.
 
 **Q:** A team (e.g. GI) wants to build an ontology demo — do they need
 admin accounts?
-No. **Building ontologies is a user-portal feature**: any regular
-account can upload data and generate an ontology in **Graph studio**,
-then ask questions and produce reports against it. Admin rights are only
-for governance (accounts, oversight, models, activation) — hand them out
-sparingly. Recommended setup: keep self-registration off, create one
-named account per team member in **Users & audit**, and share the user
-portal URL. On Vercel (ephemeral filesystem), accounts created at
-runtime live only in that instance's `/tmp`; create the accounts on a
-local/Docker instance and commit the updated `data/onti.db` before
-deploying, so every serverless instance starts with the same accounts.
+No. **Building ontologies is a user-portal feature**: every route in
+`routes/graph_studio.py` (sources, build, upload, infer, create-ontology,
+history) requires only `auth.current_user` , so a regular account can
+upload data, generate an ontology, ask questions and produce reports.
+Admin rights are only for governance (accounts, oversight, models,
+activation) — keep them for the project owner.
+
+Recommended setup:
+
+1. Keep self-registration off on shared deployments.
+2. Create **one regular account per person** (or one shared demo account
+   for a short demo) in **Users & audit**.
+3. Share `<domain>/app` — not `/admin`.
+4. On Vercel, accounts created at runtime live only in that instance's
+`/tmp` : create them on a local or Docker instance, commit the updated
+`data/onti.db` , and push. The image/deployment then starts every
+   instance with those accounts.
+
+A demo account ( `giteam` / `GiDemo@2026` , role `user` ) ships in the
+committed database for exactly this purpose; rename it or replace it with
+per-person accounts before a long-lived rollout.

@@ -69,11 +69,16 @@ DB_PATH = DATA_DIR / "onti.db"
 # model API keys remain decryptable across instances (``/tmp`` is per-instance).
 KEY_PATH = BUNDLED_DATA_DIR / ".onti.key"
 _BUNDLED_DB_PATH = BUNDLED_DATA_DIR / "onti.db"
-# ``/tmp`` on serverless hosts is per-instance and wiped on cold starts, so
-# accounts, sessions, uploads and settings written there never reach another
-# instance. Callers use this flag to degrade safely instead of silently
-# losing state (see ``auth.register_account``).
-EPHEMERAL_STORAGE = str(DATA_DIR) != str(BUNDLED_DATA_DIR)
+# Serverless hosts get a private, wiped-on-cold-start filesystem (``/tmp`` on
+# Vercel), so accounts, sessions, uploads and settings written there never reach
+# another instance. Callers use this flag to degrade safely instead of silently
+# losing state (see ``auth.register_account``). A Docker container with a mounted
+# volume is *not* ephemeral even though it sets ``ONTI_DATA_DIR``: persistence is
+# a property of the host, not of the directory name. ``ONTI_EPHEMERAL=1`` forces
+# the flag on for unusual hosts.
+EPHEMERAL_STORAGE = bool(os.environ.get("VERCEL", "").strip()) or os.environ.get(
+    "ONTI_EPHEMERAL", ""
+).strip().lower() in ("1", "true", "yes")
 _READY = False
 
 

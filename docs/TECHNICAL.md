@@ -66,13 +66,17 @@ model API keys and signed session cookies are identical across
 instances; `ONTI_SECRET_KEY` overrides it on hosts that cannot ship a key
 file (multi-replica or stateless deployments).
 
-`db.EPHEMERAL_STORAGE` is true whenever the writable directory differs
-from the bundled `data/` folder — i.e. every serverless instance. Writes
-there live only for that instance, so `auth.register_account` refuses to
-create accounts and `/api/auth/status` reports `ephemeral: true`; the
-sign-in pages then hide registration and explain how to run with a
-persistent disk. Use the Docker image with the `onti-data` volume
-(README → Deploying with Docker) for durable multi-user state.
+`db.EPHEMERAL_STORAGE` marks hosts whose filesystem is *wiped between
+instances* — it is true only when the `VERCEL` environment variable is
+present, or when `ONTI_EPHEMERAL=1` is set explicitly. It is **not**
+derived from the data-directory path: a Docker container points
+`ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent,
+so registration stays open there. On an ephemeral host writes live only
+for that instance, so `auth.register_account` refuses to create accounts
+and `/api/auth/status` reports `ephemeral: true`; the sign-in pages then
+hide registration and explain how to run with a persistent disk. Use the
+Docker image with the `onti-data` volume (README → Deploying with Docker)
+for durable multi-user state.
 
 ## 2. Data model (SQLite)
 
@@ -720,10 +724,19 @@ python tests\smoke_http.py                  :: end-to-end HTTP matrix
 python tests\verify_t7.py                   :: upload sheets/mapping + evidence
 python tests\verify_t8.py                   :: batch import (sheets/CSV/folder/JSON)
 python tests\verify_t9.py                   :: lapse pack end to end
+python tests\verify_giteam.py               :: regular team account vs admin routes
 python tests\verify_login.py                :: 24 checks — auth flows
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report
 ```
+
+Tests that talk to the server need the same database the server uses, so run
+them against `python main.py` on `127.0.0.1:8010` (not against a container
+whose volume is a separate copy). For a container, use the HTTP-only scripts
+(`smoke_http.py`, `verify_giteam.py`) and the checks in
+README → Deploying with Docker. `verify_ontology_value.py` needs a live model;
+when the gateway is slow it reports `SKIP` instead of failing, because that is
+an environment condition, not an application defect.
 
 ### Run log
 
@@ -784,7 +797,7 @@ nor the seed) and remove it again when they created it.
 
 ---
 
-### 9.1 Cross-scenario "With vs Without ontology" comparison (2026-10-29)
+### 9.1 Cross-scenario "With vs Without ontology" comparison
 
 Six real scenarios across two ontology packs were exercised end-to-end
 via `POST /api/ask/compare` to quantify what the ontology layer adds
@@ -859,7 +872,7 @@ grounded in the full ontology, once grounded in raw uploaded tables):
 `tests/verify_login.py` 24/24 ✅ · `tests/verify_model_endpoints.py`
 65/65 ✅. No pre-existing regressions introduced.
 
-### 9.2 Deep-analysis validation on the v4 pack (2026-10-29)
+### 9.2 Deep-analysis validation on the v4 pack
 
 The 9.1 run measured *grounding counts*, not *reasoning depth*, and it
 used a workbook that carried a pre-written `NARRATIVE DRIVER` column —
