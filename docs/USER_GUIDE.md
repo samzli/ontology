@@ -2,8 +2,8 @@
 
 > This guide is for **every user** — no coding knowledge required.
 > Each step includes the exact UI path. For administration see
-> `docs/ADMIN_GUIDE.md`; for architecture and APIs see
-> `docs/TECHNICAL.md`; for setup see `README.md` in the project root.
+> `docs/ADMIN_GUIDE.md` ; for architecture and APIs see
+> `docs/TECHNICAL.md` ; for setup see `README.md` in the project root.
 
 ---
 
@@ -12,17 +12,17 @@
 Onti organises an insurance business's **metrics, data and drivers**
 into a single "knowledge graph". You can:
 
-- View key metrics & the graph — User portal → Dashboard
-- Ask questions in plain language — User portal → Ask
-- Save and re-use your own questions — Ask → ★ Save question
-- Upload my own data — User portal → Data centre
-- Turn uploaded data into a new ontology — User portal → Graph studio
-- Generate a report in one click — User portal → My reports
-- Govern users, models, questions and data — Admin console
+* View key metrics & the graph — User portal → Dashboard
+* Ask questions in plain language — User portal → Ask
+* Save and re-use your own questions — Ask → ★ Save question
+* Upload my own data — User portal → Data centre
+* Turn uploaded data into a new ontology — User portal → Graph studio
+* Generate a report in one click — User portal → My reports
+* Govern users, models, questions and data — Admin console
 
-**Two portals, one rule of thumb.** The **user portal** (`/app`, light
+**Two portals, one rule of thumb.** The **user portal** ( `/app` , light
 page) is where people *use and build*: ask, upload, create ontologies,
-report. The **admin console** (`/admin`, deep-navy page) is where
+report. The **admin console** ( `/admin` , deep-navy page) is where
 administrators *govern*: accounts and access, the canonical question
 list, the available models, token usage, and oversight of every
 ontology. There is no link from the user portal into the admin console —
@@ -35,7 +35,7 @@ portal** button in the console header for the way back).
 
 ### 2.1 Read the dashboard
 
-- The **scenario banner** on top names the scenario you are looking
+* The **scenario banner** on top names the scenario you are looking
   at — the active ontology (pack), its description and the data
   sources behind it (each source shows its kind and row count). You
   always know what scenario and data the numbers are based on. The
@@ -43,7 +43,7 @@ portal** button in the console header for the way back).
   multi-section report for this scenario is generated automatically
   the first time you open the dashboard and one click opens it
   (View / HTML / PDF / Markdown are also in My reports).
-- The **KPI cards** show the numbers the active scenario's ontology
+* The **KPI cards** show the numbers the active scenario's ontology
   declares. A pack defines its own metrics, so a VNB/APE pack shows
   VNB and margin, while an actuarial pack (e.g. a lapse experience
   study) shows annualised lapse rate, A/E ratio and the IFRS 17
@@ -60,29 +60,29 @@ portal** button in the console header for the way back).
   > it reads. The metrics a lapse-experience study (Actuarial Lapse
   > Experience) shows are:
   >
-  > - **Annualised lapse rate** — 12 × actual lapses ÷ exposure, i.e.
+  > * **Annualised lapse rate** — 12 × actual lapses ÷ exposure, i.e.
   >   how many policies lapse per year.
-  > - **Lapse variance (ppt)** — actual minus expected lapse rate, in
+  > * **Lapse variance (ppt)** — actual minus expected lapse rate, in
   >   percentage points.
-  > - **A/E ratio** — actual ÷ expected; 1.00 means exactly on
+  > * **A/E ratio** — actual ÷ expected; 1.00 means exactly on
   >   assumption.
-  > - **Average assumption** — the exposure-weighted assumed lapse
+  > * **Average assumption** — the exposure-weighted assumed lapse
   >   rate, shown for reference.
-  > - **CSM / ISR / EV (closing)** — IFRS 17 Contractual Service
+  > * **CSM / ISR / EV (closing)** — IFRS 17 Contractual Service
   >   Margin, Insurance Service Result and Embedded Value closing
   >   balances (in $M).
 
-- The **scenario dropdown** in the header lists every pack you can
+* The **scenario dropdown** in the header lists every pack you can
   access. Pick another one and the dashboard, graphs, analytics, Ask
   and Graph studio all switch with it — nothing to reconfigure.
   Choose **System default** to return to the administrator-activated
   pack. Your choice is remembered the next time you sign in.
-- The **knowledge graph** in the middle: each node is a metric or
+* The **knowledge graph** in the middle: each node is a metric or
   driver. Click **Open large view** for two extra tools —
   **Find a path** (pick two nodes → Find, to see how they influence
   each other) and **Impact analysis** (pick a node → Analyse, to see
   what it drives downstream or what drives it upstream).
-- The legend maps colours / dash patterns to relationship types: blue
+* The legend maps colours / dash patterns to relationship types: blue
   solid = structural, green dash = operational driver, brown dots =
   weighting, purple long-dash = cross-link.
 
@@ -117,8 +117,8 @@ product, not just in one answer.
 
 Type directly into the **Ask the ontology** box, e.g.:
 
-- `What is the total VNB this year?`
-- `Which channel contributes the most APE?`
+* `What is the total VNB this year?`
+* `Which channel contributes the most APE?`
 
 Answers are grounded in your **entire active dataset** — the assistant
 sees a complete profile of every table (all months, per-month totals,
@@ -137,14 +137,14 @@ yourself. Your choice is remembered and only affects your own answers.
 
 Four kinds of suggestion chips sit above the question box:
 
-- **✨ Recommended for you** — questions generated from the active
+* **✨ Recommended for you** — questions generated from the active
   ontology (its metrics, numbers and entities);
-- **★ My questions** — questions you saved yourself. Type a question,
+* **★ My questions** — questions you saved yourself. Type a question,
   press **★ Save question**, and it stays here; click the × on a chip
   to remove it;
-- **🕘 Recent asks** — the last questions you asked this ontology,
+* **🕘 Recent asks** — the last questions you asked this ontology,
   across sessions. Click one to re-ask it;
-- **Standard questions** — the organisation-wide list curated by your
+* **Standard questions** — the organisation-wide list curated by your
   administrator.
 
 Click any chip to ask it immediately.
@@ -159,7 +159,7 @@ ask a question as usual.
 
 One question is answered twice and shown in a single card:
 
-- **🟢 With ontology** — the rules engine answer when a canonical rule
+* **🟢 With ontology** — the rules engine answer when a canonical rule
   matches, **plus** the deterministic deep analysis: the exact factor
   bridge for the month, the product-mix proof, the agent-cohort tables,
   the statistical diagnostics and a numbered reasoning trace. Every
@@ -168,7 +168,7 @@ One question is answered twice and shown in a single card:
   If a model is configured, a short **AI narration** of the same
   pre-computed analysis is shown underneath — the model explains the
   reasoning but never recalculates it.
-- **⚪ Without ontology** — the same model, asked the same question
+* **⚪ Without ontology** — the same model, asked the same question
   grounded in the **same uploaded data tables** (so it still sees the
   company's real figures) but **without any ontology layer**: no
   metric formulas, no entity definitions, no joins, no impact chain.
@@ -180,7 +180,7 @@ One question is answered twice and shown in a single card:
 The card contains only the two answers (and the ontology side's impact
 chain) — no explanatory banner or counter strip is added, so you can
 judge the two outputs on their own content. The same counts are still
-available programmatically from `POST /api/ask/compare` (`value`), and a
+available programmatically from `POST /api/ask/compare` ( `value` ), and a
 reproducible measurement of the gap is in
 [ONTOLOGY_VALUE_REPORT.md](ONTOLOGY_VALUE_REPORT.md).
 
@@ -227,12 +227,12 @@ just the preview.
 
 Two things you can do with *your own* file:
 
-- **Preview it — read-only.** Open **Graph studio** and press
-  **📤 Graph from file**, then choose a `.csv`, `.xlsx` or ontology
-  `.json`. The platform lines the file's columns up against the
+* **Preview it — read-only.** Open **Graph studio** and press
+  **📤 Graph from file**, then choose a `.csv` , `.xlsx` or ontology
+`.json` . The platform lines the file's columns up against the
   ontology and draws its graph. **Nothing is stored** and the ontology
   is not changed — a safe way to see how your data fits.
-- **Turn it into a real ontology.** Open **Graph studio → ✨ Build an
+* **Turn it into a real ontology.** Open **Graph studio → ✨ Build an
   ontology from your data** (section 2.7), or ask your administrator to
   import the file — see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), section 4.5.
 
@@ -251,9 +251,9 @@ scenario and data it is based on.
 
 Two extra section checkboxes make reports self-contained:
 
-- **Ontology knowledge graph** — the ontology graph itself, so readers
+* **Ontology knowledge graph** — the ontology graph itself, so readers
   see the structure behind the numbers;
-- **Performance analytics** — the month-on-month driver decomposition
+* **Performance analytics** — the month-on-month driver decomposition
   (headcount / productivity / product mix) and the per-channel
   salesforce table, identical to the Performance analytics view.
 
@@ -268,8 +268,8 @@ Two extra section checkboxes make reports self-contained:
 > *Annualised lapse rate* KPI, so the trend and the headline agree.
 >
 > **When the pack has no monthly table at all**, the page reads the fixed
-> monthly sales schema: `vnb_monthly`, `channel_monthly`, `agent_monthly`
-> and `agent_master`, each carrying a `month` column. This is **not an
+> monthly sales schema: `vnb_monthly` , `channel_monthly` , `agent_monthly`
+> and `agent_master` , each carrying a `month` column. This is **not an
 > error**: the page then lists the tables it requires, the tables your
 > pack already has and the ones still missing. Three routes to fill it:
 
@@ -287,12 +287,12 @@ Two extra section checkboxes make reports self-contained:
    pack declares on the **Dashboard**, and explore how they connect in the
    **Knowledge graph** or **Graph studio**.
 
-| Required table    | Key columns            | What it powers                                        |
+| Required table | Key columns | What it powers |
 | ----------------- | ---------------------- | ----------------------------------------------------- |
-| `vnb_monthly`     | `month`                | Company trend chart and the month-on-month VNB bridge |
-| `channel_monthly` | `month, channel_id`    | Channel breakdown and the driver attribution          |
-| `agent_monthly`   | `month, channel_id`    | Agent productivity table                              |
-| `agent_master`    | `agent_id, channel_id` | Agent names and reporting lines for the agent view    |
+| `vnb_monthly` | `month` | Company trend chart and the month-on-month VNB bridge |
+| `channel_monthly` | `month, channel_id` | Channel breakdown and the driver attribution |
+| `agent_monthly` | `month, channel_id` | Agent productivity table |
+| `agent_master` | `agent_id, channel_id` | Agent names and reporting lines for the agent view |
 
 No questions yet? Press **⚡ Sample report** — the platform answers
 the ontology's recommended questions instantly with the rules engine
@@ -307,7 +307,7 @@ document.
 ### 2.6 Search the ontology — instant insight
 
 Open **Ontology workspace** and use the **Search the ontology** box at
-the top. Type any term — for example `vnb`, `agent`, `premium`,
+the top. Type any term — for example `vnb` , `agent` , `premium` ,
 `margin` — and the platform instantly finds matching entities,
 attributes, formulas and rules across the whole active ontology.
 Results show the kind and name as chips, so you can locate a concept
@@ -315,12 +315,12 @@ without browsing every table.
 
 Below the chips an **Instant insight** card appears for every search:
 
-- **What it is** — the top match's kind, description and key facts
+* **What it is** — the top match's kind, description and key facts
   (attributes, source tables, relations, formulas using it);
-- **Affected graph neighbourhood** — the matched nodes plus one hop
+* **Affected graph neighbourhood** — the matched nodes plus one hop
   rendered as a small graph, so you immediately see what drives and
   what depends on the concept;
-- **Written analysis** — a short paragraph explaining the match and
+* **Written analysis** — a short paragraph explaining the match and
   how to use it.
 
 ### 2.7 Build your own graph in Graph studio
@@ -344,10 +344,10 @@ its kind and upload time — so you always know where each table came
 from. Tick the tables you want (or use **Select all** / **Clear**),
 then press **Build graph**.
 
-- **Click any node** — the **Node provenance** panel shows exactly
+* **Click any node** — the **Node provenance** panel shows exactly
   which entity, table or column(s) it comes from; aggregated columns
   list every source table and raw column name.
-- **Graph from file** — upload a `.csv`, `.xlsx` or ontology `.json`
+* **Graph from file** — upload a `.csv`,  `.xlsx` or ontology `.json`
   file to preview its graph instantly. Columns are matched to the
   active ontology and the connections are drawn for you. The file is
   not stored; it is a safe preview.
@@ -398,25 +398,26 @@ button in the Ask view jumps there):
 2. To register your own, press **＋ Add my model** and fill in a
    display name, the **Base URL** of any OpenAI-compatible endpoint
    (OpenAI, Azure OpenAI, DeepSeek, SiliconFlow, Deloitte Nova
-   (D.Nova), Ollama, vLLM, …), your **API key** and the **model id**;
+   (D. Nova), Ollama, vLLM, …), your **API key** and the **model id**;
    temperature, max tokens and timeout have sensible defaults.
    Paste the key exactly as issued — surrounding quotes, a `Bearer`
+
    prefix, a line break or trailing spaces are removed automatically,
    and placeholder text such as `sk-...` is treated as "no key".
    **The Base URL must be the provider's full API prefix, not the bare
-   host**: the platform calls `{base_url}/chat/completions`, so for
+   host**: the platform calls `{base_url}/chat/completions` , so for
    Nova it is `https://nova.deloitte.com.cn/v1` — the bare
-   `https://nova.deloitte.com.cn` fails with *405 Not Allowed*, and
-   `/v1` is never appended for you (other gateways use different
+`https://nova.deloitte.com.cn` fails with *405 Not Allowed*, and
+`/v1` is never appended for you (other gateways use different
    prefixes). Trailing slashes don't matter; a missing prefix does.
    When in doubt, copy the URL from the provider's API documentation.
 3. If the gateway uses a self-signed TLS certificate — Deloitte Nova
-   (`https://nova.deloitte.com.cn/v1`) is one — **uncheck** *Verify
+   ( `https://nova.deloitte.com.cn/v1` ) is one — **uncheck** *Verify
    SSL certificate*. Every other gateway keeps it on.
 4. Press **Test** before **Save**. A wrong model id is the most
    common mistake: e.g. DeepSeek V4 Flash is
-   `deepseek-ai/DeepSeek-V4-Flash` on SiliconFlow but
-   `DeepSeek-V4-Flash` on the Nova gateway. The **Test** button catches
+`deepseek-ai/DeepSeek-V4-Flash` on SiliconFlow but
+`DeepSeek-V4-Flash` on the Nova gateway. The **Test** button catches
    this and tells you "model not found" instead of a silent crash.
    Every test returns a verdict rather than an error page: green with a
    latency, or red with the cause, a suggested fix and the gateway's own
@@ -426,6 +427,7 @@ button in the Ask view jumps there):
    changing anything.
 5. Press **Save model** — it is stored for your account only and
    reappears under **My models** the next time you sign in. No `.env`
+
    file editing is ever needed.
 6. Optionally tick "Also register in the server .env file" so the
    deployment keeps a copy of the endpoint outside the database.
@@ -447,10 +449,10 @@ URL — never your key) to support you if an endpoint misbehaves.
 
 Go to **Ontology governance → New ontology**:
 
-- Step 1: fill in the name, slug (lowercase letters/digits) and
+* Step 1: fill in the name, slug (lowercase letters/digits) and
   description;
-- Step 2: choose **Start from blank** or **Copy an existing ontology**;
-- After creation a **getting-started checklist** pops up with 6
+* Step 2: choose **Start from blank** or **Copy an existing ontology**;
+* After creation a **getting-started checklist** pops up with 6
   clickable steps — just follow them.
 
 ### Step 2 — Build the schema (Entities → Attributes → Relations)
@@ -492,6 +494,7 @@ Go to **Ontology governance → New ontology**:
 **Many files at once.** The same card has a **Batch import** area:
 **＋ Select files…** or **📁 Select folder…**. Every file you pick is
 split into its own row — a workbook becomes one row per sheet, a `.csv`
+
 or data `.json` one row — and each row is routed to a table by name (an
 unmatched one offers to **create a new table**). Adjust a target or a
 mapping per row and press **✓ Import all …**. As with a single file,
@@ -505,10 +508,10 @@ same flow in detail.
 
 Press **Health check** for a one-click 9-item report:
 
-- red = must fix (e.g. a formula fails to compile);
-- amber = should fix (e.g. an entity without attributes, an isolated
+* red = must fix (e.g. a formula fails to compile);
+* amber = should fix (e.g. an entity without attributes, an isolated
   node);
-- green = all clear.
+* green = all clear.
 
 The report lists the exact offending items — click each to fix it.
 
@@ -523,33 +526,36 @@ ontology immediately; no restart is needed.
 
 ### Version snapshots & one-click rollback
 
-- Location: **Ontology governance → select a pack → History**;
-- Before a big edit, press **Save snapshot now**;
-- If something breaks, click **Restore** on the relevant version — the
-  current state is first auto-saved as `before-restore`, so a rollback
+* Location: **Ontology governance → select a pack → History**;
+* Before a big edit, press **Save snapshot now**;
+* If something breaks, click **Restore** on the relevant version — the
+  current state is first auto-saved as `before-restore` , so a rollback
   can itself be undone;
-- Each pack keeps the 20 most recent snapshots.
+* Each pack keeps the 20 most recent snapshots.
 
 ### Import preview (look before you commit)
 
-- Location: **Import pack** — choosing a JSON file triggers an
+* Location: **Import pack** — choosing a JSON file triggers an
   automatic preview:
-  - it shows how many entities / attributes / relations / formulas /
+  * it shows how many entities / attributes / relations / formulas /
     rules / tables will be imported;
-  - blocking issues (duplicate slug, missing fields, broken
+
+  * blocking issues (duplicate slug, missing fields, broken
     references) are shown in red and **disable the Import button**;
-  - advisory warnings (e.g. "no data tables") are shown in amber;
-- The file is only written once the preview passes;
-- Three file shapes are supported: `onti-pack` exports from this
+
+  * advisory warnings (e.g. "no data tables") are shown in amber;
+* The file is only written once the preview passes;
+* Three file shapes are supported: `onti-pack` exports from this
   platform, raw ontology definition JSON
-  (e.g. the built-in `data/ontology_BP2.json`), or a
+  (e.g. the built-in `data/ontology_BP2.json` ), or a
   relationship-graph ontology where entities are plain name strings
-  and relationships use `from`/`to`/`type`
+  and relationships use `from` / `to` / `type`
+
   (e.g. `data/lapse_demo.json` — its source tables are registered
   automatically);
-- If a file fails validation, the error names the exact item and
+* If a file fails validation, the error names the exact item and
   missing field, so it is easy to fix and re-import;
-- Full field-by-field format requirements (all three shapes, with
+* Full field-by-field format requirements (all three shapes, with
   minimal examples): see
   [ONTOLOGY_JSON_REFERENCE.md](ONTOLOGY_JSON_REFERENCE.md).
 
@@ -557,16 +563,16 @@ ontology immediately; no restart is needed.
 
 The rest of the admin console is governance, not modelling:
 
-- **Models & usage** — add/disable OpenAI-compatible model endpoints,
+* **Models & usage** — add/disable OpenAI-compatible model endpoints,
   set the system default, and review the last 30 days of AI usage:
   total calls, tokens, average latency and failures, broken down by
   model and by user.
-- **Canonical questions** — the organisation-wide standard questions
+* **Canonical questions** — the organisation-wide standard questions
   shown to every user. Users' own saved questions stay private and are
   managed by the users themselves.
-- **Users** — create accounts, reset passwords and control access.
-- **Data oversight** — review tables and datasets across packs.
-- **All reports** — view reports generated by all users.
+* **Users** — create accounts, reset passwords and control access.
+* **Data oversight** — review tables and datasets across packs.
+* **All reports** — view reports generated by all users.
 
 ---
 
