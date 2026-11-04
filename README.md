@@ -70,11 +70,9 @@ required:
 1. Open `C:\Windows\System32\drivers\etc\hosts` as administrator and
    append:
 
-   
-
 ```text
-   127.0.0.1  onti.local
-   ```
+127.0.0.1  onti.local
+```
 
 2. Flush DNS (`ipconfig /flushdns`) and browse to:
 
