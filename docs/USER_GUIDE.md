@@ -3,7 +3,7 @@
 > This guide is for **every user** — no coding knowledge required.
 > Each step includes the exact UI path. For administration see
 > `docs/ADMIN_GUIDE.md` ; for architecture and APIs see
-> `docs/TECHNICAL.md` ; for setup see `README.md` in the project root.
+> `docs/TECHNICAL.md`; for setup see`README.md` in the project root.
 
 ---
 
@@ -20,7 +20,7 @@ into a single "knowledge graph". You can:
 * Generate a report in one click — User portal → My reports
 * Govern users, models, questions and data — Admin console
 
-**Two portals, one rule of thumb.** The **user portal** ( `/app` , light
+**Two portals, one rule of thumb.**The**user portal** ( `/app` , light
 page) is where people *use and build*: ask, upload, create ontologies,
 report. The **admin console** ( `/admin` , deep-navy page) is where
 administrators *govern*: accounts and access, the canonical question
@@ -47,7 +47,7 @@ portal** button in the console header for the way back).
   declares. A pack defines its own metrics, so a VNB/APE pack shows
   VNB and margin, while an actuarial pack (e.g. a lapse experience
   study) shows annualised lapse rate, A/E ratio and the IFRS 17
-  **CSM**, **ISR** and **EV** closing values. A card appears as soon
+  **CSM**, **ISR**and**EV** closing values. A card appears as soon
   as the table it reads has rows. If the grid looks empty, the note
   under it states how many metrics the pack declares and points to
   the **Data centre** (§4) to load the matching tables — this is a
@@ -100,17 +100,15 @@ answers and full reports.
 orange banner at the top of every page says **“Ontology is OFF.”** Nothing is
 broken; this is the deliberate demonstration state:
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Area                           | What you see with the ontology OFF                                                                                                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dashboard                      | KPI cards and the knowledge graph are replaced by a short “Ontology is OFF — text-only mode” panel                                                                                       |
-| Performance analytics          | The same panel — no trend chart, no driver attribution                                                                                                                                   |
-| Knowledge graph / Graph studio | A panel explaining that graph views need the ontology                                                                                                                                    |
-| Ask                            | Answers are grounded in the uploaded data tables but with **no ontology layer** — no metric formulas, no impact chain, no entity linking. A “Without ontology” badge marks every answer. |
-| My reports                     | Reports are still generated and downloadable, but **text-only**: the graph, evidence, chart and analytics sections are removed and the title is suffixed “— No ontology (text-only)”     |
-<!-- markdownlint-enable MD013 MD060 -->
+|Area|What you see with the ontology OFF|
+|---|---|
+|Dashboard|KPI cards and graph replaced by an “Ontology is OFF” panel|
+|Performance analytics|Same panel — no trend chart, no driver attribution|
+|Knowledge graph / Graph studio|A panel explaining graph views need the ontology|
+|Ask|Answers grounded in raw tables, **no ontology layer**; “Without ontology” badge|
+|My reports|Reports generated but **text-only**: no graph, evidence, chart, or analytics|
 
-Turn the switch back to **ON** — or press **Turn ontology back on** in the
+Turn the switch back to **ON**— or press**Turn ontology back on** in the
 banner or panel — to restore every visual immediately. This is the fastest
 way to show a client the difference the ontology makes across the whole
 product, not just in one answer.
@@ -128,7 +126,7 @@ value ranges), not a truncated sample. Asking *"what months are there
 in the monthly experience data?"* lists every month in the data, and
 *"how does Sep compare to Aug?"* is answered with real totals for both
 months. For the Actuarial Lapse Experience pack two instant rules cover
-exactly these questions (**Data coverage** and **Monthly lapse
+exactly these questions (**Data coverage**and**Monthly lapse
 experience**), so they answer immediately without a model call.
 
 The "🤖 Model: … · change" button at the top of the Ask view shows the
@@ -156,7 +154,7 @@ Click any chip to ask it immediately.
 The yellow **◐ Compare: with / without ontology** button next to the
 Auto / Rules engine / AI mode switch turns every question into a
 side-by-side demonstration of what the ontology adds. Press it once —
-the button stays highlighted and **Send** becomes **Compare** — then
+the button stays highlighted and **Send**becomes**Compare** — then
 ask a question as usual.
 
 One question is answered twice and shown in a single card:
@@ -182,7 +180,7 @@ One question is answered twice and shown in a single card:
 The card contains only the two answers (and the ontology side's impact
 chain) — no explanatory banner or counter strip is added, so you can
 judge the two outputs on their own content. The same counts are still
-available programmatically from `POST /api/ask/compare` ( `value` ), and a
+available programmatically from `POST /api/ask/compare`(`value` ), and a
 reproducible measurement of the gap is in
 [ONTOLOGY_VALUE_REPORT.md](ONTOLOGY_VALUE_REPORT.md).
 
@@ -202,18 +200,16 @@ earlier answers as **memory** — so you can ask a broad question first
 and then follow up with *"and last month?"*. Every batch question and
 answer is stored in your history, and you can save the whole list to
 **★ My questions** with one click. When the batch finishes, use
-**📄 Generate report from session** or **⚡ Sample report** to package
+**📄 Generate report from session**or**⚡ Sample report** to package
 the results.
 
 The **badge colour** next to an answer tells you its source:
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Badge | Meaning                                     | Trust level       |
-| ----- | ------------------------------------------- | ----------------- |
-| Green | Deterministic rule (configured by an admin) | Highest — cite it |
-| Amber | No matching rule                            | Only suggestions  |
-| Blue  | AI model answer                             | Reference only    |
-<!-- markdownlint-enable MD013 MD060 -->
+|Badge|Meaning|Trust level|
+|-----|-------------------------------------------|-----------------|
+|Green|Deterministic rule (configured by an admin)|Highest — cite it|
+|Amber|No matching rule|Only suggestions|
+|Blue|AI model answer|Reference only|
 
 Every answer includes an **impact chain graph** showing which factors
 make up the number — handy for screenshots when presenting to
@@ -231,12 +227,12 @@ just the preview.
 
 Two things you can do with *your own* file:
 
-* **Preview it — read-only.** Open **Graph studio** and press
-  **📤 Graph from file**, then choose a `.csv` , `.xlsx` or ontology
+* **Preview it — read-only.**Open**Graph studio** and press
+  **📤 Graph from file**, then choose a `.csv`,`.xlsx` or ontology
 `.json` . The platform lines the file's columns up against the
   ontology and draws its graph. **Nothing is stored** and the ontology
   is not changed — a safe way to see how your data fits.
-* **Turn it into a real ontology.** Open **Graph studio → ✨ Build an
+* **Turn it into a real ontology.**Open**Graph studio → ✨ Build an
   ontology from your data** (section 2.7), or ask your administrator to
   import the file — see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), section 4.5.
 
@@ -247,7 +243,7 @@ Two things you can do with *your own* file:
 ### 2.4 Generate a report
 
 Open **Reports** → choose the Q&A scope and the sections →
-**Generate** → download as **Markdown / HTML / PDF**, or click
+**Generate**→ download as**Markdown / HTML / PDF**, or click
 **🌐 View** to read it right in the browser. Reports built from the
 current scenario carry a self-describing title — `<title> | Scenario:
 <pack> | Data: <sources>` — so a downloaded file always states what
@@ -263,7 +259,7 @@ Two extra section checkboxes make reports self-contained:
 
 > **What Performance analytics shows — and why it can be empty.**
 > The page adapts to the active scenario. **When the pack declares its own
-> monthly table** — any table with a `report_month` / `month` column of
+> monthly table** — any table with a `report_month`/`month` column of
 > `YYYY-MM` values — the page renders a **Monthly trend from this pack**
 > card automatically: pick any numeric column from the dropdown and the
 > chart and month table redraw. If the pack also holds a lapse count and
@@ -272,15 +268,15 @@ Two extra section checkboxes make reports self-contained:
 > *Annualised lapse rate* KPI, so the trend and the headline agree.
 >
 > **When the pack has no monthly table at all**, the page reads the fixed
-> monthly sales schema: `vnb_monthly` , `channel_monthly` , `agent_monthly`
-> and `agent_master` , each carrying a `month` column. This is **not an
+> monthly sales schema: `vnb_monthly`,`channel_monthly`,`agent_monthly`
+> and `agent_master`, each carrying a`month` column. This is **not an
 > error**: the page then lists the tables it requires, the tables your
 > pack already has and the ones still missing. Three routes to fill it:
 
 1. **Switch scenario** — choose a pack that carries the monthly schema
    from the **Scenario** selector at the top of the page (the built-in
    VNB / APE sample pack is one). The view fills in automatically.
-2. **Upload the tables** — open **Data centre** and upload a workbook
+2. **Upload the tables**— open**Data centre** and upload a workbook
    containing the four tables below; sheets are matched to tables by
    name, so keep the sheet names identical to the table names. The key
    columns are what let the views group by month, channel and agent.
@@ -289,16 +285,14 @@ Two extra section checkboxes make reports self-contained:
    **Monthly trend from this pack** card still works: it is built from
    whatever monthly table your pack declares. Read the metrics the active
    pack declares on the **Dashboard**, and explore how they connect in the
-   **Knowledge graph** or **Graph studio**.
+   **Knowledge graph**or**Graph studio**.
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Required table | Key columns | What it powers |
-| ----------------- | ---------------------- | ----------------------------------------------------- |
-| `vnb_monthly` | `month` | Company trend chart and the month-on-month VNB bridge |
-| `channel_monthly` | `month, channel_id` | Channel breakdown and the driver attribution |
-| `agent_monthly` | `month, channel_id` | Agent productivity table |
-| `agent_master` | `agent_id, channel_id` | Agent names and reporting lines for the agent view |
-<!-- markdownlint-enable MD013 MD060 -->
+|Required table|Key columns|What it powers|
+|-----------------|----------------------|-----------------------------------------------------|
+|`vnb_monthly`|`month`|Company trend chart and the month-on-month VNB bridge|
+|`channel_monthly`|`month, channel_id`|Channel breakdown and the driver attribution|
+|`agent_monthly`|`month, channel_id`|Agent productivity table|
+|`agent_master`|`agent_id, channel_id`|Agent names and reporting lines|
 
 No questions yet? Press **⚡ Sample report** — the platform answers
 the ontology's recommended questions instantly with the rules engine
@@ -312,8 +306,8 @@ document.
 
 ### 2.6 Search the ontology — instant insight
 
-Open **Ontology workspace** and use the **Search the ontology** box at
-the top. Type any term — for example `vnb` , `agent` , `premium` ,
+Open **Ontology workspace**and use the**Search the ontology** box at
+the top. Type any term — for example `vnb`,`agent`,`premium` ,
 `margin` — and the platform instantly finds matching entities,
 attributes, formulas and rules across the whole active ontology.
 Results show the kind and name as chips, so you can locate a concept
@@ -347,13 +341,13 @@ focused graphs instead of one huge diagram:
 
 The table picker names every table's **source** — the uploaded file,
 its kind and upload time — so you always know where each table came
-from. Tick the tables you want (or use **Select all** / **Clear**),
+from. Tick the tables you want (or use **Select all**/**Clear**),
 then press **Build graph**.
 
-* **Click any node** — the **Node provenance** panel shows exactly
+* **Click any node**— the**Node provenance** panel shows exactly
   which entity, table or column(s) it comes from; aggregated columns
   list every source table and raw column name.
-* **Graph from file** — upload a `.csv`,  `.xlsx` or ontology `.json`
+* **Graph from file** — upload a `.csv`,  `.xlsx`or ontology`.json`
   file to preview its graph instantly. Columns are matched to the
   active ontology and the connections are drawn for you. The file is
   not stored; it is a safe preview.
@@ -404,7 +398,7 @@ button in the Ask view jumps there):
 2. To register your own, press **＋ Add my model** and fill in a
    display name, the **Base URL** of any OpenAI-compatible endpoint
    (OpenAI, Azure OpenAI, DeepSeek, SiliconFlow, Deloitte Nova
-   (D. Nova), Ollama, vLLM, …), your **API key** and the **model id**;
+   (D. Nova), Ollama, vLLM, …), your **API key**and the**model id**;
    temperature, max tokens and timeout have sensible defaults.
    Paste the key exactly as issued — surrounding quotes, a `Bearer`
 
@@ -420,7 +414,7 @@ button in the Ask view jumps there):
 3. If the gateway uses a self-signed TLS certificate — Deloitte Nova
    ( `https://nova.deloitte.com.cn/v1` ) is one — **uncheck** *Verify
    SSL certificate*. Every other gateway keeps it on.
-4. Press **Test** before **Save**. A wrong model id is the most
+4. Press **Test**before**Save**. A wrong model id is the most
    common mistake: e.g. DeepSeek V4 Flash is
 `deepseek-ai/DeepSeek-V4-Flash` on SiliconFlow but
 `DeepSeek-V4-Flash` on the Nova gateway. The **Test** button catches
@@ -457,7 +451,7 @@ Go to **Ontology governance → New ontology**:
 
 * Step 1: fill in the name, slug (lowercase letters/digits) and
   description;
-* Step 2: choose **Start from blank** or **Copy an existing ontology**;
+* Step 2: choose **Start from blank**or**Copy an existing ontology**;
 * After creation a **getting-started checklist** pops up with 6
   clickable steps — just follow them.
 
@@ -480,7 +474,7 @@ Go to **Ontology governance → New ontology**:
 
 **Data oversight → pick a table → ⬆ Upload data**:
 
-1. Drop a `.csv` / `.xlsx` / `.json` (max 10 MB) and give the dataset a
+1. Drop a `.csv`/`.xlsx`/`.json` (max 10 MB) and give the dataset a
    name.
 2. Multi-sheet workbook? Pick the **Workbook sheet** holding the table
    you want — the first sheet is read by default, and the preview
@@ -497,8 +491,8 @@ Go to **Ontology governance → New ontology**:
    single bad row blocks the import.
 5. Press **✓ Looks good — commit import**.
 
-**Many files at once.** The same card has a **Batch import** area:
-**＋ Select files…** or **📁 Select folder…**. Every file you pick is
+**Many files at once.**The same card has a**Batch import** area:
+**＋ Select files…**or**📁 Select folder…**. Every file you pick is
 split into its own row — a workbook becomes one row per sheet, a `.csv`
 
 or data `.json` one row — and each row is routed to a table by name (an
@@ -555,7 +549,7 @@ ontology immediately; no restart is needed.
   platform, raw ontology definition JSON
   (e.g. the built-in `data/ontology_BP2.json` ), or a
   relationship-graph ontology where entities are plain name strings
-  and relationships use `from` / `to` / `type`
+  and relationships use `from`/`to`/`type`
 
   (e.g. `data/lapse_demo.json` — its source tables are registered
   automatically);

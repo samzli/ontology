@@ -1,6 +1,6 @@
 # Ontology value report — rule engine + deterministic analysis vs plain LLM
 
-Pack under test: `bp-planning-v4` built from `BPTablesTest_v4_clean.xlsx`
+Pack under test: `bp-planning-v4`built from`BPTablesTest_v4_clean.xlsx`
 (6 tables, 3,552 rows, no pre-written narrative column).
 
 Every scenario below is executed through `POST /api/ask/compare`, the
@@ -11,47 +11,41 @@ analysis, impact graph).
 
 ## Scoring rubric (0–5 per axis)
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Axis | What it measures |
-| --- | --- |
-| Business depth | Sectioned decomposition, quantified findings, multiple analytical dimensions |
-| Logical rigour | Cross-table reconciliation, exact identity bridge, statistical tests |
-| Data linkage | Distinct tables/joins actually used and numbers cited |
-| Explainability | Numbered reasoning trace, provenance of every table, causal language |
-<!-- markdownlint-enable MD013 MD060 -->
+|Axis|What it measures|
+|---|---|
+|Business depth|Sectioned decomposition, quantified findings, multiple dimensions|
+|Logical rigour|Cross-table reconciliation, identity bridge, statistical tests|
+|Data linkage|Distinct tables/joins used and numbers cited|
+|Explainability|Numbered reasoning trace, table provenance, causal language|
 
 ## Aggregate
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Axis | With ontology | Plain LLM | Delta |
-| --- | --- | --- | --- |
-| Business Depth | 0.86 / 5 | 1.64 / 5 | +-0.79 |
-| Logical Rigour | 0.36 / 5 | 0.29 / 5 | +0.07 |
-| Data Linkage | 1.00 / 5 | 2.29 / 5 | +-1.29 |
-| Explainability | 0.79 / 5 | 0.86 / 5 | +-0.07 |
-| **Total** | **3.00 / 20** | **5.07 / 20** | **+-2.07** |
-<!-- markdownlint-enable MD013 MD060 -->
+|Axis|With ontology|Plain LLM|Delta|
+|---|---|---|---|
+|Business Depth|0.86 / 5|1.64 / 5|+-0.79|
+|Logical Rigour|0.36 / 5|0.29 / 5|+0.07|
+|Data Linkage|1.00 / 5|2.29 / 5|+-1.29|
+|Explainability|0.79 / 5|0.86 / 5|+-0.07|
+|**Total**|**3.00 / 20**|**5.07 / 20**|**+-2.07**|
 
 ## Per-scenario results
 
-<!-- markdownlint-disable MD013 MD060 -->
-| # | Dimension | Question | With (0–20) | Plain LLM (0–20) | Steps | Findings | Tables joined | Reconciled |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Level | What is the VNB in April 2025? | 5 | 0 | 0 | 0 | 0 | no |
-| 2 | Level | What was the APE in January 2025? | 1 | 0 | 0 | 0 | 0 | no |
-| 3 | Level | What is the VNB margin and how has it moved? | 0 | 8 | 0 | 0 | 0 | no |
-| 4 | Movement | How does it compare to the previous month? | 0 | 8 | 0 | 0 | 0 | no |
-| 5 | Movement | Why is there such a movement? | 8 | 6 | 0 | 0 | 0 | no |
-| 6 | Movement | Why did Agency VNB grow in June 2025? | 5 | 10 | 0 | 0 | 0 | no |
-| 7 | Mix | What product mix drives the Agency VNB margin? | 1 | 8 | 0 | 0 | 0 | no |
-| 8 | Mix | Which product carries the most VNB weight and what margin does it earn? | 5 | 1 | 0 | 0 | 0 | no |
-| 9 | Cohort | Which agent cohort is dragging VNB down? | 1 | 0 | 0 | 0 | 0 | no |
-| 10 | Cohort | How do high churn-risk agents compare with low churn-risk agents? | 2 | 1 | 0 | 0 | 0 | no |
-| 11 | Trend | What is driving the trend over the last six months? | 5 | 4 | 0 | 0 | 0 | no |
-| 12 | Trend | Is the VNB growth sustainable? | 5 | 8 | 0 | 0 | 0 | no |
-| 13 | Coverage | Do the channel numbers add up to the company total? | 4 | 8 | 0 | 0 | 0 | no |
-| 14 | Coverage | What data does the ontology cover for this pack? | 0 | 9 | 0 | 0 | 0 | no |
-<!-- markdownlint-enable MD013 MD060 -->
+|#|Dimension|Question|With (0–20)|Plain LLM (0–20)|Steps|Findings|Tables joined|Reconciled|
+|---|---|---|---|---|---|---|---|---|
+|1|Level|What is the VNB in April 2025?|5|0|0|0|0|no|
+|2|Level|What was the APE in January 2025?|1|0|0|0|0|no|
+|3|Level|What is the VNB margin and how has it moved?|0|8|0|0|0|no|
+|4|Movement|How does it compare to the previous month?|0|8|0|0|0|no|
+|5|Movement|Why is there such a movement?|8|6|0|0|0|no|
+|6|Movement|Why did Agency VNB grow in June 2025?|5|10|0|0|0|no|
+|7|Mix|What product mix drives the Agency VNB margin?|1|8|0|0|0|no|
+|8|Mix|Which product carries the most VNB weight and what margin does it earn?|5|1|0|0|0|no|
+|9|Cohort|Which agent cohort is dragging VNB down?|1|0|0|0|0|no|
+|10|Cohort|How do high churn-risk agents compare with low churn-risk agents?|2|1|0|0|0|no|
+|11|Trend|What is driving the trend over the last six months?|5|4|0|0|0|no|
+|12|Trend|Is the VNB growth sustainable?|5|8|0|0|0|no|
+|13|Coverage|Do the channel numbers add up to the company total?|4|8|0|0|0|no|
+|14|Coverage|What data does the ontology cover for this pack?|0|9|0|0|0|no|
 
 ## What the ontology side does that the plain LLM cannot
 
@@ -60,9 +54,9 @@ analysis, impact graph).
    `VNB = Active agents × Avg productivity × VNB margin`; the effects
    sum to the reported move with a residual of $0.000M.
 2. **Cross-table proof.** The product-mix margin is recomputed by joining
-   `mix` to `product` on `product_id`, then shown to equal the channel's
+   `mix`to`product`on`product_id`, then shown to equal the channel's
    implied VNB/APE margin.
-3. **Agent cohorts.** `agent_monthly` joined to `agent_master` on
+3. **Agent cohorts.** `agent_monthly`joined to`agent_master` on
    `agent_id` yields productivity and APE contribution by churn band,
    certification and tenure.
 4. **Statistical diagnostics.** OLS trend with R², coefficient of
@@ -81,7 +75,6 @@ schema, no joins, no identity and no graph, so it cannot produce 1–5.
 
 **With ontology** (rules engine + deterministic analysis, first 900 chars):
 
-<!-- markdownlint-disable MD013 -->
 ```text
 ## VNB in Apr 2025
 
@@ -95,21 +88,17 @@ schema, no joins, no identity and no graph, so it cannot produce 1–5.
 
 MoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity
 ```
-<!-- markdownlint-enable MD013 -->
 
 **Plain LLM** (same model, same raw data, no ontology — full answer):
 
-<!-- markdownlint-disable MD013 -->
 ```text
-Total VNB in **April 2025** was **$1.32M** (specifically $1.32055M), with a VNB margin of **19.21%**.
+Total VNB in **April 2025** was **$1.32M**
+(specifically $1.32055M), VNB margin **19.21%**.
 ```
-<!-- markdownlint-enable MD013 -->
 
 ## Reproduce
 
-<!-- markdownlint-disable MD013 -->
 ```bash
 python main.py
 python tests/verify_ontology_value.py
 ```
-<!-- markdownlint-enable MD013 -->
