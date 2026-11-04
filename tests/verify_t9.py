@@ -90,6 +90,11 @@ def main() -> int:
         # The pack that was active before the round-trip — restored at the end.
         packs0 = js(c.get("/api/admin/packs")).get("packs", [])
         prev_active = next((p for p in packs0 if p["is_active"]), None)
+        # The dashboard follows the *user's* scenario selection when one is
+        # stored (app_settings ``user_pack:<id>``), otherwise the system-active
+        # pack. Remember it so the round-trip starts from a clean slate and the
+        # previous selection is put back afterwards.
+        prev_selected = js(c.get("/api/packs")).get("selected_id")
         ok(prev_active is not None, "found the previously-active pack")
 
         # ------------------------------------------------------ 1. import pack
@@ -119,6 +124,11 @@ def main() -> int:
             "pack carries the Clean file's name",
             (imp or {}).get("name"),
         )
+
+        # Drop any stored per-user selection so /api/dashboard follows the
+        # system-active pack just imported (restored in the cleanup section).
+        if prev_selected is not None:
+            c.post("/api/my/pack", json={"pack_id": None})
 
         # ------------------------------------------ 2. batch-import the workbook
         files = [("files", (LAPSE_XLSX.name, xlsx_bytes, xlsx_mime))]
@@ -249,6 +259,9 @@ def main() -> int:
             "previously-active pack restored",
             now_active,
         )
+        # Put the user's scenario selection back exactly as it was found.
+        if prev_selected is not None:
+            c.post("/api/my/pack", json={"pack_id": prev_selected})
 
     print(f"\n  {PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0

@@ -17,30 +17,30 @@ Every scenario below is executed through `POST /api/ask/compare`, the same endpo
 
 | Axis | With ontology | Plain LLM | Delta |
 | --- | --- | --- | --- |
-| Business Depth | 4.14 / 5 | 1.86 / 5 | +2.29 |
-| Logical Rigour | 5.00 / 5 | 0.29 / 5 | +4.71 |
-| Data Linkage | 5.00 / 5 | 2.57 / 5 | +2.43 |
-| Explainability | 5.00 / 5 | 1.14 / 5 | +3.86 |
-| **Total** | **19.14 / 20** | **5.86 / 20** | **+13.29** |
+| Business Depth | 0.86 / 5 | 1.50 / 5 | +-0.64 |
+| Logical Rigour | 0.43 / 5 | 0.14 / 5 | +0.29 |
+| Data Linkage | 1.00 / 5 | 2.00 / 5 | +-1.00 |
+| Explainability | 0.79 / 5 | 1.07 / 5 | +-0.29 |
+| **Total** | **3.07 / 20** | **4.71 / 20** | **+-1.64** |
 
 ## Per-scenario results
 
 | # | Dimension | Question | With (0–20) | Plain LLM (0–20) | Steps | Findings | Tables joined | Reconciled |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Level | What is the VNB in April 2025? | 19 | 3 | 6 | 13 | 4 | yes |
-| 2 | Level | What was the APE in January 2025? | 19 | 8 | 5 | 9 | 4 | yes |
-| 3 | Level | What is the VNB margin and how has it moved? | 19 | 8 | 5 | 9 | 4 | yes |
-| 4 | Movement | How does it compare to the previous month? | 19 | 8 | 5 | 9 | 4 | yes |
-| 5 | Movement | Why is there such a movement? | 20 | 4 | 5 | 9 | 4 | yes |
-| 6 | Movement | Why did Agency VNB grow in June 2025? | 20 | 9 | 6 | 13 | 4 | yes |
-| 7 | Mix | What product mix drives the Agency VNB margin? | 19 | 11 | 6 | 13 | 4 | yes |
-| 8 | Mix | Which product carries the most VNB weight and what margin does it earn? | 19 | 4 | 6 | 13 | 4 | yes |
-| 9 | Cohort | Which agent cohort is dragging VNB down? | 19 | 1 | 6 | 13 | 4 | yes |
-| 10 | Cohort | How do high churn-risk agents compare with low churn-risk agents? | 19 | 0 | 6 | 13 | 4 | yes |
-| 11 | Trend | What is driving the trend over the last six months? | 19 | 8 | 6 | 13 | 4 | yes |
-| 12 | Trend | Is the VNB growth sustainable? | 19 | 8 | 6 | 13 | 4 | yes |
-| 13 | Coverage | Do the channel numbers add up to the company total? | 19 | 10 | 6 | 13 | 4 | yes |
-| 14 | Coverage | What data does the ontology cover for this pack? | 19 | 0 | 6 | 13 | 4 | yes |
+| 1 | Level | What is the VNB in April 2025? | 5 | 0 | 0 | 0 | 0 | no |
+| 2 | Level | What was the APE in January 2025? | 1 | 1 | 0 | 0 | 0 | no |
+| 3 | Level | What is the VNB margin and how has it moved? | 0 | 8 | 0 | 0 | 0 | no |
+| 4 | Movement | How does it compare to the previous month? | 0 | 8 | 0 | 0 | 0 | no |
+| 5 | Movement | Why is there such a movement? | 8 | 7 | 0 | 0 | 0 | no |
+| 6 | Movement | Why did Agency VNB grow in June 2025? | 5 | 4 | 0 | 0 | 0 | no |
+| 7 | Mix | What product mix drives the Agency VNB margin? | 1 | 11 | 0 | 0 | 0 | no |
+| 8 | Mix | Which product carries the most VNB weight and what margin does it earn? | 5 | 1 | 0 | 0 | 0 | no |
+| 9 | Cohort | Which agent cohort is dragging VNB down? | 2 | 0 | 0 | 0 | 0 | no |
+| 10 | Cohort | How do high churn-risk agents compare with low churn-risk agents? | 2 | 0 | 0 | 0 | 0 | no |
+| 11 | Trend | What is driving the trend over the last six months? | 5 | 4 | 0 | 0 | 0 | no |
+| 12 | Trend | Is the VNB growth sustainable? | 2 | 8 | 0 | 0 | 0 | no |
+| 13 | Coverage | Do the channel numbers add up to the company total? | 7 | 6 | 0 | 0 | 0 | no |
+| 14 | Coverage | What data does the ontology cover for this pack? | 0 | 8 | 0 | 0 | 0 | no |
 
 ## What the ontology side does that the plain LLM cannot
 
@@ -59,41 +59,23 @@ The plain-LLM side can only restate the table it was shown; it has no schema, no
 **With ontology** (rules engine + deterministic analysis, first 900 chars):
 
 ```text
-**VNB in Apr 2025: $1.32M on $6.87M APE (margin 19.2%).**
+## VNB in Apr 2025
 
-| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |
-|---|---|---|---|---|---|
-| Agency | 365 | 9.00 | 3.285 | 0.589 | 17.9% |
-| Banca | 178 | 13.00 | 2.314 | 0.504 | 21.8% |
-| Brokerage | 70 | 18.20 | 1.274 | 0.227 | 17.8% |
+| Metric | Apr 2025 | Mar 2025 | Delta |
+|---|---: | ---:|---: |
+| Total APE | $6.87M | $6.40M | +0.48 $M |
+| **Total VNB** | **$1.32M** | $1.22M | **+0.10 $M** |
+| VNB margin | 19.2% | 19.1% | +0.12 pp |
+| Agency VNB | $0.59M | $0.51M | +0.07 $M |
+| Agency share | 45% | 42% | — |
 
-**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.589M (44.6%), which is where any explanation has to start.
-
-### Monthly trajectory
-
-| Month | VNB | Change | Change % |
-|---|---|---|---|
-| Jan 2025 | $1.207M |  |  |
-| Feb 2025 | $1.253M | +$0.046M | +3.8% |
-| Mar 2025 | $1.221M | -$0.032M | -2.5% |
-| Apr 2025 | $1.321M | +$0.099M | +8.1% |
-| May 2025 | $1.281M | -$0.039M | -3.0% |
-| Jun 2025 | $1.448M | +$0.167M | +13.0% |
-
-
-### Why it moved — exact driver bridge
-
-The ontology identity is applied per segment, so the effects add up to the
+MoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity
 ```
 
 **Plain LLM** (same model, same raw data, no ontology — full answer):
 
 ```text
-Based on the uploaded data, the **total VNB for April 2025 is $1.32055M** (approximately **$1.32M**).
-
-This figure comes directly from the `vnb_monthly` table's aggregate by month (2025-04: Total APE = $6.87299M, Total VNB = $1.32055M, VNB margin = 19.21%).
-
-As a cross-check, the `channel_monthly` table for April 2025 lists an average VNB per channel of $0.440184M across the 3 channels (Agency, Banca, Brokerage). Summing those three channels gives $0.440184M × 3 = $1.320552M, which matches the company total — so the channel numbers do add up.
+In **April 2025**, total **VNB** was **$1.32M** (specifically $1.32055M), with a VNB margin of **19.21%**.
 ```
 
 ## Reproduce
