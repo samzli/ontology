@@ -992,6 +992,17 @@ branch triggers a deployment. `vercel.json` builds `main.py` with
 Jinja pages and the `/static` assets itself, so no separate static build
 is involved.
 
+**Dependencies and the production branch.** Vercel's Python runtime
+chooses its installer from the repository: when a `pyproject.toml` is
+present it runs `uv` against `[project].dependencies`, and falls back to
+`requirements.txt` only when that file is absent. Both files therefore
+list the same runtime packages — keep them in sync. A build log that
+never prints `Installing required dependencies...` ships an empty
+environment, and every route then answers
+`500 FUNCTION_INVOCATION_FAILED` with `ModuleNotFoundError` in the
+function logs. Only pushes to the production branch ( `main` ) publish
+to the public domain; feature branches produce preview URLs.
+
 **Writable storage.** `modules/db.py` detects `VERCEL` and switches to
 `/tmp/onti-data` ( `ONTI_DATA_DIR` overrides the location on any host):
 
