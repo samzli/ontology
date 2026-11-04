@@ -25,8 +25,9 @@ page) is where people *use and build*: ask, upload, create ontologies,
 report. The **admin console** (`/admin`, deep-navy page) is where
 administrators *govern*: accounts and access, the canonical question
 list, the available models, token usage, and oversight of every
-ontology. There is no link between the two by design — change the URL
-if you land in the wrong one.
+ontology. There is no link from the user portal into the admin console —
+change the URL if you land in the wrong one (admins have a **← User
+portal** button in the console header for the way back).
 
 ---
 
