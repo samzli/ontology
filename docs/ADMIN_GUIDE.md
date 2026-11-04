@@ -509,11 +509,12 @@ the Dashboard chat and the with/without ontology comparison alike.
 Users & audit → create the account (or enable self-registration) and
 share the user portal URL: `http://onti.local:8010/app` after the
 hosts mapping in the README, otherwise `http://localhost:8010/app` .
-Self-registration and accounts created there need a persistent disk; on
-Vercel the function filesystem is per-instance, so registration is
-disabled ( `/api/auth/status` → `ephemeral: true` ). The Docker
-deployment keeps the volume, so registration is
-open there ( `ephemeral: false` ) — use it (README → Deploying with Docker)
+Self-registration works on every host, but accounts created at runtime
+need a persistent disk to survive: on Vercel the function filesystem is
+per-instance ( `/api/auth/status` → `ephemeral: true` ), so a registered
+account lives on one instance only. The Docker deployment keeps the
+volume, so accounts persist there ( `ephemeral: false` ) — use it
+(README → Deploying with Docker)
 for a real multi-user workspace. On Vercel use the project's production
 URL ( `https://…/app` ) and make sure **Deployment Protection → Vercel
 Authentication** is disabled, otherwise only members of your Vercel team

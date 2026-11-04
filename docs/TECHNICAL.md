@@ -71,11 +71,11 @@ file (multi-replica or stateless deployments).
 instances* — it is true only when the `VERCEL` environment variable is
 present, or when `ONTI_EPHEMERAL=1` is set explicitly. It is **not**
 derived from the data-directory path: a Docker container points
-`ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent,
-so registration stays open there. On an ephemeral host writes live only
-for that instance, so `auth.register_account` refuses to create accounts
-and `/api/auth/status` reports `ephemeral: true` ; the sign-in pages then
-hide registration. Use the
+`ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent.
+On an ephemeral host writes live only for that instance, so
+`/api/auth/status` reports `ephemeral: true` ; registration stays open
+(new accounts work for the life of that instance) but the accounts are
+not shared between instances. Use the
 Docker image with the `onti-data` volume (README → Deploying with Docker)
 for durable multi-user state.
 
@@ -706,9 +706,9 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   immediately; other serverless instances verify the signature and check
   the revocation table before loading the user directly, so a cookie
   survives cold starts and per-instance `/tmp` databases. That fallback
-  still needs the user row, which another instance may not have, so
-  account creation is disabled on ephemeral storage
-  ( `db.EPHEMERAL_STORAGE` ).
+  still needs the user row, which another instance may not have — so on
+  ephemeral storage ( `db.EPHEMERAL_STORAGE` ) a freshly registered
+  account only lives on the instance that created it.
 `/api/admin/*` requires the admin role; the admin UI is a separate page
   with no cross-links from the user portal.
 * API keys (system and user) are encrypted with a machine-local key
@@ -749,6 +749,8 @@ python tests\verify_t7.py                   :: upload sheets/mapping + evidence
 python tests\verify_t8.py                   :: batch import (sheets/CSV/folder/JSON)
 python tests\verify_t9.py                   :: lapse pack end to end
 python tests\verify_giteam.py               :: regular team account vs admin routes
+python tests\verify_permissions.py          :: registration everywhere + ontology
+                                            :: creation rights & admin visibility
 python tests\verify_login.py                :: 24 checks — auth flows
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report

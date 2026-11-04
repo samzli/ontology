@@ -434,7 +434,7 @@ backed by server-side graph algorithms:
 
 | Tool        | Endpoint                | What it does                      |
 | ----------- | ----------------------- | --------------------------------- |
-| Path finder | `GET /api/graph/path` | BFS shortest directed path.       |
+| Path finder | `GET /api/graph/path`   | BFS shortest directed path.       |
 | Impact      | `GET /api/graph/impact` | N-hop up/downstream reachability. |
 | Cycle check | `GET /api/graph/cycles` | DFS cycle detection.              |
 
@@ -980,10 +980,11 @@ model secrets stay identical across hosts.
 ### Deploying to Vercel (serverless)
 
 > **Preview/demo only.** Each function instance gets its own `/tmp` , so
-> accounts created by self-registration are not kept between requests.
-> `/api/auth/status` reports `ephemeral: true` and
-> account creation is disabled — use a pre-provisioned account,
-> or the Docker deployment above, for real use.
+> self-registration works but the new account is kept per instance and is
+> not shared between instances (another instance only has the bundled,
+> pre-provisioned accounts). `/api/auth/status` reports `ephemeral: true`
+> there — use a pre-provisioned account, or the Docker deployment above,
+> for real multi-user work.
 
 The repository is linked to Vercel, so every push to the connected
 branch triggers a deployment. `vercel.json` builds `main.py` with
@@ -1014,10 +1015,11 @@ to the public domain; feature branches produce preview URLs.
   directory.
 * Writes made **inside the app** (new registrations, uploaded data,
   generated reports, model configs) live as long as the function instance
-  and are not shared between instances. Self-registration is therefore
-  disabled on serverless hosts; admins can add accounts, but those are
-  per-instance too. For durable multi-user writes, use the Docker
-  deployment above or point `ONTI_DATA_DIR` at a persistent volume.
+  and are not shared between instances. Self-registration stays available
+  so preview visitors can try the full flow, but those accounts are
+  per-instance — and so are accounts an admin adds there. For durable
+  multi-user writes, use the Docker deployment above or point
+  `ONTI_DATA_DIR` at a persistent volume.
 * Session cookies are signed with the bundled key and also validated
   statelessly, so a login survives cold starts and requests served by
   another instance.
@@ -1030,8 +1032,9 @@ Protection* → disable **Vercel Authentication** for the production domain
 (or hand out a Protection Bypass link). Inside the app, users can then open
 `/app` and sign in with a pre-provisioned account ( `admin` / `Onti@2026`
 
-by default); self-registration is disabled on serverless hosts, and admins
-add accounts in **Admin → Users & audit**.
+by default) or register a new one — registration works on serverless hosts
+too, but such an account lives on a single instance only. Admins add
+accounts in **Admin → Users & audit**.
 
 > **Use the deployment URL, not a dashboard path.** The app URL is the
 > deployment domain itself, e.g. `https://ontology-dais-7a03.vercel.app/` .
@@ -1176,6 +1179,9 @@ python tests\verify_t9.py
 
 :: shared team account: regular login, user portal, Graph studio, admin closed
 python tests\verify_giteam.py
+
+:: registration on every host + ontology creation rights & admin visibility
+python tests\verify_permissions.py
 
 :: ontology value: 14 scenarios, with vs without ontology, scored report
 python tests\verify_ontology_value.py      :: writes docs\ONTOLOGY_VALUE_REPORT.md
@@ -1328,7 +1334,7 @@ Code/
 │  ├─ onti.db                      # SQLite database (auto-created)
 │  ├─ run_log.jsonl                # test/run audit trail (who/when/what)
 │  └─ reports/                     # generated report files
-├─ tests/               # verify_t1..t9, verify_giteam, smoke_http
+├─ tests/               # verify_t1..t9, verify_giteam/permissions, smoke_http
 ├─ templates/           # login, app, admin pages
 └─ static/              # app.css, common.js, graph.js, app.js, admin.js
 ```
