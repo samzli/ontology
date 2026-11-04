@@ -1,7 +1,7 @@
 {
   "system_name": "Onti",
   "version": "2.1.0",
-  "description": "Onti — Insurance Ontology Workspace: a data-driven insurance ontology agent platform with rule-based and AI Q&A, knowledge graph studio, data lineage, analytics reporting and per-user model management. Local domain: onti.local (see README hosts setup).",
+  "description": "Onti: insurance ontology workspace — rules + AI Q&A.",
   "server": {
     "host": "0.0.0.0",
     "port": 8010
@@ -14,6 +14,12 @@
     "session_days": 7,
     "allow_registration": true,
     "upload_max_mb": 10,
-    "allowed_upload_ext": [".csv", ".xlsx", ".xls", ".json", ".txt"]
+    "allowed_upload_ext": [
+      ".csv",
+      ".xlsx",
+      ".xls",
+      ".json",
+      ".txt"
+    ]
   }
 }
