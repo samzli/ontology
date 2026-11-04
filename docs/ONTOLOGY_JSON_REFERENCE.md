@@ -13,12 +13,14 @@ confidence.
 
 ## Which shape will my file be detected as?
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Detection (first match wins)                                 | Shape               |
 | ------------------------------------------------------------ | ------------------- |
 | `format` field equals `onti-pack/v1` | onti-pack/v1 export |
 | First entity is an object with `id` and no `key` | BP2 raw ontology    |
 | Entities are plain strings, or a `relationships` list exists | Relationship-graph  |
 | Anything else (e.g. `key` -style entities, no marker)         | onti-pack/v1        |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Notes:
 
@@ -30,12 +32,14 @@ Notes:
 
 ## Shared top-level fields (all shapes)
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Field | Required | Default | Notes |
 | ------------- | -------- | ------------------- | ---------------------------------------------------- |
 | `slug` | yes* | derived from `id` | 2-49 chars: lowercase letters, digits, `-` , `_` only |
 | `name` | no | the slug, humanised | Display name in the pack bar |
 | `description` | no | `""` | Short description shown in admin |
 | `narrative` | no | `""` | Long-form domain story used by the AI answer layer |
+<!-- markdownlint-enable MD013 MD060 -->
 
 \* A slug is required either in the file or via the **Slug override**
 box in the import dialog. If both are given the override wins. A
@@ -47,6 +51,7 @@ This is what **Export JSON** produces. Entities use `key` .
 
 ### entities
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Field | Required | Default | Notes |
 | ------------- | -------- | ------- | ------------------------------------ |
 | `key` | yes | - | Unique within the pack |
@@ -54,9 +59,11 @@ This is what **Export JSON** produces. Entities use `key` .
 | `layer` | no | `3` | 1 = top concept, 2 = mid, 3 = detail |
 | `description` | no | `""` | |
 | `sort` | no | `0` | Ordering hint |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ### attributes
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Field | Required | Default | Notes |
 | ------------- | -------- | -------- | --------------------------------- |
 | `entity_key` | yes | - | Must match an imported entity key |
@@ -69,9 +76,11 @@ This is what **Export JSON** produces. Entities use `key` .
 | `is_unique` | no | `0` | `1` marks a natural key |
 | `description` | no | `""` | |
 | `sort` | no | `0` | |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ### relations
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Field | Required | Default | Notes |
 | ----------------------------- | -------- | -------------- | ---------------------------------------------------------- |
 | `key` | yes | - | Unique within the pack |
@@ -82,6 +91,7 @@ This is what **Export JSON** produces. Entities use `key` .
 | `source_attr` / `target_attr` | no | `""` | Join attribute keys |
 | `description` | no | `""` | |
 | `sort` | no | `0` | |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ### Optional blocks
 
@@ -105,6 +115,7 @@ This is what **Export JSON** produces. Entities use `key` .
 `modules/deep_analysis.py` ; omit it and the engine infers roles from
   the ontology. Optional keys:
 
+<!-- markdownlint-disable MD013 MD060 -->
   | Key | Meaning |
   | --- | --- |
   | `metric_table` / `metric_column` | company-level metric series |
@@ -118,6 +129,7 @@ This is what **Export JSON** produces. Entities use `key` .
   | `mix` | `{mix_table, product_table, weight_column, margin_column, product_key, channel}` — cross-table mix proof |
   | `agent` | `{monthly_table, master_table, productivity_column, ape_column, status_column, attributes, join_date_column}` — cohort analysis |
   | `dimensions` | list of dimension names quoted in the answer |
+<!-- markdownlint-enable MD013 MD060 -->
 
   The spec is stored in `app_settings['analysis:{pack_id}']` on import,
   returned by pack export, and deleted with the pack.
@@ -127,6 +139,7 @@ This is what **Export JSON** produces. Entities use `key` .
 Same structure but with `id` -style field names. The importer converts
 it on the fly:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | BP2 field | Converted to |
 | --------------------------------- | ------------- |
 | entity `id` | `key` |
@@ -138,6 +151,7 @@ it on the fly:
 | relation `target_class` | `target_key` |
 | relation `source_class_attribute` | `source_attr` |
 | relation `target_class_attribute` | `target_attr` |
+<!-- markdownlint-enable MD013 MD060 -->
 
 `label_en` , `layer` , `description` , `data_type` , `cardinality` etc.
 carry over unchanged. `label_en` defaults to the `id` if omitted.
@@ -153,6 +167,7 @@ The most relaxed shape — handy when your JSON was produced by another
 tool or an LLM. Entities are **plain name strings**; relationships use
 `from` / `to` / `type` .
 
+<!-- markdownlint-disable MD013 -->
 ```json
 {
   "id": "my_domain_demo",
@@ -182,9 +197,11 @@ tool or an LLM. Entities are **plain name strings**; relationships use
   "open_decisions": ["Which lapse definition is authoritative?"]
 }
 ```
+<!-- markdownlint-enable MD013 -->
 
 Field notes:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Field | Required | Notes |
 | ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `id` (or `slug` ) | yes* | Slugified into the pack slug |
@@ -194,6 +211,7 @@ Field notes:
 | `tables` | no | Dict of `{key: {sheets, fields}}` ; `fields` maps logical names to physical column names and later powers automatic column mapping on data upload |
 | `definitions` | no | Merged into the pack narrative as a glossary |
 | `open_decisions` | no | Merged into the narrative |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Entity names, relationship types and table keys are slugified
 (spaces/punctuation become `_` , letters lowercased).
@@ -202,6 +220,7 @@ Entity names, relationship types and table keys are slugified
 
 Smallest valid onti-pack/v1 file:
 
+<!-- markdownlint-disable MD013 -->
 ```json
 {
   "format": "onti-pack/v1",
@@ -210,24 +229,30 @@ Smallest valid onti-pack/v1 file:
   "entities": [{ "key": "policy", "label_en": "Policy" }]
 }
 ```
+<!-- markdownlint-enable MD013 -->
 
 Equivalent BP2 file:
 
+<!-- markdownlint-disable MD013 -->
 ```json
 {
   "slug": "tiny_demo_bp2",
   "entities": [{ "id": "policy" }]
 }
 ```
+<!-- markdownlint-enable MD013 -->
 
 Equivalent relationship-graph file:
 
+<!-- markdownlint-disable MD013 -->
 ```json
 { "slug": "tiny_demo_graph", "entities": ["Policy"] }
 ```
+<!-- markdownlint-enable MD013 -->
 
 ## What the validator checks (and common errors)
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Check                                  | Error you will see                                    |
 | -------------------------------------- | ----------------------------------------------------- |
 | Top-level is a JSON object             | `Invalid pack file: expected a JSON object...` |
@@ -237,6 +262,7 @@ Equivalent relationship-graph file:
 | Keys unique within the pack            | `... keys must be unique within the pack.` (HTTP 422) |
 | Attributes reference existing entities | listed as a blocking issue in the preview             |
 | Graph edges reference existing nodes   | `edge x references unknown nodes ['y']` |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Tips:
 

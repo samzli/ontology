@@ -247,14 +247,14 @@ fields verbatim. Other OpenAI-compatible gateways (Azure, Ollama, vLLM,
 Together, …) only need their own base URL + model id + API key; the
 form fields are the same for every provider.
 
-<!-- markdownlint-disable MD060 -->
+<!-- markdownlint-disable MD013 MD060 -->
 | Field          | SiliconFlow                     | Deloitte Nova (D. Nova)            | Azure OpenAI                                                  |
 | -------------- | ------------------------------- | --------------------------------- | ------------------------------------------------------------- |
 | **Base URL**   | `https://api.siliconflow.cn/v1` | `https://nova.deloitte.com.cn/v1` | `https://<region>.openai.azure.com/openai/deployments/<name>` |
 | **Model id**   | `deepseek-ai/DeepSeek-V4-Flash` | `DeepSeek-V4-Flash` | `gpt-4o-mini` (your deployment name)                          |
 | **API key**    | `sk-...` | `ak-...` | `...` |
 | **Verify SSL** | ✅ keep on                       | ❌ **uncheck** (self-signed cert)  | ✅ keep on                                                     |
-<!-- markdownlint-enable MD060 -->
+<!-- markdownlint-enable MD013 MD060 -->
 
 > **Important — model ids differ across gateways.** DeepSeek V4 Flash
 > is `deepseek-ai/DeepSeek-V4-Flash` on SiliconFlow but
@@ -302,7 +302,7 @@ fix.
 
 Symptom → cause → fix:
 
-<!-- markdownlint-disable MD060 -->
+<!-- markdownlint-disable MD013 MD060 -->
 | Symptom when testing / asking                              | Most likely cause                                         | Fix                                                                |
 | ---------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
 | "The provider returned HTTP 405"                           | Base URL missing the API prefix (bare host, wrong path)   | Use the full prefix, e.g. `https://nova.deloitte.com.cn/v1` |
@@ -315,7 +315,7 @@ Symptom → cause → fix:
 | "The gateway refused the connection"                       | Nothing listening on that host/port, or a proxy blocks it | Check scheme and port; test from the server host                   |
 | "The provider did not answer in time"                      | Slow or queueing gateway; short timeout                   | Raise the model's **Timeout**, then retry — this one is transient  |
 | "The provider could not be reached"                        | Network path blocked; cause not otherwise classifiable    | Check the base URL, network and any corporate proxy                |
-<!-- markdownlint-enable MD060 -->
+<!-- markdownlint-enable MD013 MD060 -->
 
 > **How a test result is reported.** Every *completed* connection test
 > answers **HTTP 200**. The verdict lives in the payload: `ok: true` for
@@ -350,11 +350,13 @@ gateway can be configured independently.
 From `.env` , the same flag can be set with any of these variables
 (applied once at first startup, when the model table is empty):
 
+<!-- markdownlint-disable MD013 -->
 ```bash
 NOVA_VERIFY_SSL=false      # canonical Nova-specific name
 LLM_VERIFY_SSL=false       # generic
 SKIP_SSL_VERIFY=1          # standalone trigger — presence alone means skip
 ```
+<!-- markdownlint-enable MD013 -->
 
 ### Updating an API key
 
@@ -465,6 +467,7 @@ of a good key now succeeds.
 
 ## 7. Recommended routines
 
+<!-- markdownlint-disable MD013 MD060 -->
 | When                        | Do                                                         |
 | --------------------------- | ---------------------------------------------------------- |
 | New ontology made by a user | Health check → review graph → decide on activation         |
@@ -472,6 +475,7 @@ of a good key now succeeds.
 | Weekly                      | Skim the audit feed and token-by-user table for anomalies  |
 | Before big edits            | Save a pack snapshot (History)                             |
 | Monthly                     | Review canonical questions; prune ones that never match    |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ## 8. FAQ
 
