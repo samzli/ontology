@@ -9,27 +9,22 @@ shared belongs here.
 
 from __future__ import annotations
 
-
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi.responses import JSONResponse
-
-from common.logger import AppLogger
 from pydantic import BaseModel
 
+from common.logger import AppLogger
 from modules import admin_service as adm
 from modules import llm_client as llm
 from modules import ontology_service as svc
 from modules import report_builder as rb
-from modules.db import get_setting
-from modules.db import set_setting
-from modules.constants import AUTO_REPORT_QUESTION_MIN
-from modules.constants import AUTO_REPORT_QUESTION_TARGET
-from modules.constants import SOURCE_SUMMARY_LIMIT
+from modules.constants import (
+    AUTO_REPORT_QUESTION_MIN,
+    AUTO_REPORT_QUESTION_TARGET,
+    SOURCE_SUMMARY_LIMIT,
+)
+from modules.db import get_setting, set_setting
 
 # Application-wide logger shared by every router.
 logger = AppLogger("onti")

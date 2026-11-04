@@ -931,14 +931,45 @@ host there is no writable `data/`; the app then uses `/tmp/onti-data`
 - `motor_insurance_ontology.json` — a second sample schema (motor
   claims domain) demonstrating that any BP2-format JSON can be imported.
 - `.onti.key` — machine-local key used to encrypt model API keys and
-  to sign session cookies.
+  to sign session cookies. `ONTI_SECRET_KEY` overrides it on stateless
+  or multi-host deployments.
 - `reports/` — generated report files.
 - `*.csv|xlsx` uploads are parsed and stored as rows in the database.
 
 To back up: stop the server, copy the whole `data/` folder (or the
 directory named by `ONTI_DATA_DIR`).
 
+### Deploying with Docker (persistent disk — recommended)
+
+Serverless hosts give every instance its own temporary filesystem, so an
+account registered on one instance is invisible to the next one (the
+user is bounced back to sign-in and cannot sign in again). For a real
+multi-user workspace run the container with a persistent volume:
+
+```bash
+docker compose up -d --build      # http://localhost:8010
+```
+
+`docker-compose.yml` mounts the named volume `onti-data` at `/app/data`
+and sets `ONTI_DATA_DIR=/app/data`, so users, sessions, uploads and
+reports survive restarts and rolling updates. Without Compose:
+
+```bash
+docker build -t onti .
+docker run -d --name onti -p 8010:8010 -v onti-data:/app/data onti
+```
+
+For several replicas behind a load balancer, also pin one signing key on
+every container (`ONTI_SECRET_KEY`) so session cookies and encrypted
+model secrets stay identical across hosts.
+
 ### Deploying to Vercel (serverless)
+
+> **Preview/demo only.** Each function instance gets its own `/tmp`, so
+> accounts created by self-registration are not kept between requests.
+> The sign-in pages detect this (`/api/auth/status` → `ephemeral: true`),
+> disable account creation and explain it; use a pre-provisioned account,
+> or the Docker deployment above, for real use.
 
 The repository is linked to Vercel, so every push to the connected
 branch triggers a deployment. `vercel.json` builds `main.py` with
@@ -958,9 +989,10 @@ is involved.
   directory.
 - Writes made **inside the app** (new registrations, uploaded data,
   generated reports, model configs) live as long as the function instance
-  and are not shared between instances. For durable multi-user writes,
-  run the app on a VM/container with a persistent disk, or point
-  `ONTI_DATA_DIR` at a mounted persistent volume.
+  and are not shared between instances. Self-registration is therefore
+  disabled on serverless hosts; admins can add accounts, but those are
+  per-instance too. For durable multi-user writes, use the Docker
+  deployment above or point `ONTI_DATA_DIR` at a persistent volume.
 - Session cookies are signed with the bundled key and also validated
   statelessly, so a login survives cold starts and requests served by
   another instance.
@@ -971,9 +1003,9 @@ asked to sign in with a Vercel account and colleagues outside the Vercel
 team cannot open the app. In Vercel: *Project → Settings → Deployment
 Protection* → disable **Vercel Authentication** for the production domain
 (or hand out a Protection Bypass link). Inside the app, users can then open
-`/app`, sign in with a pre-provisioned account, or self-register
-(`allow_registration` is on by default); admins add accounts in
-**Admin → Users & audit**.
+`/app` and sign in with a pre-provisioned account (`admin` / `Onti@2026`
+by default); self-registration is disabled on serverless hosts, and admins
+add accounts in **Admin → Users & audit**.
 
 **Environment variables.** Set `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME`
 in *Project → Settings → Environment Variables* and redeploy. They are
@@ -1111,8 +1143,15 @@ timestamps, actor, host, script, status, exit code, last output line and
 duration):
 
 ```bat
-python tests\run_all.py                :: every tests\*.py script
+python tests\run_all.py                :: every tests\*.py script (skips _-prefixed helpers)
 python tests\run_all.py smoke verify_t9  :: only matching scripts
+```
+
+Code style and static checks (config lives in `pyproject.toml`):
+
+```bat
+python -m black .          :: format (88 columns)
+python -m ruff check .     :: lint — must report zero findings
 ```
 
 Inspect the most recent entries:
@@ -1211,6 +1250,10 @@ Code/
 │  └─ my_models.py      # per-user model management
 ├─ start_server.bat
 ├─ requirements.txt
+├─ pyproject.toml       # black (88 cols) + ruff lint configuration
+├─ Dockerfile           # container image (python:3.12-slim)
+├─ docker-compose.yml   # persistent volume `onti-data` at /app/data
+├─ .dockerignore
 ├─ vercel.json          # serverless build/route config (all paths → main.py)
 ├─ config/config.json   # port, session, upload, runtime (run-log) settings
 ├─ modules/
@@ -1237,7 +1280,7 @@ Code/
 │  ├─ onti.db                      # SQLite database (auto-created)
 │  ├─ run_log.jsonl                # test/run audit trail (who/when/what)
 │  └─ reports/                     # generated report files
-├─ tests/               # verify_t1..t9, smoke_http, run_all.py runner
+├─ tests/               # verify_t1..t9, smoke_http, run_all.py runner, _seed_synthetic helper
 ├─ templates/           # login, app, admin pages
 └─ static/              # app.css, common.js, graph.js, app.js, admin.js
 ```

@@ -9,13 +9,13 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Tuple
 
-from common.values import is_num as _is_num
-
 import matplotlib
+
+from common.values import is_num as _is_num
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 # ---------------------------------------------------------------------------
 # Brand palette / style
@@ -140,7 +140,7 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
         ...                     "series": [{"name": "VNB", "values": [1, 2]}]})
     """
     ctype = spec.get("type", "bar")
-    labels = [str(l) for l in spec.get("labels", [])]
+    labels = [str(lbl) for lbl in spec.get("labels", [])]
     series = spec.get("series", [])
     fmt = spec.get("fmt", "number")
     fig, ax = plt.subplots(figsize=(7.6, 4.2), dpi=150)
@@ -174,7 +174,7 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
         )
         ax.legend(
             wedges,
-            [f"{l}  {format_value(v, fmt)}" for l, v in zip(labels, vals)],
+            [f"{lbl}  {format_value(v, fmt)}" for lbl, v in zip(labels, vals)],
             loc="center left",
             bbox_to_anchor=(0.92, 0.5),
             frameon=False,
@@ -186,7 +186,7 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
         vals = list(s["values"])
         y = range(len(vals))
         bars = ax.barh(list(y), vals, color=PALETTE[0], height=0.62)
-        ax.set_yticks(list(y), ["\n".join(_wrap(l, 18)) for l in labels])
+        ax.set_yticks(list(y), ["\n".join(_wrap(lbl, 18)) for lbl in labels])
         ax.invert_yaxis()
         ax.grid(axis="x", color=BRAND_GRID, linewidth=0.8)
         ax.set_axisbelow(True)
@@ -211,11 +211,11 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
                 marker="o",
                 linewidth=2.2,
                 color=PALETTE[i % len(PALETTE)],
-                label=s.get("name", f"Series {i+1}"),
+                label=s.get("name", f"Series {i + 1}"),
             )
             for xi, v in zip(xs, s["values"]):
                 tag(v, xi, v)
-        ax.set_xticks(range(len(labels)), ["\n".join(_wrap(l, 12)) for l in labels])
+        ax.set_xticks(range(len(labels)), ["\n".join(_wrap(lbl, 12)) for lbl in labels])
         ax.grid(color=BRAND_GRID, linewidth=0.8)
         ax.set_axisbelow(True)
         if len(series) > 1:
@@ -250,7 +250,7 @@ def render_chart(spec: Dict[str, Any]) -> bytes:
                     dx=shift * 10,
                     fs=7.2 if nser > 1 else 8,
                 )
-        ax.set_xticks(range(len(labels)), ["\n".join(_wrap(l, 11)) for l in labels])
+        ax.set_xticks(range(len(labels)), ["\n".join(_wrap(lbl, 11)) for lbl in labels])
         ax.grid(axis="y", color=BRAND_GRID, linewidth=0.8)
         ax.set_axisbelow(True)
         if nser > 1:

@@ -6,8 +6,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modules.db import get_conn
 from modules import llm_client as ml
+from modules.db import get_conn
 
 PASS = 0
 FAIL = 0
@@ -193,7 +193,7 @@ with get_conn() as conn:
     check("model admin actions audited", audits >= 5, str(audits))
 
 print("[TR-4.5] no hardcoded provider/model outside seed migration")
-import pathlib
+import pathlib  # noqa: E402  (import kept beside its single use below)
 
 root = pathlib.Path(__file__).resolve().parent.parent
 offenders = []

@@ -2,24 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional
 
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import BackgroundTasks
-from fastapi import Depends
-from fastapi import File
-from fastapi import Form
-from fastapi import UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from pydantic import BaseModel
 
 from modules import admin_service as adm
-from modules import auth
+from modules import auth, induction
 from modules import importer as imp
-from modules import induction
 from modules.db import get_conn
 from routes.common import IdIn, logger
 

@@ -47,7 +47,7 @@
         const onLoginPage = pagePath === '/login' || pagePath === '/admin/login';
         if (!onLoginPage) {
           const onAdmin = pagePath.startsWith('/admin');
-          location.href = onAdmin ? '/admin/login?expired=1' : '/login';
+          location.href = onAdmin ? '/admin/login?expired=1' : '/login?expired=1';
         }
         throw new ApiError('Please sign in again.', 401);
       }

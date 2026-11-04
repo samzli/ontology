@@ -2,26 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
 
-from typing import Any
-from typing import Dict
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from modules import admin_service as adm
 from modules import auth
 from modules import report_builder as rb
-from modules.db import get_conn
-from modules.db import get_setting
-from modules.db import set_setting
-
-from routes.common import IdIn
-from routes.common import _parse_model_pref
-from routes.common import _user_model_pref
-from routes.common import user_pack_id
+from modules.db import get_conn, get_setting, set_setting
+from routes.common import IdIn, _parse_model_pref, _user_model_pref, user_pack_id
 
 router = APIRouter()
 

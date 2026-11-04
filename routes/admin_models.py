@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
 
-from typing import Any
-from typing import Dict
-from typing import Optional
-
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from modules import auth

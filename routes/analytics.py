@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
 
-from typing import Any
-from typing import Dict
-from typing import Optional
+from fastapi import APIRouter, Depends
 
-from fastapi import APIRouter
-from fastapi import Depends
-
-from modules import analytics
-from modules import auth
+from modules import analytics, auth
 from modules import ontology_service as svc
 from modules.db import get_conn
-
 from routes.common import user_pack_id
 
 router = APIRouter()

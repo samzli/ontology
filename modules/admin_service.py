@@ -13,8 +13,8 @@ import re
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 
-from modules.db import audit, jloads, jdumps, now, set_setting
 from modules import ontology_service as svc
+from modules.db import audit, jdumps, jloads, now, set_setting
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]{1,48}$")
 
