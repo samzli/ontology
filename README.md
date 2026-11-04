@@ -2,17 +2,17 @@
 
 Onti turns your insurance data and methodology into a
 **question-answering, graph-grounded analytics platform** — without
-writing code. Define an ontology (entities, attributes, relations, 
-formulas, rules), import CSV / Excel / JSON data (one file at a time, 
+writing code. Define an ontology (entities, attributes, relations,
+formulas, rules), import CSV / Excel / JSON data (one file at a time,
 many files, a whole folder, or every sheet of a workbook at once), and
 users get:
 
 * **Deterministic answers** from auditable rules when their question
-  matches; 
+  matches;
 * **AI answers** from any OpenAI-compatible model, grounded strictly in
-  the active ontology and data (Graph-RAG style); 
+  the active ontology and data (Graph-RAG style);
 * a **dashboard** with KPI cards and the full knowledge graph, plus an
-  inline impact chain under every answer; 
+  inline impact chain under every answer;
 * one-click **analytics reports in HTML, PDF and Markdown** with
   server-rendered charts.
 
@@ -20,7 +20,7 @@ Onti is **not hard-coded to any metric, product, or model**. It ships
 with one built-in **VNB / APE sample pack** so you can try it
 immediately; everything you see is data that an administrator can
 replace or extend from the admin console — by drawing the graph in
-ontology governance, by uploading a raw ontology JSON file (BP2, 
+ontology governance, by uploading a raw ontology JSON file (BP2,
 relationship-graph or `onti-pack/v1` format), by exporting /
 importing a `.onti-pack.json` pack on another machine, or — fastest
 of all — by letting users generate an ontology straight from their
@@ -30,7 +30,7 @@ uploaded tables in Graph studio
 * **Backend:** Python 3.10+ · FastAPI · SQLite (zero external services)
 * **Frontend:** server-rendered Jinja2 pages + vanilla HTML/CSS/JS — no
   build step, no CDN
-* **Auth:** local accounts, PBKDF2 hashes, signed HttpOnly session cookies, 
+* **Auth:** local accounts, PBKDF2 hashes, signed HttpOnly session cookies,
   role-based portals
 * **Default URL:** <http://localhost:8010> — or `http://onti.local:8010`
   after the one-line hosts mapping below
@@ -74,14 +74,14 @@ required:
 127.0.0.1  onti.local
 ```
 
-2. Flush DNS (`ipconfig /flushdns`) and browse to:
+1. Flush DNS (`ipconfig /flushdns`) and browse to:
 
-   - **User portal** — <http://onti.local:8010/app>
-   - **Admin console** — <http://onti.local:8010/admin>
+   * **User portal** — <http://onti.local:8010/app>
+   * **Admin console** — <http://onti.local:8010/admin>
 
 The server already listens on `0.0.0.0` , so colleagues on the same
 network can also reach it via your IP: `http://<your-ip>:8010/app` .
-For a production domain, put Onti behind any reverse proxy (Caddy, 
+For a production domain, put Onti behind any reverse proxy (Caddy,
 nginx, IIS) and point the proxy at port 8010 — no code change needed.
 
 A default administrator is pre-provisioned so you can sign in
@@ -89,7 +89,7 @@ immediately. The credentials are **not displayed on the web pages** (to
 avoid exposing them to anyone who reaches the site); they are only shown
 in the local server console and recorded here for the operator:
 
-| Username | Password    |
+| Username | Password |
 | -------- | ----------- |
 | `admin` | `Onti@2026` |
 
@@ -104,7 +104,9 @@ in the local server console and recorded here for the operator:
 Behind a restricted network, install with a mirror:
 
 ```bat
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
+pip install -r requirements.txt ^
+  -i https://pypi.tuna.tsinghua.edu.cn/simple ^
+  --trusted-host pypi.tuna.tsinghua.edu.cn
 ```
 
 ### AI models are optional
@@ -120,7 +122,7 @@ On first start, a `.env` with the generic `LLM_API_KEY` /
 `LLM_BASE_URL` / `LLM_MODEL_NAME` variables (see `.env.example` ; the
 legacy `SILICONFLOW_*` names are still accepted as a fallback) is
 migrated **once** into an encrypted default model configuration. Any
-OpenAI-compatible endpoint works — OpenAI, DeepSeek, Moonshot, Together, 
+OpenAI-compatible endpoint works — OpenAI, DeepSeek, Moonshot, Together,
 Ollama, vLLM and similar. You can delete or replace the configuration
 afterwards in Models & usage.
 
@@ -145,7 +147,7 @@ SKIP_SSL_VERIFY=1          # alternative trigger
 > **Important — base URLs and model ids are gateway-specific.**
 > The Base URL must be the provider's full API prefix — the platform
 > calls `{base_url}/chat/completions` , so `https://nova.deloitte.com.cn/v1`
-
+>
 > works while the bare host `https://nova.deloitte.com.cn` returns *405
 > Not Allowed* (Nova only serves routes under `/v1` ). Trailing slashes
 > are normalised away, but `/v1` is never auto-appended (Azure and
@@ -169,7 +171,7 @@ SKIP_SSL_VERIFY=1          # alternative trigger
 Onti serves **two independent web entries**, each with its own URL and
 sign-in page. The split is deliberately simple:
 
-* **Users use and build.** In the user portal they ask questions, 
+* **Users use and build.** In the user portal they ask questions,
   upload data, turn their data into ontologies, and produce reports.
 * **Admins govern.** In the admin console they manage accounts and
   access, oversee everyone's knowledge bases, configure the available
@@ -203,11 +205,11 @@ portal.
   quick question box. A layer switcher toggles between **Impact
   graph** (default, coloured by edge type) and **Class
   relationships** (entities → relations with cardinality labels).
-  A **Full analytics report** for the scenario (multi-section, 
+  A **Full analytics report** for the scenario (multi-section,
   chart-rich) is generated automatically the first time the dashboard
   is opened and one click away from the banner.
 * **Scenario switcher** (header) — a dropdown of every pack the
-  account can access. Switching updates the dashboard, graphs, 
+  account can access. Switching updates the dashboard, graphs,
   analytics, Ask and Graph studio in place; the choice is remembered
   per user and **System default** returns to the admin-activated
   pack.
@@ -219,19 +221,19 @@ portal.
   ( `12 × lapses ÷ exposure` ), matching the dashboard KPI. The full
   VNB/APE views — monthly trend chart, MoM driver attribution, target
   back-solve scenario and agent-salesforce health — activate when the
-  pack carries the built-in monthly sales sheets ( `vnb_monthly` , 
+  pack carries the built-in monthly sales sheets ( `vnb_monthly` ,
 `channel_monthly` , `agent_monthly` , `agent_master` ); a pack with no
   monthly table gets a message listing which of those tables are
   required, present and missing.
 * **Ask the ontology** — Auto / Rules engine / AI mode switch. Answers
-  stream over SSE with a source badge (green rules, amber no-match, 
+  stream over SSE with a source badge (green rules, amber no-match,
   blue AI). Every answer is followed by an inline **Impact chain**
   graph card. A "🤖 Model: … · change" button shows the active model
   and jumps to the dedicated **Model centre** view where every user
   picks any enabled model for their own answers (remembered per user)
   and registers personal models.
   The AI grounding block is **profile-first and never truncated**: every
-  table is summarised over its full active dataset (column profiles, 
+  table is summarised over its full active dataset (column profiles,
   complete month coverage, per-month aggregates, a 3-row sample), so
   questions like *"what months are in the data?"* or *"compare Sep to
   Aug"* answer from all months, not the first 100 rows — and the smaller
@@ -253,16 +255,19 @@ portal.
   quantitative gap is returned by the API ( `value` ) and measured in
   [docs/ONTOLOGY_VALUE_REPORT.md](docs/ONTOLOGY_VALUE_REPORT.md). Built
   for client demos; costs two model calls per question.
-* **Global ontology ON / OFF switch** — a header toggle in **both the user portal and the admin console**.
-  OFF is a deliberate **text-only demo mode**: KPI cards, knowledge graphs, performance charts
-  and impact chains are hidden behind an explicit "Ontology is OFF" panel, Ask answers from
-  the uploaded data tables but with no ontology layer, and reports still generate but as text-only. ON is the default and restores
-  every view instantly. The toggle is per-browser in localStorage; it does not change any server-side data.
+* **Global ontology ON / OFF switch** — a header toggle in **both the
+  user portal and the admin console**. OFF is a deliberate **text-only
+  demo mode**: KPI cards, knowledge graphs, performance charts and
+  impact chains are hidden behind an explicit "Ontology is OFF" panel,
+  Ask answers from the uploaded data tables but with no ontology layer,
+  and reports still generate but as text-only. ON is the default and
+  restores every view instantly. The toggle is per-browser in
+  localStorage; it does not change any server-side data.
 * **Data centre** — browse the underlying data tables (each shows its
   source file and upload time) and read their rows; tables with more
   than a dozen rows offer **View full dataset**, a paged browser
   (50 rows per page) over the complete active dataset. To preview your
-  own `.csv` / `.xlsx` against the ontology without storing anything, 
+  own `.csv` / `.xlsx` against the ontology without storing anything,
   use **Graph studio → 📤 Graph from file**.
 * **Ontology workspace** — build / manage the active ontology
   (entities, attributes, graph nodes/edges, formulas, rules) and a
@@ -276,11 +281,11 @@ portal.
 * **Graph studio** — two things in one place: (1) **✨ Build an
   ontology from your data** — pick knowledge-base tables, preview the
   inferred entities/attributes/relations (optionally **AI-enriched**:
-  the model writes entity descriptions and suggests starter questions), 
+  the model writes entity descriptions and suggests starter questions),
   then create and activate the new ontology with one click (its data is
   copied, so you can ask it questions and report on it immediately — a
   full analytics report is generated automatically); (2) explore
-  read-only graphs of your sources — **data lineage** (default), schema, 
+  read-only graphs of your sources — **data lineage** (default), schema,
   column mapping, or an uploaded CSV/XLSX/JSON file.
   Every table chip shows its source file and upload time; every node
   carries a provenance record. A **Generation history** card lists
@@ -291,7 +296,7 @@ portal.
 * **History** — your current session's questions and answers, with
   one-click Re-ask. Ask history is also kept across sessions and used
   as conversational memory for AI follow-ups.
-* **Knowledge library** — read-only browsing of entities, attributes, 
+* **Knowledge library** — read-only browsing of entities, attributes,
   relations, formulas and imported data tables.
 * **My reports** — generate a report (sections now include the
   **ontology knowledge graph** and **performance analytics**), open it
@@ -315,9 +320,9 @@ portal.
    activate / delete), a **🧾 origin badge** stating exactly where each
    pack came from (which user created it in Graph studio and from which
    tables, or which admin imported it), a **Health check** (one-click
-   structural integrity report), and seven CRUD tabs: entities, 
+   structural integrity report), and seven CRUD tabs: entities,
    attributes, relations, graph nodes, edges, metric formulas, question
-   rules. Supports deep links: `/admin?view=onto` , `/admin?view=data` , 
+   rules. Supports deep links: `/admin?view=onto` , `/admin?view=data` ,
    etc.
 4. **Data oversight** — see and supplement the data imported into any
    ontology table: upload `.csv` / `.xlsx` / `.json` , pick the workbook
@@ -333,14 +338,14 @@ portal.
 6. **Knowledge graph** — three layers of the same ontology:
    **Schema** (entities & relations), **Impact** (the curated graph
    users see), and **Instance** (actual data rows, with search and
-   entity filters). If the schema and impact graphs ever differ, 
+   entity filters). If the schema and impact graphs ever differ,
    **Sync impact graph from ontology** rebuilds the impact graph from
    the entities and relations in one click.
 7. **Models & usage** — configure the OpenAI-compatible endpoints
    users may choose from, review the **User-created models** table
-   (every model a user registered in their Model centre — owner, name, 
+   (every model a user registered in their Model centre — owner, name,
    model, base URL, masked key) and the **User portal settings** table
-   (which scenario pack and model each user currently works with, 
+   (which scenario pack and model each user currently works with,
    marked default or user-selected) so support can reproduce any
    setup. Keys are encrypted at rest and shown masked. Every AI answer
    records token usage for the dashboard above.
@@ -365,7 +370,7 @@ explicitly ( `graph_nodes` / `graph_edges` tables) **or** leave them
 empty — the engine will then **auto-generate** the graph from the
 ontology's entities and relations ( `ontology_service._auto_generate_graph` ):
 
-* Layer → group mapping: layer 1/2 → `financial`, 3 → `operational`, 
+* Layer → group mapping: layer 1/2 → `financial`, 3 → `operational`,
   4 → `mix` , 5 → `cross` .
 * Cardinality → edge-type mapping: `ONE_TO_ONE` / `ONE_TO_MANY` /
 `MANY_TO_ONE` → `STRUCTURAL` ; `MANY_TO_MANY` → `CROSS_LINK` .
@@ -375,19 +380,19 @@ ontology's entities and relations ( `ontology_service._auto_generate_graph` ):
 Every edge is rendered with a colour + dash + width from a fixed
 palette; the legend shows a line sample for each type present:
 
-| Edge type     | Colour    | Dash     | Meaning                               |
+| Edge type | Colour | Dash | Meaning |
 | ------------- | --------- | -------- | ------------------------------------- |
-| `STRUCTURAL` | `#5B8DEF` | solid    | Formula-derived identity relationship |
-| `OPERATIONAL` | `#0E7C5F` | `6,3` | Driver to component relationship      |
-| `MIX` | `#B45309` | `3,3` | Weighting to blended margin           |
-| `CROSS_LINK` | `#7C3AED` | `10,4,2` | Cross-cutting multi-node dependency   |
-| `RELATION` | `#2563EB` | solid    | Entity relationship (class layer)     |
+| `STRUCTURAL` | `#5B8DEF` | solid | Formula-derived identity relationship |
+| `OPERATIONAL` | `#0E7C5F` | `6,3` | Driver to component relationship |
+| `MIX` | `#B45309` | `3,3` | Weighting to blended margin |
+| `CROSS_LINK` | `#7C3AED` | `10,4,2` | Cross-cutting multi-node dependency |
+| `RELATION` | `#2563EB` | solid | Entity relationship (class layer) |
 
 ### Interactions
 
 * **Hover a node** → connected edges and neighbour nodes stay
   highlighted, all others dim. Tooltips show label, value, description.
-* **Hover an edge** → it turns red; tooltip shows label, type, 
+* **Hover an edge** → it turns red; tooltip shows label, type,
   description.
 * **Edge labels** render with a white outline so they stay readable
   where they cross lines and nodes.
@@ -420,7 +425,7 @@ Because the impact graph can historically diverge from the schema
 (e.g. after hand edits), the view carries a **Sync impact graph from
 ontology** action ( `POST /api/admin/ontology/sync-graph` ) that
 rebuilds `graph_nodes` / `graph_edges` from the current entities and
-relations. Ontologies generated from data write both layers at once, 
+relations. Ontologies generated from data write both layers at once,
 so they start in sync.
 
 ### Graph intelligence tools (Open large view toolbar)
@@ -430,7 +435,7 @@ backed by server-side graph algorithms:
 
 | Tool        | Endpoint                | What it does                      |
 | ----------- | ----------------------- | --------------------------------- |
-| Path finder | `GET /api/graph/path` | BFS shortest directed path.       |
+| Path finder | `GET /api/graph/path`   | BFS shortest directed path.       |
 | Impact      | `GET /api/graph/impact` | N-hop up/downstream reachability. |
 | Cycle check | `GET /api/graph/cycles` | DFS cycle detection.              |
 
@@ -480,7 +485,7 @@ The fastest path for a user who already has tables:
    rows** into it, writes a matching impact graph, activates it, and
    **generates a full analytics report automatically** (titled with
    the scenario and the exact source tables). You land back on Ask and
-   can question the ontology immediately; it also powers analytics, 
+   can question the ontology immediately; it also powers analytics,
    the dashboard graph and reports. The creation, the report and any
    previews or uploads are recorded in Graph studio's **Generation
    history**.
@@ -488,8 +493,8 @@ The fastest path for a user who already has tables:
 Inference rules live in
 `ontology_service.infer_ontology` ; endpoints:
 
-* `POST /api/graph-studio/infer` — dry-run preview (counts, entities, 
-  relations, schema graph, optional `ai_questions` ); 
+* `POST /api/graph-studio/infer` — dry-run preview (counts, entities,
+  relations, schema graph, optional `ai_questions` );
 * `POST /api/graph-studio/create-ontology` — create, copy data and
   activate in one transaction (rolled back if validation fails). Both
   accept `ai_enrich: true` ; created packs record their origin
@@ -504,7 +509,7 @@ Inference rules live in
 2. A **getting-started checklist** appears; every step is a clickable
    jump: entities → relations → data → graph → health → activate.
 3. **Add entities** (`Ontology governance → Entities → Add`): one row
-   per business concept. Layer 1–2 = financial, 3 = operational, 
+   per business concept. Layer 1–2 = financial, 3 = operational,
    4 = mix, 5 = cross.
 4. **Add attributes** for each entity — typed, with units.
 5. **Add relations** between entities with cardinality — the class
@@ -522,7 +527,7 @@ Inference rules live in
 8. **Activate the pack** (select it in the pack bar → Activate). Users
    see the new ontology immediately, no restart.
 
-> Prefer a file? **Import pack** accepts a raw ontology JSON (BP2, 
+> Prefer a file? **Import pack** accepts a raw ontology JSON (BP2,
 > relationship-graph or `onti-pack/v1` ) — see
 > [Importing an ontology JSON file](#importing-an-ontology-json-file).
 
@@ -534,8 +539,8 @@ Inference rules live in
    answers; edges may use multi-source keys. (Leave empty and the graph
    auto-generates from entities + relations.)
 3. Add **metric formulas** using the safe expression language:
-`rows()` , `where()` , `lookup()` , `cell()` , `sum()` , `avg()` , 
-`min()` , `max()` , `count()` , `wavg()` , `round()` , `abs()` , 
+`rows()` , `where()` , `lookup()` , `cell()` , `sum()` , `avg()` ,
+`min()` , `max()` , `count()` , `wavg()` , `round()` , `abs()` ,
 `money_k()` . Arbitrary Python, imports and attribute access are
    rejected at save time.
 4. Add **question rules**: regex patterns, AND groups, guards, a
@@ -553,7 +558,7 @@ computed metrics before activation.
 
 ### Importing an ontology JSON file
 
-The import dialog accepts **any JSON file** in one of three shapes, 
+The import dialog accepts **any JSON file** in one of three shapes,
 auto-detected on the server ( `admin_service._normalize_pack_payload` ):
 
 * **`onti-pack/v1`** — detected by `format: "onti-pack/v1"`. Used
@@ -561,11 +566,11 @@ auto-detected on the server ( `admin_service._normalize_pack_payload` ):
 * **BP2 raw ontology** — detected by `entities` whose first item
   carries `id` but no `key` . Converted on the fly by
 `_convert_bp2_to_v1` . Field mapping: entity `id` → `key` ; attribute
-`id` → `key` , `owned_class` → `entity_key` , `unique` → `is_unique` ; 
-  relation `id` → `key` , `source_class` → `source_key` , 
-`target_class` → `target_key` , `source_class_attribute` → `source_attr` , 
+`id` → `key` , `owned_class` → `entity_key` , `unique` → `is_unique` ;
+  relation `id` → `key` , `source_class` → `source_key` ,
+`target_class` → `target_key` , `source_class_attribute` → `source_attr` ,
 `target_class_attribute` → `target_attr` . Other blocks
-  ( `graph_nodes` , `graph_edges` , `metric_formulas` , `question_rules` , 
+  ( `graph_nodes` , `graph_edges` , `metric_formulas` , `question_rules` ,
 `tables` ) pass through untouched.
 * **Relationship-graph ontology** — detected by `entities` given as
   plain name strings and/or a `relationships` list with
@@ -573,7 +578,7 @@ auto-detected on the server ( `admin_service._normalize_pack_payload` ):
 `_convert_relationship_graph_to_v1` : entity names are slugified into
   keys; `relationships` become relations with the cardinality mapped
   ( `many_to_one` → `MANY_TO_ONE` , etc.) and join keys / time rules /
-  business rules preserved in the relation description; 
+  business rules preserved in the relation description;
 `deferred_entities` are imported with a "deferred" note; the
 `tables` dict (sheets + logical-field-to-physical-column mapping)
   becomes pack tables with columns; `definitions` and
@@ -585,7 +590,7 @@ The built-in sample schema `data/ontology_BP2.json` is one example of a
 BP2 raw file — drag it into the import dialog to provision a minimal
 5-entity / 30-attribute / 5-relation pack. `data/lapse_demo.json`
 
-shows the relationship-graph shape (6 active + 2 deferred entities, 
+shows the relationship-graph shape (6 active + 2 deferred entities,
 5 relationships, 4 source tables). You can also drop in any other
 raw or `onti-pack/v1` JSON file; the dashboard graph is then
 auto-generated from the entities and relations
@@ -601,12 +606,12 @@ auto-generated from the entities and relations
 Selecting a file in the import dialog **immediately runs a dry-run**
 ( `POST /api/admin/packs/import/preview` ) before anything is written:
 
-* shows the pack name / slug and a chip row of counts (entities, 
-  attributes, relations, graph nodes/edges, formulas, rules, tables, 
-  questions); 
-* **blocking issues** (duplicate slug, missing required fields, 
+* shows the pack name / slug and a chip row of counts (entities,
+  attributes, relations, graph nodes/edges, formulas, rules, tables,
+  questions);
+* **blocking issues** (duplicate slug, missing required fields,
   attributes referencing unknown entities, edges referencing unknown
-  nodes) render in red and the Import button stays disabled; 
+  nodes) render in red and the Import button stays disabled;
 * advisory warnings (e.g. "no data tables") render in amber.
 
 The preview reuses the same validation as the real import, so a green
@@ -634,7 +639,7 @@ panel:
 * **Save snapshot now** stores a complete `onti-pack/v1` snapshot —
   entities, graph, formulas, rules, question bank and data rows; the 20
   most recent per pack are kept.
-* **Restore** replaces the pack with the snapshot. Before overwriting, 
+* **Restore** replaces the pack with the snapshot. Before overwriting,
   the current state is auto-saved as `before-restore` on the new pack
   record, so a rollback is itself reversible.
 
@@ -644,21 +649,21 @@ Both portals mount a floating **?** button. The panel opens an
 English quick-start with two tabs: **How to use** and **FAQ**. The
 same content in long form lives in:
 
-* [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — end-user guide (ask, 
-  upload, Graph studio, Model centre, reports); 
+* [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — end-user guide (ask,
+  upload, Graph studio, Model centre, reports);
 * [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) — administrator guide
-  (governance, oversight, support workflows); 
+  (governance, oversight, support workflows);
 * [docs/ONTOLOGY_JSON_REFERENCE.md](docs/ONTOLOGY_JSON_REFERENCE.md) —
   ontology JSON file format: the three accepted shapes, required vs
-  optional fields, minimal examples and validator error messages; 
+  optional fields, minimal examples and validator error messages;
 * [docs/TECHNICAL.md](docs/TECHNICAL.md) — architecture, data model
-  and HTTP API reference; 
+  and HTTP API reference;
 * [docs/ONTOLOGY_VALUE_REPORT.md](docs/ONTOLOGY_VALUE_REPORT.md) —
   measured with-vs-without-ontology comparison (14 scenarios, scored).
 
 ### Graph studio — user-built graphs with provenance
 
-The **Graph studio** view ( `/app` → 🕸️) has two jobs. The top card, 
+The **Graph studio** view ( `/app` → 🕸️) has two jobs. The top card,
 **✨ Build an ontology from your data**, performs the full
 data → ontology → activate loop described in
 [3.1](#31-generate-an-ontology-from-your-data). Below it, **Explore
@@ -698,14 +703,14 @@ content connects to existing concepts. Nothing is written to the
 database — it is an in-memory preview.
 
 **Provenance everywhere** — every node carries a `source` record
-(kind + detail). Clicking a node shows exactly which entity, table, 
+(kind + detail). Clicking a node shows exactly which entity, table,
 column (with all source tables and raw column names) or uploaded file
 it came from, and a **Sources used** panel lists every origin behind
 the current graph.
 
-Endpoints: `GET /api/graph-studio/sources` , 
+Endpoints: `GET /api/graph-studio/sources` ,
 `POST /api/graph-studio/build` ( `view` ∈ `schema` | `lineage` |
-`columns` , `table_ids` , `include_unmatched` ), 
+`columns` , `table_ids` , `include_unmatched` ),
 `POST /api/graph-studio/upload` , plus the ontology-generation pair
 `POST /api/graph-studio/infer` and
 `POST /api/graph-studio/create-ontology` .
@@ -721,15 +726,15 @@ administrator-curated canonical questions:
   ontology — metric formulas, numeric attributes and entities — and
   de-duplicated against the canonical list. They refresh automatically
   when the active pack changes.
-* Endpoints: `GET/POST /api/my-questions`, 
-`DELETE /api/my-questions/{id}` , 
+* Endpoints: `GET/POST /api/my-questions`,
+`DELETE /api/my-questions/{id}` ,
 `GET /api/recommended-questions` . Lists are scoped to the active
   pack and the signed-in user.
 
 ### Ask history, batch questions and long-term memory
 
 Every question answered against the active pack is recorded in the
-`ask_history` table (question, answer excerpt, source, latency, 
+`ask_history` table (question, answer excerpt, source, latency,
 tokens) — visible to the user as the **🕘 Recent asks** chips and the
 History view, and usable as **long-term memory** by the AI:
 
@@ -737,7 +742,7 @@ History view, and usable as **long-term memory** by the AI:
   last turns plus the four most recent stored answers, so follow-ups
   like *"and last month?"* resolve correctly. The rules engine uses the
   same memory: when a follow-up names no month (e.g. *"How does it
-  compare to the previous month?"*, *"Why is there such a movement?"*), 
+  compare to the previous month?"*, *"Why is there such a movement?"*),
   it inherits the month from the most recent question that named one
   and answers with the month-on-month comparison, biggest cohort movers
   and the financial bridge for that month.
@@ -748,7 +753,7 @@ History view, and usable as **long-term memory** by the AI:
   click.
 * **Sample report** — **⚡ Sample report** in My reports answers the
   ontology's recommended questions with the deterministic rules engine
-  (no AI wait, no token cost) and renders the full report — summary, 
+  (no AI wait, no token cost) and renders the full report — summary,
   Q&A, evidence, KPIs, charts, ontology graph, analytics, appendix —
   in one click. `POST /api/reports/sample` .
 * Endpoint: `GET /api/ask/history` — the caller's 30 most recent asks
@@ -767,7 +772,7 @@ jumps there:
   only affects that user's answers; **Default** falls back to the
   system default model.
 * **＋ Add my model** registers any OpenAI-compatible endpoint
-  (display name, base URL, API key, model name, temperature, 
+  (display name, base URL, API key, model name, temperature,
   max tokens, timeout), with one-click **Test**, edit and delete.
   Entries are private to the account and reappear the next time the
   user signs in.
@@ -779,8 +784,8 @@ jumps there:
   is documentation, not configuration.
 * Oversight: administrators see every user-created model (keys masked)
   in **Admin → Models & usage → User-created models**.
-* Endpoints: `GET /api/models`,  `POST /api/models/select`, 
-`GET/POST /api/my/models` , `PUT/DELETE /api/my/models/{id}` , 
+* Endpoints: `GET /api/models`,    `POST /api/models/select`,
+`GET/POST /api/my/models` , `PUT/DELETE /api/my/models/{id}` ,
 `POST /api/my/models/test` (accepts `my:N` to test a saved entry).
 
 ### Formula impact analysis
@@ -789,8 +794,8 @@ When an admin opens a formula for editing, the form loads an
 **impact panel** ( `GET /api/formulas/{key}/impact` ) listing everything
 that depends on the formula — transitively:
 
-* downstream formulas that call it; 
-* graph nodes whose `value` references it; 
+* downstream formulas that call it;
+* graph nodes whose `value` references it;
 * question rules whose template mentions it.
 
 Green = nothing depends on it; amber = lists the affected items.
@@ -812,11 +817,11 @@ questions, or use the admin Reports area. You choose the title, scope
 and sections:
 
 * executive summary, Q&A record (mode, latency, evidence), ontology
-  evidence & impact chain; 
+  evidence & impact chain;
 * KPI tables, chart analysis, appendix & methodology, optional AI
-  business interpretation (skipped when no model is configured); 
+  business interpretation (skipped when no model is configured);
 * **Ontology knowledge graph** — the pack's class/impact graph rendered
-  into the report, so readers see the structure behind the numbers; 
+  into the report, so readers see the structure behind the numbers;
 * **Performance analytics** — the month-on-month VNB driver
   decomposition (headcount / productivity / product-mix effects) and
   the per-channel salesforce table, identical to the analytics view.
@@ -861,7 +866,7 @@ effect immediately.
 
 ### Token metering
 
-Every AI answer is logged to the `llm_calls` table with caller, model, 
+Every AI answer is logged to the `llm_calls` table with caller, model,
 success flag, latency and token count. Streamed requests send
 `stream_options.include_usage` so the provider reports prompt +
 completion tokens; providers that omit usage fall back to a word-count
@@ -892,9 +897,9 @@ with a human approval gate:
    the manual builder, so an invalid proposal is rejected with a
    reason.
 
-Related admin endpoints: `GET /api/admin/proposals` , 
-`POST /api/admin/proposals/{id}/approve|reject` , 
-`POST /api/admin/packs/{pack_id}/proposals/approve-all` , 
+Related admin endpoints: `GET /api/admin/proposals` ,
+`POST /api/admin/proposals/{id}/approve|reject` ,
+`POST /api/admin/packs/{pack_id}/proposals/approve-all` ,
 `POST /api/admin/data/tables/{table_id}/analyze` .
 
 ---
@@ -907,7 +912,7 @@ Related admin endpoints: `GET /api/admin/proposals` ,
 {
   "system_name": "Onti",
   "version": "2.1.0",
-  "description": "Onti — Insurance Ontology Workspace: a data-driven insurance ontology agent platform with rule-based and AI Q&A, knowledge graph studio, data lineage, analytics reporting and per-user model management.",
+  "description": "Onti: insurance ontology workspace — rules + AI Q&A.",
   "server": { "host": "0.0.0.0", "port": 8010 },
   "security": {
     "session_days": 7,
@@ -929,9 +934,9 @@ host there is no writable `data/` ; the app then uses `/tmp/onti-data`
 (or the directory named by `ONTI_DATA_DIR` ) — see
 [Deploying to Vercel](#deploying-to-vercel-serverless).
 
-* `onti.db` (+ `-wal` / `-shm`) — users, ontology packs, datasets, 
+* `onti.db` (+ `-wal` / `-shm`) — users, ontology packs, datasets,
   reports metadata, audit.
-* `ontology_BP2.json` — built-in sample schema in raw BP2 format; 
+* `ontology_BP2.json` — built-in sample schema in raw BP2 format;
   used by the sample pack seed and as a ready-to-import example.
 * `motor_insurance_ontology.json` — a second sample schema (motor
   claims domain) demonstrating that any BP2-format JSON can be imported.
@@ -977,8 +982,8 @@ model secrets stay identical across hosts.
 
 > **Preview/demo only.** Each function instance gets its own `/tmp` , so
 > accounts created by self-registration are not kept between requests.
-> The sign-in pages detect this ( `/api/auth/status` → `ephemeral: true` ), 
-> disable account creation and explain it; use a pre-provisioned account, 
+> The sign-in pages detect this ( `/api/auth/status` → `ephemeral: true` ),
+> disable account creation and explain it; use a pre-provisioned account,
 > or the Docker deployment above, for real use.
 
 The repository is linked to Vercel, so every push to the connected
@@ -997,7 +1002,7 @@ is involved.
 * Reports that were generated before the deployment are read from the
   bundled `data/reports/` folder when they are absent from the writable
   directory.
-* Writes made **inside the app** (new registrations, uploaded data, 
+* Writes made **inside the app** (new registrations, uploaded data,
   generated reports, model configs) live as long as the function instance
   and are not shared between instances. Self-registration is therefore
   disabled on serverless hosts; admins can add accounts, but those are
@@ -1049,16 +1054,16 @@ All endpoints except `/health` , `/login` and `/api/auth/*` require the
 `onti_session` cookie; `/api/admin/*` additionally requires the admin
 role.
 
-* **POST** `/api/auth/register`,  `/login`,  `/logout` — accounts &
+* **POST** `/api/auth/register`,    `/login`,  `/logout` — accounts &
   sessions.
-* **GET** `/api/config`,  `/api/questions`,  `/api/graph`, 
-`/api/class-graph` , `/api/library` , `/api/search?q=` , 
+* **GET** `/api/config`,    `/api/questions`,    `/api/graph`,
+`/api/class-graph` , `/api/library` , `/api/search?q=` ,
 `/api/search/insight?q=` (chips + affected sub-graph + written
   analysis), `/api/formulas/{key}/impact` — user portal reads.
 * **GET** `/api/models`, **POST** `/api/models/select` — per-user
   model picker for the Model centre (enabled configs only, no keys
   exposed).
-* **GET/POST** `/api/my/models`, **PUT/DELETE** `/api/my/models/{id}`, 
+* **GET/POST** `/api/my/models`, **PUT/DELETE** `/api/my/models/{id}`,
   **POST** `/api/my/models/test` — the personal Model centre
   (user-private configs, optional `.env` registration).
 * **GET** `/api/recommended-questions`, **GET/POST**
@@ -1070,15 +1075,15 @@ role.
   list for the header dropdown and the per-user selection ( `null`
 
   resets to the admin-activated pack); **GET** `/api/dashboard` —
-  scenario banner, KPI cards and timeseries for the resolved pack; 
+  scenario banner, KPI cards and timeseries for the resolved pack;
   **GET** `/api/graph-studio/history` — the caller's generation
   history (ontologies, previews, uploads, reports).
 * **GET** `/api/graph-studio/sources`, **POST**
-`/api/graph-studio/build` , **POST** `/api/graph-studio/upload` , 
+`/api/graph-studio/build` , **POST** `/api/graph-studio/upload` ,
   **POST** `/api/graph-studio/infer` , **POST**
 `/api/graph-studio/create-ontology` — source graphs (upload is
   in-memory only) and data → ontology generation with preview.
-* **GET** `/api/graph/path`,  `/api/graph/impact`,  `/api/graph/cycles`
+* **GET** `/api/graph/path`,    `/api/graph/impact`,    `/api/graph/cycles`
   — graph intelligence (path, N-hop impact, cycle detection).
 * **POST** `/api/ask-stream` — SSE answer stream
   ( `meta` → `token*` → `done` / `error` ); the `done` event carries
@@ -1087,13 +1092,13 @@ role.
 `with_ontology` (rules / grounded AI, with its impact chain) and
 `without_ontology` (same model, raw data tables only, no graph), plus
   a `value` summary of what the ontology contributed.
-* **GET** `/api/analytics/timeseries`,  `/attribution`,  `/scenario`, 
+* **GET** `/api/analytics/timeseries`,    `/attribution`,    `/scenario`,
 `/agent-stats` — monthly analytics.
-* **POST/GET/DELETE** `/api/reports...` — generate, list, download, 
-  delete; **POST** `/api/reports/sample` — one-click demo report; 
+* **POST/GET/DELETE** `/api/reports...` — generate, list, download,
+  delete; **POST** `/api/reports/sample` — one-click demo report;
   **GET** `/api/reports/{uid}/view` — open the HTML inline.
-* **GET/POST/PUT/DELETE** `/api/admin/...` — packs, ontology elements, 
-  data, datasets, questions, instance graph, visual graph, models, 
+* **GET/POST/PUT/DELETE** `/api/admin/...` — packs, ontology elements,
+  data, datasets, questions, instance graph, visual graph, models,
   users, settings, audit; **GET** `/api/admin/user-models` — oversight
   of all user-created models (keys masked); **GET**
 `/api/admin/user-settings` — each user's current scenario pack and
@@ -1101,9 +1106,9 @@ role.
 * **POST** `/api/admin/ontology/sync-graph`, **GET**
 `/api/admin/visual-graph` — rebuild the impact graph from
   entities/relations; read any pack's impact graph.
-* **GET/POST** `/api/admin/proposals`,  `/approve`,  `/reject` — AI
+* **GET/POST** `/api/admin/proposals`,    `/approve`,  `/reject` — AI
   proposal review queue.
-* **POST** `/api/admin/packs/{id}/proposals/approve-all`, 
+* **POST** `/api/admin/packs/{id}/proposals/approve-all`,
 `/api/admin/data/tables/{id}/analyze` — approve all; run induction.
 * **GET** `/api/admin/ontology/health?pack_id=` — structural
   integrity report.
@@ -1135,13 +1140,17 @@ python tests\verify_t5.py
 python tests\verify_t6.py
 
 :: authentication & account flows (freshly re-seeded DB recommended)
-python tests\verify_login.py               :: 24 checks — login, register, session, lockout
+:: 24 checks — login, register, session, lockout
+python tests\verify_login.py
 
 :: model endpoint contract (needs the live provider configured)
-python tests\verify_model_endpoints.py     :: 65 checks — create/test/edit/default/delete, self-signed diagnostics, CRUD, audit
+:: 65 checks — create/test/edit/default/delete, self-signed diagnostics,
+:: CRUD, audit
+python tests\verify_model_endpoints.py
 
 :: model key handling (offline, no provider call)
-python tests\verify_model_key.py           :: 68 checks — paste hygiene, persistence, error mapping
+:: 68 checks — paste hygiene, persistence, error mapping
+python tests\verify_model_key.py
 
 :: end-to-end HTTP smoke
 python tests\smoke_http.py
@@ -1171,7 +1180,8 @@ timestamps, actor, host, script, status, exit code, last output line and
 duration):
 
 ```bat
-python tests\run_all.py                :: every tests\*.py script (skips _-prefixed helpers)
+:: every tests\*.py script (skips _-prefixed helpers)
+python tests\run_all.py
 python tests\run_all.py smoke verify_t9  :: only matching scripts
 ```
 
@@ -1190,7 +1200,7 @@ python -m modules.run_log              :: prints the last 10 runs
 
 Retention is capped by `runtime.run_log_max_entries` (default `5000` ) and
 the file location is `runtime.run_log` , both under the `runtime` block of
-`config/config.json` . The log is append-only and never read by the web app, 
+`config/config.json` . The log is append-only and never read by the web app,
 so it can be shipped to an external audit store unchanged.
 
 The layer checks ( `verify_t1` … `verify_t6` ) are **workspace-tolerant**:
@@ -1215,19 +1225,19 @@ Coverage:
   certificate-off toggle, verifies that raw API keys are never
   serialised back, and confirms that test failures are HTTP 200 with
 `ok:false` plus an actionable hint (not 4xx).
-* The smoke suite covers the anonymous / user / admin cookie matrix, 
+* The smoke suite covers the anonymous / user / admin cookie matrix,
   default-admin login, all read APIs, SSE rules answers with graph
   evidence, unmatched suggestions, report generation with all three
   formats, CSV upload validation and admin question/model endpoints.
 
 `verify_t7.py` needs the server running with the synthetic-demo pack
 seeded and exercises the administrator import path end to end:
-multi-sheet workbook selection (default first sheet, explicit pick, 
+multi-sheet workbook selection (default first sheet, explicit pick,
 unknown-sheet error), manual column-mapping overrides, a sheet+mapping
 commit round-trip, and AI-proposal evidence storage/retrieval.
 
 `verify_t8.py` covers **batch import** end to end: one workbook expanded
-into one item per sheet, name-matched sheets routed to their tables, 
+into one item per sheet, name-matched sheets routed to their tables,
 unmatched sheets creating new tables (with entity, attributes and graph
 sync), several CSVs and a data-shaped JSON imported together, an
 ontology-shaped JSON rejected with a pointer to **Import pack**, and an
@@ -1248,7 +1258,7 @@ python -m modules.db
 ## 9. Project layout
 
 The codebase follows a **thin HTTP layer, fat service layer** split:
-`main.py` only wires the app (lifespan, exception handlers, static mount, 
+`main.py` only wires the app (lifespan, exception handlers, static mount,
 router registration), the HTTP endpoints live in `routes/` , and all
 business logic lives in `modules/` .
 
@@ -1308,7 +1318,7 @@ Code/
 │  ├─ onti.db                      # SQLite database (auto-created)
 │  ├─ run_log.jsonl                # test/run audit trail (who/when/what)
 │  └─ reports/                     # generated report files
-├─ tests/               # verify_t1..t9, verify_giteam, smoke_http, run_all.py runner, _seed_synthetic helper
+├─ tests/               # verify_t1..t9, verify_giteam, smoke_http
 ├─ templates/           # login, app, admin pages
 └─ static/              # app.css, common.js, graph.js, app.js, admin.js
 ```
@@ -1316,7 +1326,7 @@ Code/
 ### How a question flows through the modules
 
 1. `routes/ask.py:ask_stream` validates the request, loads the active pack +
-   the caller's effective model config (per-user pick, else default), 
+   the caller's effective model config (per-user pick, else default),
    and calls `qa_service.stream_answer(...)` .
 2. `qa_service` asks `ontology_service.answer_question` (rules engine).
    On a hit it yields `meta` → `token` → `done` with the impact-chain
