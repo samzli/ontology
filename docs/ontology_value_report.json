@@ -13,14 +13,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 171,
-      "numbers": 5,
+      "chars": 548,
+      "numbers": 9,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
-      "reconciled": 0,
-      "identity": 0
+      "reconciled": 1,
+      "identity": 1
     },
     "with_score": {
       "business_depth": 4,
@@ -30,20 +30,20 @@
     },
     "without_score": {
       "business_depth": 0,
-      "logical_rigour": 0,
+      "logical_rigour": 2,
       "data_linkage": 0,
       "explainability": 1
     },
     "with_source": "rules+analysis",
     "with_chars": 5253,
-    "without_chars": 171,
+    "without_chars": 548,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**Apr 2025 VNB is $1.321M on $6.873M APE (margin 19.2%).** That is **+$0.099M (+8.1%)** versus Mar 2025.\n\n**Where the number sits.** VNB is spread across 3 segments (channel_monthly joined to vnb_monthly); **Agency** contributes **$0.589M (44.6%)**, which is where any explanation has to start.\n\n**Monthly trajectory.** Apr 2025 ($1.321M) rebounded from Mar 2025 ($1.221M), which had dipped -$0.032M after Feb's +$0.046M.\n\n**Why it moved — exact driver bridge.** The ontology applies identity per segment, so effects add up to the reported move with **no residual** (residual $-0.000000M). Across all segments:\n- **Active agents**: +$0.045M\n- **Average productivity ($k)**: +$0.042M\n- **VNB margin**: +$0.012M\n- **Total**: **+$0.099M**\n\nThe move is led by **Agency (+$0.074M**, from $0.515M to $0.589M). The largest factor is **Active agents (+$0.045M)**, closely followed by **Average productivity (+$0.042M)**.\n\n**Product-mix proof (cross-table join).** Mix-weighted VNB margin in Apr 2025 is **17.94%** vs 17.56% in Mar 2025 (+0.38pp), identical to the implied Agency channel margin. The margin movement is almost entirely a **mix** story: product-margin effect is **+$0.00pp** (margins constant), with mix effect +0.38pp — driven by Unit-Linked weight up (13%→15%, +0.50pp) and Term Life down (15%→12%, -0.30pp), per `mix` joined to `product` on `product_id`.\n\n**Reconciliation.** Segment total vs company total in `vnb_monthly` fully reconciles: max |residual| = $0.000000M over all 6 periods.\n\n",
+    "narrative": "**VNB in Apr 2025: $1.321M** on **$6.873M APE** (margin **19.2%**). That is **+$0.099M (+8.1%)** versus Mar 2025.\n\nThis figure comes from the **channel_monthly** table joined to **vnb_monthly** on month and reconciled to the segment table (max residual $0.000000M). The number sits across 3 segments, led by **Agency** at **$0.589M (44.6%)**.",
     "with_answer": "**VNB in Apr 2025: $1.32M on $6.87M APE (margin 19.2%).**\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 365 | 9.00 | 3.285 | 0.589 | 17.9% |\n| Banca | 178 | 13.00 | 2.314 | 0.504 | 21.8% |\n| Brokerage | 70 | 18.20 | 1.274 | 0.227 | 17.8% |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.589M (44.6%), which is where any explanation has to start.\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |\n\n\n### Why it moved — exact driver bridge\n\nThe ontology identity is applied per segment, so the effects add up to the reported move with **no residual** (residual $-0.000000M).\n\n| Segment | Active agents | Average productivity ($k) | VNB margin | Total change | From | To |\n|---|---|---|---|---|---|---|\n| Agency | +$0.030M | +$0.032M | +$0.012M | +$0.074M | $0.515M | $0.589M |\n| Banca | +$0.008M | +$0.008M | +$0.00",
-    "without_answer": "根据原始数据表 **VNB Monthly (company)**，2025年4月的总VNB为 **$1.32055M**（总APE为 $6.87299M，VNB利润率为 19.21%）。\n\n*（注意：这是公司层面的总额，来自 `vnb_monthly` 表；原始数据中该月也包含按渠道划分的详细信息，但仅凭表格本身，公司总额就是此数字。）*"
+    "without_answer": "Based on the uploaded data, the **total VNB for April 2025 is $1.32055M** (approximately **$1.32M**).\n\nThis figure comes directly from the `vnb_monthly` table's aggregate by month (2025-04: Total APE = $6.87299M, Total VNB = $1.32055M, VNB margin = 19.21%).\n\nAs a cross-check, the `channel_monthly` table for April 2025 lists an average VNB per channel of $0.440184M across the 3 channels (Agency, Banca, Brokerage). Summing those three channels gives $0.440184M × 3 = $1.320552M, which matches the company total — so the channel numbers do add up."
   },
   {
     "dimension": "Level",
@@ -59,10 +59,10 @@
       "identity": 1
     },
     "without": {
-      "chars": 477,
-      "numbers": 9,
+      "chars": 541,
+      "numbers": 10,
       "tables": true,
-      "rows_in_tables": 4,
+      "rows_in_tables": 5,
       "causal": 0,
       "stats": 0,
       "reconciled": 0,
@@ -75,21 +75,21 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 2,
+      "business_depth": 3,
       "logical_rigour": 0,
-      "data_linkage": 2,
+      "data_linkage": 4,
       "explainability": 1
     },
     "with_source": "rules+analysis",
     "with_chars": 3650,
-    "without_chars": 477,
+    "without_chars": 541,
     "reasoning_steps": 5,
     "findings": 9,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**Jan 2025 APE: $6.31M** (from `vnb_monthly`), split across channels via `channel_monthly`:\n\n| Channel | APE ($M) |\n|---|---|\n| Agency | $2.86M |\n| Banca | $2.23M |\n| Brokerage | $1.22M |\n\n**Where the number sits.** APE is spread across 3 segments; **Agency** contributes $2.86M (45.3%), which is where any explanation has to start.\n\n### Monthly trajectory\n\n| Month | APE | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $6.31M |  |  |\n| Feb 2025 | $6.53M | +$0.22M | +3.5% |\n| Mar 2025 | $6.40M | -$0.13M | -2.0% |\n| Apr 2025 | $6.87M | +$0.48M | +7.5% |\n| May 2025 | $6.70M | -$0.17M | -2.5% |\n| Jun 2025 | $7.42M | +$0.72M | +10.8% |\n\n\n### Why it moved — exact driver",
+    "narrative": "**Jan 2025 APE: $6.307M** (from `vnb_monthly`).\n\n**Where the number sits.** APE is spread across 3 channels; **Agency** contributes $2.856M (45.3%), which is where any explanation has to start.\n\n### Channel breakdown (from `channel_monthly`)\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 340 | 8.40 | 2.856 | 0.504 | 17.6% |\n| Banca | 174 | 12.80 | 2.227 | 0.486 | 21.8% |\n| Brokerage | 68 | 18.00 | 1.224 | 0.218 | 17.8% |\n\n**Reconciliation.** Sum of channel APE = $2.856M + $2.227M + $1.224M = **$6.307M**, matching the company total exactly (max residual $0.000000M over all 6 periods).",
     "with_answer": "**VNB in Jan 2025: $1.21M on $6.31M APE (margin 19.1%).**\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 340 | 8.40 | 2.856 | 0.504 | 17.6% |\n| Banca | 174 | 12.80 | 2.227 | 0.486 | 21.8% |\n| Brokerage | 68 | 18.00 | 1.224 | 0.218 | 17.8% |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.504M (41.7%), which is where any explanation has to start.\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |\n\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jan 2025 = **17.64%**.\n\nImplied channel margin = $0.504M ÷ $2.856M = **17.64%** — identical to the mix-weighted margin **17.64%**.\n\n### Agent cohorts behind the number\n\n**By churn-risk band**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 212 | 8.33 | $1.765M | +$1.7",
-    "without_answer": "Based on the uploaded data, the **total APE in January 2025 was $6.31M** (from the `vnb_monthly` table, which shows Total APE for 2025-01 as $6.31M).\n\nFor reference, the channel-level breakdown for January 2025 (from the `channel_monthly` table) was:\n\n| Channel | APE ($M) |\n|---|---|\n| Agency (CH001) | $2.86M |\n| Banca (CH002) | $2.23M |\n| Brokerage (CH003) | $1.22M |\n\nNote: The channel figures sum to $6.31M ($2.86 + $2.23 + $1.22), which matches the company total exactly."
+    "without_answer": "Based on the uploaded data, the **total APE in January 2025 was $6.31M** (from the `vnb_monthly` table, which shows Total APE of $6.30719M for 2025-01).\n\nFor reference, the channel-level breakdown for January 2025 (from the `channel_monthly` table) was:\n\n| Channel | APE ($M) |\n|---|---|\n| Agency (CH001) | $2.86M |\n| Banca (CH002) | $2.23M |\n| Brokerage (CH003) | $1.22M |\n| **Total** | **$6.31M** |\n\nNote: The channel figures sum to $6.31M, which matches the company total of $6.30719M (small rounding differences in the displayed values)."
   },
   {
     "dimension": "Level",
@@ -105,7 +105,7 @@
       "identity": 1
     },
     "without": {
-      "chars": 1680,
+      "chars": 1481,
       "numbers": 38,
       "tables": true,
       "rows_in_tables": 12,
@@ -128,14 +128,14 @@
     },
     "with_source": "rules+analysis",
     "with_chars": 3650,
-    "without_chars": 1680,
+    "without_chars": 1481,
     "reasoning_steps": 5,
     "findings": 9,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**VNB margin in Jan 2025: 19.1%** ($1.207M VNB ÷ $6.307M APE). It has been stable, drifting slightly upward over the six months.\n\n**Monthly trajectory (from `vnb_monthly`):**\n\n| Month | VNB margin |\n|---|---|\n| Jan 2025 | 19.1% |\n| Feb 2025 | 19.2% |\n| Mar 2025 | 19.1% |\n| Apr 2025 | 19.2% |\n| May 2025 | 19.1% |\n| Jun 2025 | 19.5% |\n\n**How it moved.** The margin stayed within a narrow 19.1%–19.5% band — a **+0.4pp** rise from Jan to Jun. The largest single move was **Jun 2025 (+0.4pp to 19.5%)**, driven by the strongest VNB month ($1.448M) on the highest APE ($7.423M).\n\n**By channel (Jan 2025, from `channel_monthly`):** Banca has the highest margin at **21.8%**, well above Agency (**17.6%**) and Brokerage (**17.8%**). The company-level margin is a blend of these channel margins weighted by APE.\n\n**What drives it.** The ontology traces margin through the product-mix chain: `product_mix` joined to `product` on `product_id` yields a mix-weighted VNB margin of **17.64%** for Agency in Jan 2025 — identical to Agency's implied channel margin ($0.504M ÷ $2.856M). This confirms the margin is a product-mix effect, not a channel pricing anomaly.",
+    "narrative": "**VNB margin in Jan 2025: 19.1%** ($1.207M VNB ÷ $6.307M APE). It has been stable, ranging from **19.1% to 19.5%** across the six months.\n\n### Monthly trajectory\n\n| Month | VNB margin |\n|---|---|\n| Jan 2025 | 19.1% |\n| Feb 2025 | 19.2% |\n| Mar 2025 | 19.1% |\n| Apr 2025 | 19.2% |\n| May 2025 | 19.1% |\n| Jun 2025 | 19.5% |\n\n**Where the margin sits.** The company margin is a blend of three channels, joined from `channel_monthly`:\n\n| Channel | VNB margin |\n|---|---|\n| Agency | 17.6% |\n| Banca | 21.8% |\n| Brokerage | 17.8% |\n\n**What drives it.** The **Banca** channel carries the highest margin at **21.8%**, pulling the company average up. The **mix-weighted VNB margin** in Jan 2025 was **17.64%** — identical to Agency's implied margin ($0.504M ÷ $2.856M), confirming the product mix (via `mix` joined to `product` on `product_id`) is the structural driver behind channel margins.\n\n**Movement.** The margin is essentially flat — the **+0.4pp** jump in Jun 2025 (19.1% → 19.5%) is the only notable move, driven by higher active-agent counts and productivity that month. No single factor dominates; the series is stable with low volatility.",
     "with_answer": "**VNB in Jan 2025: $1.21M on $6.31M APE (margin 19.1%).**\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 340 | 8.40 | 2.856 | 0.504 | 17.6% |\n| Banca | 174 | 12.80 | 2.227 | 0.486 | 21.8% |\n| Brokerage | 68 | 18.00 | 1.224 | 0.218 | 17.8% |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.504M (41.7%), which is where any explanation has to start.\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jan 2025 = **17.64%**.\n\nImplied channel margin = $0.504M ÷ $2.856M = **17.64%** — identical to the mix-weighted margin **17.64%**.\n\n### Agent cohorts behind the number\n\n**By churn-risk band**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 212 | 8.33 | $1.765M | +$1.765M | 61.8% |\n| Medium | 154 | 91 | 8.36 | $0.761M | +$0.761M | 26.6% |\n| High | 80 | 37 | 8.93 | $0.330M | +$0.330M | 11.6% |\n\n**By certification**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| All Products | 184 | 136 | 8.29 | $1.128M | +$1.128M | 39.",
-    "without_answer": "Based on the uploaded data, here is the VNB margin picture:\n\n## VNB Margin by Month (Company Total)\n\n| Month | Total APE ($M) | Total VNB ($M) | VNB margin |\n|---|---|---|---|\n| 2025-01 | 6.30719 | 1.2072 | 19.14% |\n| 2025-02 | 6.5293 | 1.25273 | 19.19% |\n| 2025-03 | 6.3965 | 1.22114 | 19.09% |\n| 2025-04 | 6.87299 | 1.32055 | 19.21% |\n| 2025-05 | 6.70019 | 1.28111 | 19.12% |\n| 2025-06 | 7.423 | 1.44801 | 19.51% |\n\n## Movement Analysis\n\n**Overall trend:** The margin has been relatively stable, ranging between **19.09% and 19.51%** over the six-month period — a spread of only 0.42 percentage points.\n\n**Key movements:**\n- **Jan → Feb:** +0.05 pp (19.14% → 19.19%)\n- **Feb → Mar:** −0.10 pp (19.19% → 19.09%) — lowest point\n- **Mar → Apr:** +0.12 pp (19.09% → 19.21%)\n- **Apr → May:** −0.09 pp (19.21% → 19.12%)\n- **May → Jun:** +0.39 pp (19.12% → 19.51%) — largest single-month jump, reaching the period high\n\n**June peak:** The 19.51% margin in June is the highest of the period, driven by VNB growing faster (+13.0% MoM) than APE (+10.8% MoM).\n\n## VNB Margin by Channel (from channel_monthly table)\n\n| Channel | Jan | Feb | Mar | Apr | May | Jun |\n|---|---|---|---|---|---|---|\n| Agency | 17.6"
+    "without_answer": "Based on the uploaded data, here's the VNB margin picture:\n\n## VNB Margin by Month (Company Total)\n\n| Month | Total APE ($M) | Total VNB ($M) | VNB Margin |\n|---|---|---|---|\n| 2025-01 | 6.307 | 1.207 | 19.14% |\n| 2025-02 | 6.529 | 1.253 | 19.19% |\n| 2025-03 | 6.397 | 1.221 | 19.09% |\n| 2025-04 | 6.873 | 1.321 | 19.21% |\n| 2025-05 | 6.700 | 1.281 | 19.12% |\n| 2025-06 | 7.423 | 1.448 | 19.51% |\n\n## Movement Analysis\n\n**Overall range:** 19.09% (Mar) to 19.51% (Jun) — a spread of only 0.42 percentage points.\n\n**Trend:**\n- **Jan → Feb:** +0.05pp (19.14% → 19.19%)\n- **Feb → Mar:** -0.10pp (19.19% → 19.09%) — lowest point\n- **Mar → Apr:** +0.12pp (19.09% → 19.21%)\n- **Apr → May:** -0.09pp (19.21% → 19.12%)\n- **May → Jun:** +0.39pp (19.12% → 19.51%) — largest single-month jump\n\n**Key observation:** The margin is relatively stable (within ~0.4pp) for the first five months, then jumps sharply in June to its highest level. The June increase (+0.39pp) is nearly as large as the entire prior range (0.42pp), suggesting a structural shift — possibly a change in product mix or channel performance in that month.\n\n## By Channel (June 2025, the peak month)\n\n| Channel | VNB Margin |\n|---|---|\n| Banca "
   },
   {
     "dimension": "Movement",
@@ -151,11 +151,11 @@
       "identity": 1
     },
     "without": {
-      "chars": 1126,
-      "numbers": 23,
+      "chars": 1291,
+      "numbers": 37,
       "tables": true,
-      "rows_in_tables": 12,
-      "causal": 0,
+      "rows_in_tables": 14,
+      "causal": 1,
       "stats": 0,
       "reconciled": 0,
       "identity": 0
@@ -174,14 +174,14 @@
     },
     "with_source": "rules+analysis",
     "with_chars": 3605,
-    "without_chars": 1126,
+    "without_chars": 1291,
     "reasoning_steps": 5,
     "findings": 9,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**VNB in Jan 2025: $1.21M on $6.31M APE (margin 19.1%).**\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 340 | 8.40 | 2.856 | 0.504 | 17.6% |\n| Banca | 174 | 12.80 | 2.227 | 0.486 | 21.8% |\n| Brokerage | 68 | 18.00 | 1.224 | 0.218 | 17.8% |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.504M (41.7%), which is where any explanation has to start.\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |",
+    "narrative": "**VNB in Jan 2025: $1.21M on $6.31M APE (margin 19.1%).**\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 340 | 8.40 | 2.856 | 0.504 | 17.6% |\n| Banca | 174 | 12.80 | 2.227 | 0.486 | 21.8% |\n| Brokerage | 68 | 18.00 | 1.224 | 0.218 | 17.8% |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.504M (41.7%), which is where any explanation has to start.\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jan 2025 = **17.64%**.\n\nImplied channel margin = $0.504M ÷ $2.856",
     "with_answer": "**Jun 2025 vs May 2025:** total VNB $1.28M to $1.45M (change $0.17M).\n\n| Driver | Effect on VNB |\n|---|---|\n| Active-agent effect | $0.06M |\n| Productivity effect | $0.07M |\n| Mix / margin effect | $0.04M |\n| **Total** | **$0.17M** |\n| *Reconciliation residual* | $-0.00M |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.504M (41.7%), which is where any explanation has to start.\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jan 2025 = **17.64%**.\n\nImplied channel margin = $0.504M ÷ $2.856M = **17.64%** — identical to the mix-weighted margin **17.64%**.\n\n### Agent cohorts behind the number\n\n**By churn-risk band**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 212 | 8.33 | $1.765M | +$1.765M | 61.8% |\n| Medium | 154 | 91 | 8.36 | $0.761M | +$0.761M | 26.6% |\n| High | 80 | 37 | 8.93 | $0.330M | +$0.330M | 11.6% |\n\n**By certification**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| All Products | 184 | 136 | 8.29 | $1.128M | +$1.128M | 39.5% |\n| Participating | 173 | 110 | 8.71 | $0.",
-    "without_answer": "Based on the raw data provided, here is the VNB margin comparison:\n\n## VNB Margin — April 2025 vs March 2025\n\n| Month | Total APE ($M) | Total VNB ($M) | VNB margin |\n|---|---|---|---|\n| **Mar 2025** | $6.40M | $1.22M | **19.09%** |\n| **Apr 2025** | $6.87M | $1.32M | **19.21%** |\n| **Change** | +$0.48M (+7.4%) | +$0.10M (+8.1%) | **+0.12 pp** |\n\n### Key observations\n\n1. **Margin improved slightly** — from 19.09% in March to 19.21% in April, an increase of **0.12 percentage points**.\n\n2. **VNB grew faster than APE** — VNB increased 8.1% while APE grew 7.4%, which is why the margin ticked up.\n\n3. **April was the strongest month so far in 2025** — both APE ($6.87M) and VNB ($1.32M) were the highest of the six months in the data.\n\n### Full 2025 trajectory (Jan–Jun)\n\n| Month | VNB margin | Change (pp) |\n|---|---|---|\n| Jan 2025 | 19.14% | — |\n| Feb 2025 | 19.19% | +0.05 |\n| Mar 2025 | 19.09% | −0.10 |\n| **Apr 2025** | **19.21%** | **+0.12** |\n| May 2025 | 19.12% | −0.09 |\n| Jun 2025 | 19.51% | +0.39 |\n\nThe margin has been relatively stable (range: 19.09%–19.51%), with April showing a modest improvement over March."
+    "without_answer": "Based on the uploaded data, here is the VNB margin movement across the available months (Jan–Jun 2025):\n\n| Month | Total APE ($M) | Total VNB ($M) | VNB margin |\n|---|---|---|---|\n| 2025-01 | 6.31 | 1.21 | 19.14% |\n| 2025-02 | 6.53 | 1.25 | 19.19% |\n| 2025-03 | 6.40 | 1.22 | 19.09% |\n| 2025-04 | 6.87 | 1.32 | 19.21% |\n| 2025-05 | 6.70 | 1.28 | 19.12% |\n| 2025-06 | 7.42 | 1.45 | 19.51% |\n\n**Month-over-month changes:**\n\n| Period | Margin change (pp) |\n|---|---|\n| Jan → Feb | +0.05 pp |\n| Feb → Mar | −0.10 pp |\n| Mar → Apr | +0.12 pp |\n| Apr → May | −0.09 pp |\n| May → Jun | +0.39 pp |\n\n**Key observations:**\n\n1. **Overall range is narrow** — the margin stayed between **19.09% and 19.51%** across all six months, a spread of only 0.42 percentage points.\n2. **June is the clear outlier** — at 19.51%, it is the highest margin in the period, driven by both the highest APE ($7.42M) and the highest VNB ($1.45M).\n3. **No sustained trend** — the margin oscillates up and down month to month, with no consistent upward or downward direction until the June jump.\n4. **April sits near the top** — at 19.21%, April is the second-highest margin month, just below June.\n\nIf you need a comparison against a "
   },
   {
     "dimension": "Movement",
@@ -197,14 +197,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 2900,
-      "numbers": 50,
-      "tables": true,
-      "rows_in_tables": 4,
-      "causal": 3,
+      "chars": 2198,
+      "numbers": 42,
+      "tables": false,
+      "rows_in_tables": 0,
+      "causal": 2,
       "stats": 0,
       "reconciled": 0,
-      "identity": 1
+      "identity": 0
     },
     "with_score": {
       "business_depth": 5,
@@ -213,21 +213,21 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 4,
+      "business_depth": 1,
       "logical_rigour": 0,
-      "data_linkage": 4,
-      "explainability": 3
+      "data_linkage": 2,
+      "explainability": 1
     },
     "with_source": "rules+analysis",
     "with_chars": 3932,
-    "without_chars": 2900,
+    "without_chars": 2198,
     "reasoning_steps": 5,
     "findings": 9,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "The $0.17M movement (May $1.28M → Jun $1.45M) is driven by the **productivity effect ($0.07M)** and the **active-agent effect ($0.06M)**, with the **mix/margin effect ($0.04M)** contributing least – and it is almost entirely an **Agency** story.\n\n**Channel breakdown (rule engine attribution):**\n\n| Channel | Active-agent | Productivity | Mix/margin | Total |\n|---|---|---|---|---|\n| Agency | $0.05M | $0.07M | $0.04M | **$0.15M** |\n| Banca | $0.01M | $0.00M | $0.00M | $0.01M |\n| Brokerage | $0.00M | $0.00M | $0.00M | $0.00M |\n| **All** | **$0.06M** | **$0.07M** | **$0.04M** | **$0.17M** |\n\n**Reasoning chain:**\n- **Dominant factor:** Productivity effect ($0.07M) is the largest single contributor, but the active-agent effect ($0.06M) is close behind. Together they explain **$0.13M** of the $0.17M.\n- **Dominant segment:** **Agency** accounts for **$0.15M (88%)** of the total movement – its productivity effect alone ($0.07M) matches the entire company-wide productivity effect.\n- **Provenance:** This attribution applies the ontology identity **VNB = Active agents × Avg productivity × VNB margin** per channel (structural edges from `channel_monthly`), so the three effects add exactly to the movement with no residual.\n- **Causal chain:** Agency active agents (operational, via `active_ratio`) and Agency average productivity (`avg_prod`) both rose, feeding through the structural identity to VNB. Banca and Brokerage contributed only $0.01M and $0.00M respectively, so they are not drivers ",
+    "narrative": "The **+$0.17M** movement (Jun vs May 2025) is driven almost entirely by the **Agency channel (+$0.15M)**, and within that, the **productivity effect (+$0.07M)** is the single largest driver.\n\n| Channel | Active-agent effect | Productivity effect | Mix/margin effect | Total change |\n|---|---|---|---|---|\n| Agency | $0.05M | $0.07M | $0.04M | **$0.15M** |\n| Banca | $0.01M | $0.00M | $0.00M | $0.01M |\n| Brokerage | $0.00M | $0.00M | $0.00M | $0.00M |\n| **All channels** | **$0.06M** | **$0.07M** | **$0.04M** | **$0.17M** |\n\n**Why this happens.** The ontology applies the identity **VNB = Active agents × Avg productivity × VNB margin** per channel (edges `e_agents_to_vnb`, `e_prod_to_vnb`, `e_margin_to_vnb` on `channel_monthly`), so the three effects add up exactly to the movement with no unexplained residual.\n\n- **Dominant factor:** **Productivity +$0.07M** — slightly ahead of the active-agent effect (+$0.06M) and mix/margin (+$0.04M). Agency's productivity effect alone (+$0.07M) equals the entire all-channel productivity effect, meaning that is where the momentum originates.\n- **Dominant segment:** **Agency** contributes $0.15M of the $0.17M total (88% of the movement). Banca adds only $0.01M and Brokerage $0.00M.\n- **Supporting context:** The monthly trajectory shows Jun 2025 at **$1.448M**, up **+$0.167M (+13.0%)** — the largest monthly jump in the series. The company-level reconciliation confirms max residual = $0.000000M over all 6 periods, so the attribution is clean.\n\nIn sh",
     "with_answer": "**Driver attribution — Jun 2025 versus May 2025.** Total VNB $1.28M to $1.45M ($0.17M).\nThe ontology identity **VNB = Active agents × Avg productivity × VNB margin** is applied per channel, so the three effects add up exactly to the movement (no unexplained residual).\n\n| Channel | Active-agent effect | Productivity effect | Mix / margin effect | Total change |\n|---|---|---|---|---|\n| Agency | $0.05M | $0.07M | $0.04M | $0.15M |\n| Banca | $0.01M | $0.00M | $0.00M | $0.01M |\n| Brokerage | $0.00M | $0.00M | $0.00M | $0.00M |\n| **All channels** | **$0.06M** | **$0.07M** | **$0.04M** | **$0.17M** |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.504M (41.7%), which is where any explanation has to start.\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jan 2025 = **17.64%**.\n\nImplied channel margin = $0.504M ÷ $2.856M = **17.64%** — identical to the mix-weighted margin **17.64%**.\n\n### Agent cohorts behind the number\n\n**By churn-risk band**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 212 | 8.33 | $1.765M | +$1.765M | 61.8% |\n| Medium | 154 | 91 | 8.",
-    "without_answer": "The movement in VNB between May and June 2025 is driven by **two clear forces**: a **volume increase** (more APE sold) and a **margin improvement** (higher VNB per dollar of APE).\n\n### Headline numbers\n| Metric | May 2025 | Jun 2025 | Change |\n|---|---|---|---|\n| Total APE ($M) | 6.70 | 7.42 | **+$0.72M (+10.8%)** |\n| Total VNB ($M) | 1.28 | 1.45 | **+$0.17M (+13.0%)** |\n| VNB margin | 19.12% | 19.51% | **+39 bps** |\n\nVNB grew faster than APE, meaning **both volume and margin contributed**.\n\n---\n\n### 1. Volume effect — more sales from existing channel structure\nFrom the channel monthly data:\n- **Registered agents stayed flat** at 780 (both months). The growth came from **activation**: active agents rose from **606 → 639** (+33, active ratio 82.25% → 85.00%).\n- **Average productivity per active agent** also rose from **$13.27k → $13.67k** (+$0.40k, +3.0%).\n\nRough decomposition of the $0.72M APE increase:\n- **Active-agent headcount effect:** +33 agents × $13.27k avg product. ≈ **+$0.44M**\n- **Productivity effect:** +$0.40k × 639 active agents ≈ **+$0.26M**\n- **Other (rounding)** ≈ **+$0.02M**\n\nSo roughly **60% of the APE lift came from more agents turning active**, and **~40% from hi"
+    "without_answer": "The VNB movement between **May 2025** and **June 2025** (+$0.167M, from $1.281M to $1.448M, a 13.0% increase) is driven by **two factors – APE volume growth and a margin improvement**. Here is the breakdown using the uploaded figures:\n\n### 1. Volume effect (APE growth) — explains ~83% of the movement\n- **Total APE** rose from **$6.70M** (May) to **$7.42M** (June) (+$0.72M, +10.8%).\n- This volume increase added approximately **$0.138M** of VNB (holding margin constant at May’s 19.12%).\n- Why did APE grow? Two measurable levers in the `channel_monthly` data:\n  - **Active agents** increased from **606** to **639** (+33 agents, +5.4%).\n  - **Average productivity** per agent rose from **$13.27k** to **$13.67k** (+$0.40k, +3.0%).\n  - The **active ratio** also improved from **82.25%** to **85.00%**, meaning more of the 780 registered agents became productive.\n\n### 2. Margin effect (mix improvement) — explains ~17% of the movement\n- The **overall VNB margin** improved from **19.12%** (May) to **19.51%** (June) (+0.39 percentage points).\n- This margin gain added approximately **$0.029M** of VNB (holding June’s APE constant).\n- A margin increase means the **product mix shifted towards higher"
   },
   {
     "dimension": "Movement",
@@ -243,14 +243,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 1259,
+      "chars": 1495,
       "numbers": 19,
       "tables": true,
-      "rows_in_tables": 9,
+      "rows_in_tables": 3,
       "causal": 3,
       "stats": 0,
       "reconciled": 0,
-      "identity": 0
+      "identity": 1
     },
     "with_score": {
       "business_depth": 5,
@@ -259,21 +259,21 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 4,
+      "business_depth": 2,
       "logical_rigour": 0,
       "data_linkage": 4,
       "explainability": 3
     },
     "with_source": "rules+analysis",
     "with_chars": 5769,
-    "without_chars": 1259,
+    "without_chars": 1495,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "Agency VNB grew by **+$0.153M** (from $0.561M to $0.714M) in June 2025. The dominant driver is **Average productivity ($k)** at **+$0.069M**, followed by **Active agents** at **+$0.047M** and **VNB margin** at **+$0.037M**.\n\n**Driver bridge.** Using the ontology identity **VNB = Active agents × Average productivity × VNB margin** applied per segment on the `channel_monthly` table, the Agency effects reconcile exactly to the reported move (residual $-0.000000M). The productivity effect is the largest factor (~45% of the move).\n\n**Margin contribution — a mix story.** The +$0.037M margin effect comes from product mix, not product-margin changes. Joining `mix` to `product` on `product_id`, the mix-weighted VNB margin for Agency rose from **17.71%** to **18.68%** (+0.97pp). The driver is **Unit-Linked** weight jumping from 14.0% to 21.0% (product margin 25.0%), while **Term Life** fell from 14.0% to 8.0% (margin 10.0%). Product margins stayed constant (+0.00pp effect).\n\n**Underlying cohort activity** (from `agent_monthly`): Agency productivity per active agent rose across cohorts — **High churn-risk agents** are the most productive at $10.16k, **All-Products certified** at $9.99k, and **48+ month tenure** at $9.89k — driving the productivity-led growth.",
+    "narrative": "**Agency VNB grew by +$0.153M in June 2025** (from $0.561M to $0.714M), and it is the main driver of the company's total +$0.167M move.\n\nApplying the ontology identity **VNB = Active agents × Average productivity ($k) × VNB margin** per channel (from `channel_monthly` joined to `agent_monthly` via `channel_id`), the bridge for Agency is:\n\n| Factor | Effect |\n|---|---|\n| **Average productivity ($k)** | **+$0.069M** |\n| Active agents | +$0.047M |\n| VNB margin | +$0.037M |\n| **Total Agency change** | **+$0.153M** |\n\n**Dominant factor:** **Average productivity ($k)** explains the largest share (+$0.069M), ahead of active agents (+$0.047M) and margin (+$0.037M). This maps to the upstream operational link `certification → avg_prod`: by cohort, **All Products** certified agents are the most productive at **$9.99k/agent**, followed by **48+ mo** tenure agents at **$9.89k/agent**.\n\n**Why the margin effect (+$0.037M) exists:** it is almost entirely a **product-mix story**, not a pricing story. The mix-weighted VNB margin for Agency rose from **17.71%** (May) to **18.68%** (Jun) — **+0.97pp**. Joining `mix` to `product` on `product_id` shows the mix effect is **+0.97pp** while the product-margin effect is **+0.00pp** (product margins are constant). The shift is driven by **Unit-Linked** weight rising from **14.0% → 21.0%** (high 25.0% margin, +1.75pp) and **Term Life** falling from **14.0% → 8.0%** (low 10.0% margin, −0.60pp). So the margin lift comes from selling more high-margin Unit-",
     "with_answer": "**Driver attribution — Jun 2025 versus May 2025.** Total VNB $1.28M to $1.45M ($0.17M).\nThe ontology identity **VNB = Active agents × Avg productivity × VNB margin** is applied per channel, so the three effects add up exactly to the movement (no unexplained residual).\n\n| Channel | Active-agent effect | Productivity effect | Mix / margin effect | Total change |\n|---|---|---|---|---|\n| Agency | $0.05M | $0.07M | $0.04M | $0.15M |\n| Banca | $0.01M | $0.00M | $0.00M | $0.01M |\n| Brokerage | $0.00M | $0.00M | $0.00M | $0.00M |\n| **All channels** | **$0.06M** | **$0.07M** | **$0.04M** | **$0.17M** |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** The move is carried by **Agency** (+$0.153M); decomposing the identity Active agents × Average productivity ($k) × VNB margin shows **Average productivity ($k)** explains +$0.074M and **Active agents** +$0.056M.\n\n### Why it moved — exact driver bridge\n\nThe ontology identity is applied per segment, so the effects add up to the reported move with **no residual** (residual $-0.000000M).\n\n| Segment | Active agents | Average productiv",
-    "without_answer": "The raw uploaded data does **not** contain the channel-specific (Agency / CH001) VNB figures for May and June 2025. The `channel_monthly` table shows:\n\n- Sample rows only for **January 2025** (e.g., Agency VNB $0.50M on $2.86M APE, margin 17.6%).\n- Monthly aggregates across **all three channels combined** (Agency, Banca, Brokerage) — these are averages, not Agency-only values.\n\nTherefore I cannot isolate why **Agency** VNB specifically grew in June.\n\nWhat the data *does* show for the whole company (from `vnb_monthly`):\n\n| Metric | May 2025 | June 2025 |\n|---|---|---|\n| Total APE | $6.70M | $7.42M |\n| Total VNB | $1.28M | $1.45M |\n| VNB margin | 19.12% | 19.51% |\n\nAnd from `channel_monthly` monthly aggregates (averaged over all 3 channels):\n\n| Metric | May 2025 | June 2025 |\n|---|---|---|\n| Active agents (sum) | 606 | 639 |\n| Avg productivity ($k) | 13.27 | 13.67 |\n| VNB margin (avg) | 19.10% | 19.43% |\n\nOverall, the company's VNB growth is attributable to more active agents, higher productivity, and a slightly better margin — but since the data lacks per-channel rows for May/June, I cannot tell you how much of this came specifically from Agency. If you can provide the CH001 rows fo"
+    "without_answer": "Based strictly on the uploaded data, the most direct, measurable driver of Agency (CH001) VNB growth in June 2025 is a **large increase in agent productivity**.\n\n**Evidence from `agent_monthly` (all 500 agents belong to CH001/Agency):**\n\n| Month | Average productivity ($k) | Total APE for Agency (500 agents) |\n|---|---|---|\n| 2025-05 | 6.33598 | 500 × 6.33598 = **$3.168M** |\n| 2025-06 | 7.64401 | 500 × 7.64401 = **$3.822M** |\n\n→ That's a **+$0.65M APE increase** (+20.6%) month-over-month for Agency.\n\n**Secondary contributing signal:** The overall company VNB margin (from `vnb_monthly`) rose from 19.12% in May to 19.51% in June, which would amplify the VNB generated on the higher APE. However, we don't have the exact Agency-specific margin for June in the uploaded data.\n\n**Important limitation:** The uploaded `channel_monthly` table contains 18 rows (3 channels × 6 months), but only the **January 2025** rows are shown in the sample. The May and June per-channel rows (including Agency's exact VNB and active-agent counts) are **not available** in the provided data. Therefore, I cannot precisely quantify the split between active-agent effect, productivity effect, and mix/margin effect "
   },
   {
     "dimension": "Mix",
@@ -289,14 +289,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 2294,
-      "numbers": 44,
+      "chars": 994,
+      "numbers": 22,
       "tables": true,
-      "rows_in_tables": 7,
+      "rows_in_tables": 6,
       "causal": 3,
       "stats": 0,
       "reconciled": 0,
-      "identity": 1
+      "identity": 0
     },
     "with_score": {
       "business_depth": 4,
@@ -312,14 +312,14 @@
     },
     "with_source": "analysis",
     "with_chars": 5381,
-    "without_chars": 2294,
+    "without_chars": 994,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "The Agency VNB margin is driven by the **product mix** — the mix-weighted margin is **18.68%** in Jun 2025, up **+0.97pp** from 17.71% in May 2025. This comes from the `mix` table joined to `product` on `product_id` (via `channel_has_mix` and `mix_refers_product`), feeding the `mix-weighted VNB margin` that blends into the channel margin.\n\nThe single largest mix shift is **Unit-Linked** (14.0% → 21.0%, **+1.75pp**), the highest-margin product at 25.0%. Offsetting that are **Term Life** (14.0% → 8.0%, **-0.60pp**) and **Participating Life** (67.0% → 66.0%, **-0.18pp**). Universal Life is flat at 5.0%.\n\n| Product | Weight from → to | Product VNB margin | Mix effect |\n|---|---|---|---|\n| Unit-Linked | 14.0% → 21.0% | 25.0% | +1.75pp |\n| Term Life | 14.0% → 8.0% | 10.0% | -0.60pp |\n| Participating Life | 67.0% → 66.0% | 18.0% | -0.18pp |\n| Universal Life | 5.0% → 5.0% | 15.0% | +0.00pp |\n| **Total mix effect** | | | **+0.97pp** |\n\nProduct margins are constant (product-margin effect **+0.00pp**), so the margin movement is **entirely a mix story** — the shift toward higher-margin Unit-Linked dominates.",
+    "narrative": "The Agency VNB margin in Jun 2025 is **18.68%** — and it is driven almost entirely by **product mix**, not by product-margin changes. The ontology joined `mix` to `product` on `product_id`, then blended the weights into the channel margin via `channel_monthly`.\n\n**Proof:** Agency VNB of **$0.714M** on **$3.822M** APE gives an implied margin of **18.68%**, identical to the mix-weighted margin of **18.68%**. Versus May 2025, the margin rose **+0.97pp** — all from mix (**+0.97pp**), with product-margin effect **+0.00pp** (product margins are constant).\n\n| Product | Weight May → Jun | Product VNB margin | Mix effect |\n|---|---|---|---|\n| Unit-Linked | 14.0% → 21.0% | 25.0% | **+1.75pp** |\n| Term Life | 14.0% → 8.0% | 10.0% | -0.60pp |\n| Participating Life | 67.0% → 66.0% | 18.0% | -0.18pp |\n| Universal Life | 5.0% → 5.0% | 15.0% | +0.00pp |\n| **Total mix effect** | | | **+0.97pp** |\n\nSo the dominant driver is the **Unit-Linked** weight shift (+1.75pp), which more than offsets the drag from Term Life and Participating Life. **Participating Life** still carries the largest weighted contribution (66.0% weight × 18.0% product margin), but it is the **mix shift toward Unit-Linked** that explains the margin movement.",
     "with_answer": "**Jun 2025 — VNB $1.448M on $7.423M APE (margin 19.5%).** That is +$0.167M (+13.0%) versus May 2025.\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** The mix-weighted margin is **18.68%**, and **Participating Life** carries the largest weighted contribution (66.0% weight × 18.0% product margin). Versus May 2025 that is +0.97pp, of which +0.97pp comes from **mix** and +0.00pp from product margins.\nThe single largest mix shift is **Unit-Linked** (14.0% → 21.0%, +1.75pp).\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jun 2025 = **18.68%** vs 17.71% in May 2025 (+0.97pp).\n\nImplied channel margin = $0.714M ÷ $3.822M = **18.68%** — identical to the mix-weighted margin **18.68%**.\n\n| Product | Weight from → to | Product VNB margin | Mix effect | Product-margin effect |\n|---|---|---|---|---|\n| Unit-Linked | 14.0% → 21.0% | 25.0% | +1.75pp | +0.00pp |\n| Term Life | 14.0% → 8.0% | 10.0% | -0.60pp | +0.00pp |\n| Participating Life | 67.0% → 66.0% | 18.0% | -0.18pp | +0.00pp |\n| Universal Life | 5.0% → 5.0% | 15.0% | +0.00pp | +0.00pp |\n\nTotal mix effect *",
-    "without_answer": "Based on the raw data provided, I can calculate the **product-mix-weighted VNB margin** for the Agency channel (CH001) for each month. Here's what drives it:\n\n---\n\n## Product Mix-Weighted VNB Margin — Agency (CH001)\n\nUsing the formula: **Σ (Product weight × Product VNB margin)** from the `mix` and `product` tables:\n\n| Month | Term Life (P001, 10%) | Participating (P002, 18%) | Unit-Linked (P003, 25%) | Universal Life (P004, 20%) | **Mix-Weighted Margin** |\n|---|---|---|---|---|---|\n| 2025-01 | 14% × 10% = 1.4% | 68% × 18% = 12.24% | 13% × 25% = 3.25% | 5% × 20% = 1.0% | **17.89%** |\n| 2025-02 | (mix data not shown) | | | | — |\n| 2025-03 | (mix data not shown) | | | | — |\n| 2025-04 | (mix data not shown) | | | | — |\n| 2025-05 | (mix data not shown) | | | | — |\n| 2025-06 | (mix data not shown) | | | | — |\n\n---\n\n## Key Drivers of Agency VNB Margin\n\n1. **Participating Life (P002)** is the dominant driver — it holds **68% of channel APE** in Jan 2025 and carries an **18% VNB margin**. This single product contributes **12.24 percentage points** of the 17.89% mix-weighted margin.\n\n2. **Unit-Linked (P003)** has the **highest margin (25%)** but only a **13% weight** — contributing 3.25 poin"
+    "without_answer": "The Agency VNB margin is driven by the **product mix** in the `mix` table (CH001 = Agency). It is a **weighted average** of each product’s VNB margin, using the product’s share of channel APE.\n\nFrom the available data (January 2025 mix, which matches the Agency margin in `channel_monthly`):\n\n| Product | Share of Agency APE | Product VNB margin | Contribution |\n|---|---|---|---|\n| Participating Life (P002) | 68% | 18.0% | 12.24 pts |\n| Term Life (P001) | 14% | 10.0% | 1.40 pts |\n| Unit-Linked (P003) | 13% | 25.0% | 3.25 pts |\n| Universal Life (P004) | 5% | 15.0% | 0.75 pts |\n| **Total** | **100%** | | **17.64%** |\n\nThis matches the Agency VNB margin shown in `channel_monthly` (17.6%).\n\n**So the main driver is Participating Life**: it has a large 68% share and a solid 18% margin. Unit-Linked has the highest margin (25%) but only a 13% share, so it contributes less. The exact June mix weights are not shown in the visible rows, but the same mix-weighting logic applies to every month."
   },
   {
     "dimension": "Mix",
@@ -335,14 +335,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 771,
-      "numbers": 6,
+      "chars": 434,
+      "numbers": 12,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
       "reconciled": 0,
-      "identity": 0
+      "identity": 1
     },
     "with_score": {
       "business_depth": 4,
@@ -351,21 +351,21 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 0,
+      "business_depth": 1,
       "logical_rigour": 0,
-      "data_linkage": 0,
+      "data_linkage": 2,
       "explainability": 1
     },
     "with_source": "rules+analysis",
     "with_chars": 5599,
-    "without_chars": 771,
+    "without_chars": 434,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**Participating Life** carries the most VNB weight at **66.0%** of Agency APE in Jun 2025, earning a **18.0%** product VNB margin.\n\nVia the `mix` table joined to `product` on `product_id`, the weight shifted slightly from 67.0% in May to 66.0% in Jun, while its product margin stayed constant at 18.0%. That makes its weighted contribution 66.0% × 18.0% = **11.9pp** of the Agency mix-weighted margin of **18.68%** — the largest single contributor. The margin itself did not move (product-margin effect +0.00pp); the mix effect for Participating Life was only **-0.18pp**.",
+    "narrative": "**Participating Life** carries the largest weighted contribution to the Agency mix-weighted VNB margin: **66.0% weight × 18.0% product margin**.\n\nThis comes from the **mix table joined to product on product_id**: Participating Life (P002) has a product VNB margin of **18.0%** and holds a **66.0%** share of channel APE in Jun 2025. Its weighted contribution is therefore **11.88pp** of the total mix-weighted margin of **18.68%**.\n\nThe next largest contributors are **Unit-Linked** (21.0% × 25.0% = 5.25pp) and **Term Life** (8.0% × 10.0% = 0.80pp), with **Universal Life** at 5.0% × 15.0% = 0.75pp.",
     "with_answer": "**VNB in Jun 2025: $1.45M on $7.42M APE (margin 19.5%).**\n\n| Channel | Active agents | Avg productivity ($k) | APE ($M) | VNB ($M) | VNB margin |\n|---|---|---|---|---|---|\n| Agency | 390 | 9.80 | 3.822 | 0.714 | 18.7% |\n| Banca | 179 | 13.00 | 2.327 | 0.507 | 21.8% |\n| Brokerage | 70 | 18.20 | 1.274 | 0.227 | 17.8% |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** The mix-weighted margin is **18.68%**, and **Participating Life** carries the largest weighted contribution (66.0% weight × 18.0% product margin). Versus May 2025 that is +0.97pp, of which +0.97pp comes from **mix** and +0.00pp from product margins.\nThe single largest mix shift is **Unit-Linked** (14.0% → 21.0%, +1.75pp).\n\n### Product-mix proof (cross-table join)\n\nMix-weighted VNB margin in Jun 2025 = **18.68%** vs 17.71% in May 2025 (+0.97pp).\n\nImplied channel margin = $0.714M ÷ $3.822M = **18.68%** — identical to the mix-weighted margin **18.68%**.\n\n| Product | Weight from → to | Product VNB margin | Mix effect | Product-margin effect |\n|---|---|---|---|---|\n| Unit-Linked | 14.0% → 21.0% | 25.0% | +1.75p",
-    "without_answer": "Based on the raw uploaded data, the product that carries the largest share of channel APE (the closest available indicator of \"VNB weight\", since VNB is not explicitly broken down by product) is **Participating Life (P002)**.\n\n- **Share of channel APE (weight):** 68.0% — this is the maximum value recorded in the Product Mix Monthly table (column profile shows max 68.00%) and appears in the sample row for 2025-01.\n- **VNB margin (earned):** **18.0%** — as per the Product Master table for P002.\n\nNote: The data does not contain a direct product-level VNB figure, so \"VNB weight\" is interpreted here as the product's share of channel APE (the `weight` field in the `mix` table), which is the only link between products and VNB-related revenue available in the raw data."
+    "without_answer": "**Participating Life (P002)** carries the most VNB weight.\n\n- **Share of channel APE:** 68% in Jan 2025 (and 66% in Jun 2025 per the mix data)\n- **Product VNB margin:** 18.0%\n\nSo its contribution to VNB is roughly **69% of the channel’s VNB** in Jan 2025 (68% × 18% ÷ 17.64% weighted margin), or about **64%** in Jun 2025.\n\nUnit-Linked has a higher margin (25%) but a much smaller weight (13–21%), so it is second in VNB contribution."
   },
   {
     "dimension": "Cohort",
@@ -381,8 +381,8 @@
       "identity": 1
     },
     "without": {
-      "chars": 1327,
-      "numbers": 9,
+      "chars": 828,
+      "numbers": 8,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 2,
@@ -404,14 +404,14 @@
     },
     "with_source": "analysis",
     "with_chars": 5273,
-    "without_chars": 1327,
+    "without_chars": 828,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**Direct answer.** No cohort is shrinking — the **High** churn-risk band is the weakest contributor, adding only **+$0.131M APE** (13.0% of APE). The drag is **headcount efficiency**, not a decline.\n\n**Cohort evidence.** From `agent_master` joined to `agent_monthly` on `agent_id` (via `agent_reports_monthly`), split by churn-risk band:\n\n| Cohort | Agents | Active | APE ($M) | Δ APE |\n|---|---|---|---|---|\n| Low | 266 | 232 | $2.266M | +$0.353M |\n| Medium | 154 | 109 | $1.058M | +$0.170M |\n| **High** | **80** | **49** | **$0.498M** | **+$0.131M** |\n\n**Why High drags.** High earns $0.498M APE from 49 active agents at **$10.16k** productivity — actually the *most productive* band of the three. The bottleneck is activation: **only 49 of 80 registered agents are active (61%)**. Per the ontology graph, this follows the operational chain **Churn risk → Active ratio → Active agents** (`e_churn_to_ratio`, `e_ratio_to_agents`).\n\n**Causal story.** High churn risk → lower active ratio → fewer active agents → smallest APE contribution (13.0% share). This is an activation problem, not a productivity or volume problem — all cohorts grew, and High is the most productive per active agent. The ontology confirms exactly this: High is the most productive cohort ($10.16k per active agent), so the drag is purely headcount efficiency.",
+    "narrative": "**No cohort is dragging VNB down — all churn-risk bands grew in June 2025.** The weakest contributor is the **High risk** band: +$0.131M APE, only 13.0% of total APE, with **49 active of 80 agents**. The drag is headcount efficiency, not a decline.\n\n| Churn-risk band | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 232 | 9.77 | $2.266M | +$0.353M | 59.3% |\n| Medium | 154 | 109 | 9.71 | $1.058M | +$0.170M | 27.7% |\n| High | 80 | 49 | 10.16 | $0.498M | +$0.131M | 13.0% |\n\nThe High band is actually the **most productive per active agent** ($10.16k), but only 61% of its agents are active — so it contributes the least APE. This comes from the **agent master joined to agent_monthly** on agent_id, grouped by churn-risk band. No cohort shrank; the story is under-activation in High risk, not falling output.",
     "with_answer": "**Jun 2025 — VNB $1.448M on $7.423M APE (margin 19.5%).** That is +$0.167M (+13.0%) versus May 2025.\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** No churn band is shrinking — all cohorts grew. The weakest contribution is **High** risk at +$0.131M APE (13.0% of APE, 49 active of 80 agents). The real drag is headcount efficiency in the High band, not a decline.\n\n### Agent cohorts behind the number\n\n**By churn-risk band**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 232 | 9.77 | $2.266M | +$0.353M | 59.3% |\n| Medium | 154 | 109 | 9.71 | $1.058M | +$0.170M | 27.7% |\n| High | 80 | 49 | 10.16 | $0.498M | +$0.131M | 13.0% |\n\n**By certification**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| All Products | 184 | 145 | 9.99 | $1.448M | +$0.258M | 37.9% |\n| Participating | 173 | 136 | 9.84 | $1.338M | +$0.245M | 35.0% |\n| Term Only | 92 | 65 | 9.69 | $0.630M | +$0.078M | 16.5% |\n| Unit-Linked | 51 | 44 | 9.23 | $0.406M | +$0.073",
-    "without_answer": "Based on the uploaded data, **I cannot determine which agent cohort is dragging VNB down**, because the data does not contain VNB at the agent or cohort level.\n\n**Here is what the uploaded data actually contains:**\n\n- **VNB figures exist only at two levels:**\n  1. Channel-month level (`channel_monthly` — for CH001 Agency, CH002 Banca, CH003 Brokerage).\n  2. Company-month level (`vnb_monthly`).\n\n- **Agent-level data** (`agent_master`, `agent_monthly`) contains productivity (`prod`) and APE (`ape`) per agent, but **no VNB column** for agents.\n\n- **Cohort fields exist** (e.g., `certification`, `churn_risk`, `join_date` in `agent_master`), but the uploaded data provides **no aggregated VNB, APE, or productivity breakdown by any of these cohorts**. The only aggregates given are:\n  - Overall averages across all 500 agents/3000 rows (avg productivity 6.36 $k, avg APE 0.006 $M).\n  - Month-level aggregates for the whole agent base.\n\nBecause VNB is not mapped to individual agents or cohorts in these tables, attributing VNB movement to a specific certificate type, churn-risk group, or tenure cohort would require inventing a business rule that does not exist in the raw data — which I am not pe"
+    "without_answer": "Based on the uploaded data, the only cohort I can identify as dragging VNB down is the **inactive-agent cohort** in the Agency channel.\n\n- In Jun 2025, Agency had **500 registered agents** but only **390 active** → **110 inactive agents**.\n- Those 110 agents produced **zero APE/VNB**.\n- If they had been active at the Agency average productivity of **$9.8k**, they would have added roughly **$1.08M APE** and, at Agency’s 18.7% VNB margin, about **$0.20M VNB**.\n\nSo the inactive agents are a clear drag on Agency VNB.\n\n**Important limitation:** The uploaded data does **not** contain agent-level VNB or product mix per agent. Therefore I cannot directly attribute VNB drag to cohorts by join date, certification, or churn risk — those attributes exist in the Agent Master, but they are not linked to VNB in the tables provided."
   },
   {
     "dimension": "Cohort",
@@ -427,11 +427,11 @@
       "identity": 1
     },
     "without": {
-      "chars": 1145,
-      "numbers": 3,
+      "chars": 1185,
+      "numbers": 4,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 0,
+      "causal": 1,
       "stats": 0,
       "reconciled": 0,
       "identity": 0
@@ -450,14 +450,14 @@
     },
     "with_source": "rules+analysis",
     "with_chars": 5446,
-    "without_chars": 1145,
+    "without_chars": 1185,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**High churn-risk agents are more productive per active agent but far less efficient in headcount, so they contribute the least absolute VNB.**\n\n| Cohort | Agents | Active | Active ratio | Avg productivity ($k) | APE ($M) | Δ APE |\n|---|---|---|---|---|---|---|\n| Low | 266 | 232 | 87.2% | 9.77 | $2.266M | +$0.353M |\n| High | 80 | 49 | 61.3% | 10.16 | $0.498M | +$0.131M |\n\n**Direct answer.** The **High** cohort has the best productivity at **$10.16k per active agent** (vs **$9.77k** for Low), but only **49 of 80** agents are active (61.3%) versus **232 of 266** for Low (87.2%). That active-ratio drag limits High to **$0.498M** APE (13.0% share) versus **$2.266M** for Low (59.3% share).\n\n**The causal story.** The active ratio (an OPERATIONAL driver: `churn_risk -> active_ratio -> active_agents`) is the limiting factor for the High band — productivity doesn't need fixing, activation does. High still grew +$0.131M in June, so it isn't declining; it's simply under-deployed. Low remains the workhorse, adding +$0.353M.",
+    "narrative": "**High churn-risk agents are actually the most productive per head**, but they drag volume because far fewer are active.\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 232 | 9.77 | $2.266M | +$0.353M | 59.3% |\n| High | 80 | 49 | 10.16 | $0.498M | +$0.131M | 13.0% |\n\n**Direct comparison.** High-risk agents earn a higher productivity index (**$10.16k** per active agent vs **$9.77k** for Low), so on a per-agent basis they are *not* the drag. The gap is structural: High has only **49 active of 80** agents (61% activation), versus **232 active of 266** (87%) for Low. That lower active ratio − via the ontology edge `churn_risk → active_ratio` (OPERATIONAL) → `active_agents` → VNB − caps their APE at **$0.498M** vs **$2.266M** for Low, and their APE share at just **13.0%** vs **59.3%**.\n\n**Where the analysis stands.** Both cohorts grew (High +$0.131M, Low +$0.353M), so neither is contracting. The real story is **activation/headcount**, not productivity: High is the most productive cohort in the company, but its low active ratio limits the contribution. This is consistent with the driver bridge — the dominant effect is **Average productivity ($k)** (+$0.074M) across all segments, with **Active agents** second (+$0.056M), and churn-risk feeds the latter.",
     "with_answer": "**Jun 2025 vs May 2025:** total VNB $1.28M to $1.45M (change $0.17M).\n\n| Driver | Effect on VNB |\n|---|---|\n| Active-agent effect | $0.06M |\n| Productivity effect | $0.07M |\n| Mix / margin effect | $0.04M |\n| **Total** | **$0.17M** |\n| *Reconciliation residual* | $-0.00M |\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** No churn band is shrinking — all cohorts grew. The weakest contribution is **High** risk at +$0.131M APE (13.0% of APE, 49 active of 80 agents). The real drag is headcount efficiency in the High band, not a decline.\n\n### Agent cohorts behind the number\n\n**By churn-risk band**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| Low | 266 | 232 | 9.77 | $2.266M | +$0.353M | 59.3% |\n| Medium | 154 | 109 | 9.71 | $1.058M | +$0.170M | 27.7% |\n| High | 80 | 49 | 10.16 | $0.498M | +$0.131M | 13.0% |\n\n**By certification**\n\n| Cohort | Agents | Active | Avg productivity ($k) | APE ($M) | Δ APE | Share |\n|---|---|---|---|---|---|---|\n| All Products | 184 | 145 | 9.99 | $1.448M | +$0.258M | 37.9% |\n| P",
-    "without_answer": "The uploaded data does **not** contain a direct comparison or aggregate breakdown for High vs Low churn-risk agents. It only shows:\n\n- **`agent_master`**: defines `churn_risk` (High, Low, Medium) and a `base_productivity_index` per agent (overall avg 1.00976, min 0.45, max 1.6872) — but **no aggregate statistics** (counts, average productivity, APE) per churn-risk level.\n- **`agent_monthly`**: contains productivity and APE per agent per month, but **no grouping or summarization by churn risk** is provided in the uploaded tables.\n\nTo compare High vs Low churn-risk agents, I would need to join `agent_monthly` to `agent_master` and aggregate by `churn_risk`, but that aggregation is **not present** in the raw data you supplied.\n\nThe only concrete data points available are:\n- `churn_risk` categories exist (High, Low, Medium) in `agent_master`.\n- The overall `base_productivity_index` (avg 1.00976) is for **all agents combined**, not split by risk level.\n\nI cannot state a numeric comparison (e.g., average productivity, APE, or VNB contribution) between High and Low churn-risk agents — that information is absent from the uploaded data."
+    "without_answer": "Based on the raw data you uploaded, I **cannot** compare high vs. low churn-risk agents directly, because the data does not include a breakdown by churn-risk for productivity, APE, VNB, or activity.\n\nWhat I *do* see in the tables:\n\n- The **`agent_master`** table has the `churn_risk` field (High, Low, Medium) and a `base_productivity_index` field. However, the column profile only gives the average across **all** 500 agents (avg = 1.00976), and the sample rows (3 of 500) are not authoritative for a high-vs-low comparison.\n- The **`agent_monthly`** table (3000 rows) contains `prod` and `ape` per agent per month, but it does **not** include the `churn_risk` field. The aggregates shown are only by month, not by churn-risk.\n- There is no uploaded table that joins `agent_master` with `agent_monthly` or `channel_monthly` to produce churn-risk-level productivity or VNB figures.\n\nTo answer your question precisely, I would need a table (or a pre-computed aggregate) that groups agents by `churn_risk` and shows their total or average productivity/APE/VNB. That information is not present in the uploaded data, so I cannot state which group performs better or worse without guessing."
   },
   {
     "dimension": "Trend",
@@ -473,13 +473,13 @@
       "identity": 1
     },
     "without": {
-      "chars": 1972,
-      "numbers": 38,
+      "chars": 1804,
+      "numbers": 53,
       "tables": true,
-      "rows_in_tables": 5,
-      "causal": 4,
+      "rows_in_tables": 7,
+      "causal": 1,
       "stats": 0,
-      "reconciled": 1,
+      "reconciled": 0,
       "identity": 0
     },
     "with_score": {
@@ -489,21 +489,21 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 4,
-      "logical_rigour": 2,
+      "business_depth": 3,
+      "logical_rigour": 0,
       "data_linkage": 4,
-      "explainability": 3
+      "explainability": 1
     },
     "with_source": "analysis",
     "with_chars": 5175,
-    "without_chars": 1972,
+    "without_chars": 1804,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**The last six months show a clear upward drift — +$0.040M/month (R²=0.71) — with accelerating momentum (+$0.123M, +10.0% in the last 3 vs first 3 months).**\n\n| Month | VNB | Change % |\n|---|---|---|\n| Jan 2025 | $1.207M | |\n| Feb 2025 | $1.253M | +3.8% |\n| Mar 2025 | $1.221M | -2.5% |\n| Apr 2025 | $1.321M | +8.1% |\n| May 2025 | $1.281M | -3.0% |\n| Jun 2025 | $1.448M | +13.0% |\n\nThe **June move (+$0.167M, z=+2.07)** is the outlier that sets the pace, and it is driven by the **Agency** segment (+$0.153M of the total). The largest single factor is **Average productivity** (+$0.074M), followed by **Active agents** (+$0.056M), then **VNB margin** (+$0.037M) — all reconciled to zero residual across the 6 periods (max residual $0.000000M).\n\n**Product mix is the margin story.** The mix-weighted margin rose to **18.68%** from 17.71% (+0.97pp), driven almost entirely by the **mix effect** (+0.97pp) while product margins stayed flat (+0.00pp). This comes from `mix` joined to `product` on `product_id`: **Unit-Linked** weight jumped from 14.0% to 21.0% (mix effect +1.75pp, margin 25.0%), while Term Life fell from 14.0% to 8.0% (−0.60pp).\n\n**Behind the productivity uplift in Agency:** the most productive cohorts are **High churn-risk** ($10.16k/agent), **All Products certified** ($9.99k/agent), and **48+ months tenure** ($9.89k/agent). The active ratio also improved to **85.0%** in June (from 82.3% in May), lifting the active-agent tail.\n\nSo the trend is not one thing: it is Agency's prod",
+    "narrative": "**The six-month trend is an upward drift driven mainly by Agency productivity gains, with a supportive product-mix shift — not by margin expansion.**\n\n**Monthly trajectory.** VNB rose from $1.207M (Jan) to $1.448M (Jun), with a clear upward drift of **+$0.040M/month** (R² = 0.71) and accelerating momentum: last 3 months vs first 3 months are **+$0.123M (+10.0%)**. The Jun jump is an outlier move (z = +2.07).\n\n**Driver bridge (channel_monthly joined to vnb_monthly, reconciled to $0 residual).** The +$0.167M move from May to Jun decomposes as:\n\n| Factor | Effect |\n|---|---|\n| Average productivity ($k) | **+$0.074M** |\n| Active agents | +$0.056M |\n| VNB margin | +$0.037M |\n| **Total** | **+$0.167M** |\n\n**Agency** leads the move (+$0.153M of the +$0.167M). The dominant factor is **Average productivity ($k)** (+$0.074M), ahead of **Active agents** (+$0.056M) and margin (+$0.037M).\n\n**Product-mix proof (mix joined to product on product_id).** Product margins are constant, so the margin lift is a mix story: mix-weighted VNB margin rose **+0.97pp** (17.71% → 18.68%). The driver is **Unit-Linked** shifting from 14.0% → 21.0% of channel APE (25.0% margin, +1.75pp), partly offset by Term Life (−0.60pp) and Participating Life (−0.18pp).\n\n**Cohort context.** The productivity gain is broad-based: **High churn-risk** agents are the most productive ($10.16k/active), **All Products** certified agents lead ($9.99k), and **48+ month** tenure leads ($9.89k). So the trend is not a mix of weaker a",
     "with_answer": "**Jun 2025 — VNB $1.448M on $7.423M APE (margin 19.5%).** That is +$0.167M (+13.0%) versus May 2025.\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** The series has a clear upward drift — +$0.040M / month, R² = 0.71 — and momentum is accelerating (+$0.123M (+10.0%)).\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |\n\n\n### Statistical diagnostics\n\n| Test | Result | Reading |\n|---|---|---|\n| Linear trend (OLS) on the monthly series | +$0.040M / month, R² = 0.71 | clear upward drift |\n| Volatility (coefficient of variation) | 6.3% | stable run-rate |\n| Move into Jun 2025 vs the historical distribution | z = +2.07 | outlier move (>2σ) |\n| Momentum (last 3 months vs first 3 months) | +$0.123M (+10.0%) | accelerating |\n| Concentration (Herfindahl index) across segments | HHI = 0.390 (effective 2.6 segments) |",
-    "without_answer": "**Trend (Jan 2025 → Jun 2025):** APE grew **$6.31M → $7.42M (+17.7%)**, VNB grew **$1.21M → $1.45M (+20.0%)**, and VNB margin tightened **19.14% → 19.51% (+0.37pp)**. The path wasn't linear — March and May dipped, but June accelerated sharply.\n\n**What is driving it — three measurable factors:**\n\n1. **Agent activation (biggest driver).** Active agents rose from **582 → 639 (+9.8%)**; the active ratio climbed from **80.0% → 85.0%** over the period. This contributed roughly +$0.62M of the +$1.12M APE growth, assuming productivity held flat.\n\n2. **Productivity per active agent.** APE per active agent rose from **$10.8k → $11.6k (+7.4%)**; the channel average productivity metric went **13.07 → 13.67 (+4.6%)** in the `channel_monthly` table. This added roughly +$0.50M of APE on top of the headcount effect.\n\n3. **Margin expansion — concentrated in June.** The overall margin stayed range-bound (19.1–19.2%) through May, then jumped to **19.51%** in June — the highest of the six months. This added ~$0.03M of VNB in June alone. However, the uploaded `mix` table only exposes full product shares for January (e.g., Participating Life 68%, Term Life 14%, Unit-Linked 13%); the other 21 rows are no"
+    "without_answer": "Based on the uploaded data, the six-month VNB trend is driven **mainly by APE growth**, with **margin improvement** as a secondary factor.\n\n### Monthly VNB, APE and margin\n\n| Month | Total APE ($M) | Total VNB ($M) | VNB margin | MoM VNB change |\n|---|---|---|---|---|\n| 2025-01 | 6.31 | 1.21 | 19.14% | — |\n| 2025-02 | 6.53 | 1.25 | 19.19% | +0.05 |\n| 2025-03 | 6.40 | 1.22 | 19.09% | −0.03 |\n| 2025-04 | 6.87 | 1.32 | 19.21% | +0.10 |\n| 2025-05 | 6.70 | 1.28 | 19.12% | −0.04 |\n| 2025-06 | 7.42 | 1.45 | 19.51% | +0.17 |\n\n### What is driving the trend\n\nFrom Jan to Jun, VNB rose **+$0.24M** (+20.0%). That increase decomposes as:\n\n- **APE effect:** +$0.21M — APE grew from $6.31M to $7.42M (+17.7%)\n- **Margin effect:** +$0.03M — margin improved from 19.14% to 19.51% (+0.37pp)\n\nSo **~89% of the VNB increase came from higher APE**, not from better margins.\n\n### Where the APE growth came from\n\nUsing the agent-level data for the Agency channel (CH001) and total company APE:\n\n- **Agency APE** rose from **$2.86M** in Jan to **$3.82M** in Jun (**+33.8%**)\n- **Other channels combined** (Banca + Brokerage) rose from **$3.45M** to **$3.60M** (**+4.3%**)\n\nSo the Agency channel was the main APE growt"
   },
   {
     "dimension": "Trend",
@@ -519,10 +519,10 @@
       "identity": 1
     },
     "without": {
-      "chars": 2602,
-      "numbers": 38,
-      "tables": false,
-      "rows_in_tables": 0,
+      "chars": 2502,
+      "numbers": 56,
+      "tables": true,
+      "rows_in_tables": 7,
       "causal": 2,
       "stats": 0,
       "reconciled": 0,
@@ -535,21 +535,21 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 1,
+      "business_depth": 3,
       "logical_rigour": 0,
-      "data_linkage": 2,
+      "data_linkage": 4,
       "explainability": 1
     },
     "with_source": "analysis",
     "with_chars": 5175,
-    "without_chars": 2602,
+    "without_chars": 2502,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "**Direct answer:** The underlying trend is sustainable, but **June's specific jump is an outlier** — the run-rate is stable, yet the +13.0% move is >2σ, so you shouldn't expect that pace every month.\n\n**Statistical diagnostics** (from `vnb_monthly` vs `channel_monthly`):\n- **Linear trend:** +$0.040M/month, R² = 0.71 — a clear, genuine upward drift.\n- **Volatility:** 6.3% coefficient of variation — the run-rate is stable month to month.\n- **June move:** z = +2.07 (>2σ) — an outsized jump relative to the historical distribution; momentum (+10.0% last 3 vs first 3 months) says acceleration, but the z-score flags it as exceptional.\n- **Concentration:** HHI = 0.390 (effective 2.6 segments), with **Agency** at 49.3% of VNB — growth is concentrated, so it's less diversified.\n\n**What actually drove June** (driver bridge, reconciled to $0 residual):\n- **Productivity** is the largest factor (+$0.074M), followed by **active agents** (+$0.056M) and **margin/mix** (+$0.037M).\n- Agency alone contributed **+$0.153M** of the +$0.167M total.\n- On the **mix** table (joined to `product` via `product_id`): margin rose +0.97pp to 18.68%, and it's pure **mix** (Unit-Linked weight 14%→21%, +1.75pp) — product margins are constant (+0.00pp), so there's no pricing tailwind.\n\n**Cohort backing:** the most productive cohorts are High-risk ($10.16k/agent), All-Products certified ($9.99k), and 48+ month tenure ($9.89k) — productivity is broad-based, not a one-off.\n\n**Conclusion:** The +$0.040M/month trend ",
+    "narrative": "**Yes, the underlying trend is sustainable, but June's +13% jump is an outlier, not the new run-rate.**\n\n**Direct answer.** The 6-month series shows a clear structural upward drift of **+$0.040M / month** (R² = 0.71), with low volatility (6.3%) — a durable base. June's +$0.167M (+13.0%) move was an outlier (z = +2.07), so expect a pullback to the trendline, not a repeat.\n\n### Why the trend holds\n1. **Broad-based drivers** — the driver bridge on `channel_monthly` joined to `vnb_monthly` shows the June move was led by **Average productivity ($k)** (+$0.074M) and **Active agents** (+$0.056M). Productivity is an OPERATIONAL lever (certification, tenure), not a one-off.\n2. **Healthy cohort base** — per `agent_monthly` joined to `agent_master`, *every* cohort grew. Even High churn-risk agents are the most productive ($10.16k per active agent), and the active ratio rose to 85% in June — no attrition drag.\n3. **Mix tailwind is real but finite** — the margin gain (+0.97pp to **18.68%**) came entirely from product mix (`mix` joined to `product` on `product_id`): Unit-Linked weight up 14.0%→21.0% at a 25.0% margin. Product margins themselves are constant (+0.00pp), so this is a structural shift, but it can't compound indefinitely once the mix stabilizes.\n\n### The caveat\nMomentum (+$0.123M, +10.0% last 3 vs first 3) is accelerating, but the z-score of +2.07 means June overshot the historical distribution. Treat the **+$0.040M/month** drift as the sustainable pace; the **+13.0%** monthly ",
     "with_answer": "**Jun 2025 — VNB $1.448M on $7.423M APE (margin 19.5%).** That is +$0.167M (+13.0%) versus May 2025.\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n**Direct answer.** The series has a clear upward drift — +$0.040M / month, R² = 0.71 — and momentum is accelerating (+$0.123M (+10.0%)).\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |\n\n\n### Statistical diagnostics\n\n| Test | Result | Reading |\n|---|---|---|\n| Linear trend (OLS) on the monthly series | +$0.040M / month, R² = 0.71 | clear upward drift |\n| Volatility (coefficient of variation) | 6.3% | stable run-rate |\n| Move into Jun 2025 vs the historical distribution | z = +2.07 | outlier move (>2σ) |\n| Momentum (last 3 months vs first 3 months) | +$0.123M (+10.0%) | accelerating |\n| Concentration (Herfindahl index) across segments | HHI = 0.390 (effective 2.6 segments) |",
-    "without_answer": "Based strictly on the uploaded data, I **cannot confirm** that the VNB growth is sustainable. Here is why:\n\n**1. The data window is short and volatile.**\nWe only have 6 months of data (Jan–Jun 2025). Month-to-month VNB changes are highly erratic:\n- Jan → Feb: **+$0.046M** (+3.8%)\n- Feb → Mar: **-$0.032M** (-2.5%)\n- Mar → Apr: **+$0.099M** (+8.2%)\n- Apr → May: **-$0.039M** (-3.0%)\n- May → Jun: **+$0.167M** (+13.0%)\n\nThis is not a smooth, consistent growth path — March and May were negative months. The overall upward trend is mostly driven by the single large **June spike**.\n\n**2. The June spike comes from two levers, both near their observed limits.**\nLooking at `channel_monthly` (which consolidates all 3 channels — CH001, CH002, CH003):\n\n- **Registered agents are capped.** Every month, registered agents total exactly **780** (500 Agency + 200 Banca + 80 Brokerage). So headcount growth is not a driver — the company cannot add more agents from this table.\n- **Active agents jumped to 639 in June** — the highest of the 6 months. The active ratio reached **85.00%** in June. Across the full dataset, the maximum observed active ratio is **89.50%**. That leaves only ~4.5 percentage points "
+    "without_answer": "Based on the uploaded data (January–June 2025 only), the VNB growth **cannot be shown to be sustainable** — the drivers behind the recent increase are near their observable ceilings or are volatile.\n\n### What actually drove the VNB trend\n\nLooking across the six months of data:\n\n| Month | Total APE ($M) | Total VNB ($M) | Margin | Active agents | Active ratio | Avg productivity ($k) |\n|---|---|---|---|---|---|---|\n| 2025-01 | 6.31 | 1.21 | 19.1% | 582 | 80.0% | 13.07 |\n| 2025-02 | 6.53 | 1.25 | 19.2% | 595 | 81.4% | 13.20 |\n| 2025-03 | 6.40 | 1.22 | 19.1% | 588 | 80.5% | 13.10 |\n| 2025-04 | 6.87 | 1.32 | 19.2% | 613 | 83.2% | 13.40 |\n| 2025-05 | 6.70 | 1.28 | 19.1% | 606 | 82.3% | 13.27 |\n| 2025-06 | 7.42 | 1.45 | 19.5% | 639 | 85.0% | 13.67 |\n\nThe June jump is explained by three things, all visible in the raw data:\n\n1. **Active headcount** — active agents rose to 639 (from 606 in May), pushing the active ratio to 85.0%. However, **registered agents are flat at 780 every month** — no new agents were added. The maximum active ratio ever observed in the channel data is 89.5%. At 85% now, there is **only ~4.5 percentage points of headroom** left before you hit the historical max.\n2. **"
   },
   {
     "dimension": "Coverage",
@@ -565,14 +565,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 1119,
-      "numbers": 26,
+      "chars": 1251,
+      "numbers": 32,
       "tables": true,
       "rows_in_tables": 7,
-      "causal": 0,
+      "causal": 1,
       "stats": 0,
-      "reconciled": 1,
-      "identity": 0
+      "reconciled": 2,
+      "identity": 1
     },
     "with_score": {
       "business_depth": 4,
@@ -588,14 +588,14 @@
     },
     "with_source": "analysis",
     "with_chars": 5037,
-    "without_chars": 1119,
+    "without_chars": 1251,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "Yes — the channel numbers reconcile exactly to the company total. The ontology joined **channel_monthly** to **vnb_monthly** and checked the segmentation identity per month.\n\n**Jun 2025 proof of sum:**\n\n| Channel | VNB |\n|---|---|\n| Agency | $0.714M |\n| Banca | $0.507M |\n| Brokerage | $0.227M |\n| **Company total** | **$1.448M** |\n\nThe segment sum equals the reported company VNB with **no residual** (residual $-0.000000M). The same holds for the monthly driver bridge: Agency +$0.153M, Banca +$0.010M, Brokerage +$0.004M sum to **+$0.167M**, exactly the May → Jun move.\n\nAcross all 6 historical periods, the ontology reports a **maximum |residual| of $0.000000M** between segment totals and company totals — **fully reconciled** in every month. The channel tables are the source of the company-level figure, so there is no unexplained gap.",
+    "narrative": "**Yes — fully.** The segment totals reconcile to the company total in all 6 periods with max residual $0.000000M.\n\n**How the ontology proves it:** `channel_monthly` (per-segment rows for Agency, Banca, Brokerage) is joined to `vnb_monthly` (company totals). The segment table sums to the company table every month:\n\n| Month | Segment VNB (Agency + Banca + Brokerage) | Company VNB (`vnb_monthly`) | Residual |\n|---|---|---|---|\n| All 6 periods (Jan–Jun 2025) | Sums exactly | `total_vnb` | $0.000000M |\n\nThe driver bridge also closes with **no residual** (residual $-0.000000M): the three segment changes (+$0.153M Agency, +$0.010M Banca, +$0.004M Brokerage) add up to the reported +$0.167M company move.\n\nSo the numbers add up perfectly — the reconciliation is exact across the entire series.",
     "with_answer": "**Jun 2025 — VNB $1.448M on $7.423M APE (margin 19.5%).** That is +$0.167M (+13.0%) versus May 2025.\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |\n\n\n### Why it moved — exact driver bridge\n\nThe ontology identity is applied per segment, so the effects add up to the reported move with **no residual** (residual $-0.000000M).\n\n| Segment | Active agents | Average productivity ($k) | VNB margin | Total change | From | To |\n|---|---|---|---|---|---|---|\n| Agency | +$0.047M | +$0.069M | +$0.037M | +$0.153M | $0.561M | $0.714M |\n| Banca | +$0.006M | +$0.004M | +$0.000M | +$0.010M | $0.498M | $0.507M |\n| Brokerage | +$0.003M | +$0.001M | +$0.000M | +$0.004M | $0.222M | $0.227M |\n| **All segments** | **+$0.056M** | **+$0.074M** | **+$0.037M** | **+$0.167M** | | |\n\n\n### Product-mix p",
-    "without_answer": "Yes, they reconcile exactly.\n\n**Direct answer.** The channel-level numbers in `channel_monthly` sum to exactly the company totals in `vnb_monthly`:\n\n- **Total APE:** Channel sum = **$40.2292M** = Company total = **$40.2292M** ✅\n- **Total VNB:** Channel sum = **$7.73074M** = Company total = **$7.73074M** ✅\n\n**Monthly breakdown.** Every month reconciles (rounding to the displayed precision):\n\n| Month | Channels APE sum | Company APE | Channels VNB sum | Company VNB |\n|---|---|---|---|---|\n| 2025-01 | $6.31M | $6.31M | $1.21M | $1.21M |\n| 2025-02 | $6.53M | $6.53M | $1.25M | $1.25M |\n| 2025-03 | $6.40M | $6.40M | $1.22M | $1.22M |\n| 2025-04 | $6.87M | $6.87M | $1.32M | $1.32M |\n| 2025-05 | $6.70M | $6.70M | $1.28M | $1.28M |\n| 2025-06 | $7.42M | $7.42M | $1.45M | $1.45M |\n\n**Margin consistency.** The company-wide VNB margin (19.21% average) is the weighted average of the three channels' margins (Agency 17.6–18.1%, Banca 21.8%, Brokerage 17.8%), fully consistent with the reconciliation.\n\n**Conclusion.** The channel data is a clean, complete partition of the company total — no missing or duplicated figures."
+    "without_answer": "**Yes — the channel numbers reconcile exactly with the company totals for every month.**\n\n**Direct answer.** Summing the 3 channels (Agency, Banca, Brokerage) in `channel_monthly` produces the same APE and VNB as the `vnb_monthly` company totals, month by month, with no residual. Since there are exactly 3 channels per month, the channel sum = 3 × the average shown in the channel table.\n\n### Reconciliation table (APE & VNB, $M)\n\n| Month | Channel APE (sum of 3) | Company APE (`vnb_monthly`) | Channel VNB (sum of 3) | Company VNB (`vnb_monthly`) |\n|---|---|---|---|---|\n| 2025-01 | 6.3072 | 6.30719 | 1.2072 | 1.2072 |\n| 2025-02 | 6.52929 | 6.5293 | 1.252731 | 1.25273 |\n| 2025-03 | 6.39651 | 6.3965 | 1.221138 | 1.22114 |\n| 2025-04 | 6.873 | 6.87299 | 1.320552 | 1.32055 |\n| 2025-05 | 6.7002 | 6.70019 | 1.281114 | 1.28111 |\n| 2025-06 | 7.42299 | 7.423 | 1.44801 | 1.44801 |\n\n**Margin check.** The implied company margin (total VNB ÷ total APE) also matches `vnb_monthly` exactly for each month — e.g., Jan: 1.2072 / 6.3072 = 19.14%, Jun: 1.44801 / 7.42299 = 19.51%.\n\n**Conclusion.** The data is internally consistent — the channel-level `channel_monthly` table fully explains the company-level "
   },
   {
     "dimension": "Coverage",
@@ -611,14 +611,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 2618,
-      "numbers": 14,
-      "tables": true,
-      "rows_in_tables": 6,
+      "chars": 1139,
+      "numbers": 4,
+      "tables": false,
+      "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
       "reconciled": 0,
-      "identity": 0
+      "identity": 1
     },
     "with_score": {
       "business_depth": 4,
@@ -627,20 +627,20 @@
       "explainability": 5
     },
     "without_score": {
-      "business_depth": 3,
+      "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 4,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "analysis",
     "with_chars": 5037,
-    "without_chars": 2618,
+    "without_chars": 1139,
     "reasoning_steps": 6,
     "findings": 13,
     "tables_joined": 4,
     "reconciled": true,
-    "narrative": "The ontology covers **6 months of data (Jan–Jun 2025)** across **6 clean source tables**:\n\n- **`product`** — 4 products (Participating Life, Term Life, Unit-Linked, Universal Life) with VNB margins, commission, expense and risk discount rates.\n- **`agent_master`** — 500 agents with channel, join date, certification, churn risk and base productivity index.\n- **`agent_monthly`** — 3,000 rows of per-agent monthly status, productivity and APE.\n- **`mix`** — 24 rows of monthly product-mix weights per channel.\n- **`channel_monthly`** — 18 rows (3 channels × 6 months) with registered/active agents, productivity, APE, VNB and margin.\n- **`vnb_monthly`** — 6 rows of company totals (APE, VNB, margin).\n\n**Key coverage facts:**\n- **3 channels** — Agency, Banca, Brokerage.\n- **Full reconciliation** — segment totals match company totals in all 6 periods (max residual $0.000000M).\n- **Product mix** — 4 products; mix-weighted margin moved from 17.71% (May) to 18.68% (Jun), driven entirely by mix (+0.97pp), not product margins (+0.00pp).\n- **Agent cohorts** — by churn risk, certification and tenure, with productivity and APE per cohort.\n\nThe ontology encodes the VNB identity ladder (VNB = active agents × avg productivity × margin) and joins `channel_monthly` to `vnb_monthly`, `mix` to `product` on `product_id`, and `agent_master` to `agent_monthly` on `agent_id`.",
+    "narrative": "The ontology covers **six months (Jan–Jun 2025)** of VNB planning data from **six clean source tables**:\n\n- **`product`** (4 rows) — product VNB margins, commission, expense, risk discount.\n- **`agent_master`** (500 rows) — channel, join date, certification, churn risk, base productivity index.\n- **`agent_monthly`** (3,000 rows) — per-agent monthly status, productivity ($k), APE ($M).\n- **`mix`** (24 rows) — monthly product share of channel APE.\n- **`channel_monthly`** (18 rows) — 3 channels × 6 months: registered/active agents, active ratio, avg productivity, APE, VNB, VNB margin.\n- **`vnb_monthly`** (6 rows) — company totals: APE, VNB, margin.\n\n**Joins used:** `channel_monthly` joined to `vnb_monthly` for reconciliation; `agent_master` joined to `agent_monthly` for cohort analysis; `mix` joined to `product` on `product_id` for mix-weighted margin; `channel_monthly` joined to `mix` on channel-month for product-mix proof.\n\n**Entities:** Reporting Period, Distribution Channel (Agency, Banca, Brokerage), Agent, Product, Product Mix, Agent Monthly Activity.\n\n**Computed metrics:** 6-month total APE **$40.23M**, total VNB **$7.73M**, VNB margin **19.2%**, average active agents per channel **201**, exposure-weighted productivity **11.10 ($k)**, Agency share of VNB **44.2%**.\n\nThe ontology also encodes the **VNB identity ladder** (active agents × avg productivity × VNB margin) and the driver graph linking agent behaviour (churn risk → active ratio, certification → productivity) to c",
     "with_answer": "**Jun 2025 — VNB $1.448M on $7.423M APE (margin 19.5%).** That is +$0.167M (+13.0%) versus May 2025.\n\n**Where the number sits.** VNB is spread across 3 segments; **Agency** contributes $0.714M (49.3%), which is where any explanation has to start.\n\n### Monthly trajectory\n\n| Month | VNB | Change | Change % |\n|---|---|---|---|\n| Jan 2025 | $1.207M |  |  |\n| Feb 2025 | $1.253M | +$0.046M | +3.8% |\n| Mar 2025 | $1.221M | -$0.032M | -2.5% |\n| Apr 2025 | $1.321M | +$0.099M | +8.1% |\n| May 2025 | $1.281M | -$0.039M | -3.0% |\n| Jun 2025 | $1.448M | +$0.167M | +13.0% |\n\n\n### Why it moved — exact driver bridge\n\nThe ontology identity is applied per segment, so the effects add up to the reported move with **no residual** (residual $-0.000000M).\n\n| Segment | Active agents | Average productivity ($k) | VNB margin | Total change | From | To |\n|---|---|---|---|---|---|---|\n| Agency | +$0.047M | +$0.069M | +$0.037M | +$0.153M | $0.561M | $0.714M |\n| Banca | +$0.006M | +$0.004M | +$0.000M | +$0.010M | $0.498M | $0.507M |\n| Brokerage | +$0.003M | +$0.001M | +$0.000M | +$0.004M | $0.222M | $0.227M |\n| **All segments** | **+$0.056M** | **+$0.074M** | **+$0.037M** | **+$0.167M** | | |\n\n\n### Product-mix p",
-    "without_answer": "Based on the raw uploaded data provided, I can see the following tables and fields are covered:\n\n## Tables in the data pack\n\n### 1. Product Master (`product`) — 4 rows\n- Product ID (`product_id`)\n- Product name (`product_name`)\n- Product type (`product_type`)\n- VNB margin (`product_margin`)\n- Commission rate (`commission_rate`)\n- Expense ratio (`expense_ratio`)\n- Risk discount rate (`risk_discount_rate`)\n\n### 2. Agent Master (`agent_master`) — 500 rows\n- Agent ID (`agent_id`)\n- Channel ID (`channel_id`)\n- Join date (`join_date`)\n- Certification (`certification`)\n- Churn risk (`churn_risk`)\n- Base productivity index (`base_productivity_index`)\n\n### 3. Agent Monthly Activity (`agent_monthly`) — 3,000 rows\n- Month (`month`)\n- Agent ID (`agent_id`)\n- Channel ID (`channel_id`)\n- Status (`status`) — Active / Inactive\n- Productivity ($k) (`prod`)\n- APE ($M) (`ape`)\n\n### 4. Product Mix Monthly (`mix`) — 24 rows\n- Month (`month`)\n- Channel ID (`channel_id`)\n- Product ID (`product_id`)\n- Product name (`product_name`)\n- Share of channel APE (`weight`)\n\n### 5. Channel Monthly (`channel_monthly`) — 18 rows\n- Month (`month`)\n- Channel ID (`channel_id`)\n- Channel name (`channel_name`) — Agency, B"
+    "without_answer": "I don’t have access to any ontology layer for this pack — only the raw uploaded tables. Based on the data provided, the pack covers:\n\n- **Product Master** (`product`): Product ID, product name, product type, VNB margin, commission rate, expense ratio, risk discount rate — 4 products.\n- **Agent Master** (`agent_master`): Agent ID, channel ID, join date, certification, churn risk, base productivity index — 500 agents.\n- **Agent Monthly Activity** (`agent_monthly`): Month, agent ID, channel ID, status, productivity ($k), APE ($M) — 6 months × 500 agents.\n- **Product Mix Monthly** (`mix`): Month, channel ID, product ID, product name, share of channel APE — 6 months × 4 products.\n- **Channel Monthly** (`channel_monthly`): Month, channel ID, channel name, registered agents, active agents, active ratio, average productivity, APE, VNB, VNB margin — 3 channels × 6 months.\n- **VNB Monthly (company)** (`vnb_monthly`): Month, total APE, total VNB, VNB margin — 6 months.\n\nIf you need to know which of these fields are mapped into an ontology, I can’t answer that from the data alone — the ontology is not included in the uploaded tables."
   }
 ]

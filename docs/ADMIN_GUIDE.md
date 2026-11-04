@@ -19,8 +19,9 @@ The two portals have strictly separated responsibilities:
   accounts and access, oversight of every ontology and dataset, the
   canonical question list, model configuration and token spend.
 
-There is deliberately **no navigation link between the portals**.
-Change the URL to switch. The default administrator (`admin` /
+The portals stay separate: the admin console header has a one-way
+**← User portal** button back to `/app`, while the user portal has no
+link into `/admin`. The default administrator (`admin` /
 `Onti@2026` — change the password after first login) can enter both;
 self-registered users only ever see `/app`.
 
@@ -515,3 +516,16 @@ for a real multi-user workspace. On Vercel use the project's production
 URL (`https://…/app`) and make sure **Deployment Protection → Vercel
 Authentication** is disabled, otherwise only members of your Vercel team
 can open it.
+
+**Q:** A team (e.g. GI) wants to build an ontology demo — do they need
+admin accounts?
+No. **Building ontologies is a user-portal feature**: any regular
+account can upload data and generate an ontology in **Graph studio**,
+then ask questions and produce reports against it. Admin rights are only
+for governance (accounts, oversight, models, activation) — hand them out
+sparingly. Recommended setup: keep self-registration off, create one
+named account per team member in **Users & audit**, and share the user
+portal URL. On Vercel (ephemeral filesystem), accounts created at
+runtime live only in that instance's `/tmp`; create the accounts on a
+local/Docker instance and commit the updated `data/onti.db` before
+deploying, so every serverless instance starts with the same accounts.
