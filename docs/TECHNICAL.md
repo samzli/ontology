@@ -1,14 +1,13 @@
 # Onti — Technical Documentation
 
 > Audience: developers and integrators. For usage see
-> `docs/USER_GUIDE.md` and `docs/ADMIN_GUIDE.md` ; for setup see the
+> `docs/USER_GUIDE.md`and`docs/ADMIN_GUIDE.md` ; for setup see the
 > root `README.md` .
 
 ---
 
 ## 1. Architecture
 
-<!-- markdownlint-disable MD013 -->
 ```text
 Browser (vanilla JS)
   │  fetch / SSE
@@ -49,14 +48,13 @@ FastAPI app (main.py)        ← app assembly + exception handlers only
         ▼
       data/onti.db (SQLite, WAL; /tmp/onti-data on read-only hosts)
 ```
-<!-- markdownlint-enable MD013 -->
 
 No external services: one Python process, one SQLite file. The
 frontend is server-rendered Jinja2 plus four static JS files
-( `common.js` , `graph.js` , `app.js` , `admin.js` ) — no build step.
+( `common.js`,`graph.js`,`app.js`,`admin.js` ) — no build step.
 
 `modules/db.py:_resolve_data_dir` picks the writable data directory:
-`ONTI_DATA_DIR` when set, `/tmp/onti-data` when `VERCEL` is present
+`ONTI_DATA_DIR`when set,`/tmp/onti-data`when`VERCEL` is present
 (the deployment itself is read-only), otherwise the bundled `data/`
 
 folder. On first connection the bundled `data/onti.db` is copied into
@@ -75,7 +73,7 @@ present, or when `ONTI_EPHEMERAL=1` is set explicitly. It is **not**
 derived from the data-directory path: a Docker container points
 `ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent.
 On an ephemeral host writes live only for that instance, so
-`/api/auth/status` reports `ephemeral: true` ; registration stays open
+`/api/auth/status`reports`ephemeral: true` ; registration stays open
 (new accounts work for the life of that instance) but the accounts are
 not shared between instances. Use the
 Docker image with the `onti-data` volume (README → Deploying with Docker)
@@ -85,27 +83,25 @@ for durable multi-user state.
 
 Core tables (selection):
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Table | Purpose |
-| --------------------------------------- | ----------------------------------------------- |
-| `users` | accounts, PBKDF2 hashes, roles |
-| `sessions` | session tokens (signed + stored) |
-| `revoked_sessions` | tokens revoked by logout (checked before use) |
-| `ontology_packs` | one row per ontology (see origin note below) |
-| `entities` / `attributes` / `relations` | the ontology schema |
-| `graph_nodes` / `graph_edges` | the impact graph (auto-generated if empty) |
-| `metric_formulas` / `question_rules` | computation + rules engine |
-| `tables` / `datasets` | logical data tables and their versioned sources |
-| `question_bank` | canonical questions |
-| `user_questions` | per-user private question lists |
-| `ask_history` | one row per answered question (see memory note) |
-| `studio_history` | Graph studio generation history log |
-| `model_configs` | admin-registered models (keys encrypted) |
-| `user_model_configs` | per-user Model centre entries (keys encrypted) |
-| `llm_calls` | token metering: caller, model, success, latency |
-| `audit` | append-only write log |
-| `app_settings` | key/value store: user model + pack selections |
-<!-- markdownlint-enable MD013 MD060 -->
+|Table|Purpose|
+|---------------------------------------|-----------------------------------------------|
+|`users`|accounts, PBKDF2 hashes, roles|
+|`sessions`|session tokens (signed + stored)|
+|`revoked_sessions`|tokens revoked by logout (checked before use)|
+|`ontology_packs`|one row per ontology (see origin note below)|
+|`entities`/`attributes`/`relations`|the ontology schema|
+|`graph_nodes`/`graph_edges`|the impact graph (auto-generated if empty)|
+|`metric_formulas`/`question_rules`|computation + rules engine|
+|`tables`/`datasets`|logical data tables and their versioned sources|
+|`question_bank`|canonical questions|
+|`user_questions`|per-user private question lists|
+|`ask_history`|one row per answered question (see memory note)|
+|`studio_history`|Graph studio generation history log|
+|`model_configs`|admin-registered models (keys encrypted)|
+|`user_model_configs`|per-user Model centre entries (keys encrypted)|
+|`llm_calls`|token metering: caller, model, success, latency|
+|`audit`|append-only write log|
+|`app_settings`|key/value store: user model + pack selections|
 
 Four columns deserve detail:
 
@@ -117,25 +113,25 @@ Four columns deserve detail:
   Write endpoints accept an `expected_version` parameter and answer
   HTTP 409 when another session already moved the pack forward, so
   concurrent admin edits never overwrite each other.
-* `ontology_proposals.evidence` — the JSON snapshot of *what the model
+*`ontology_proposals.evidence` — the JSON snapshot of*what the model
   was shown* when it drafted the proposal: target table key/label,
   dataset id, the table's column specs and the sample rows
   ( `modules/induction.py:_build_evidence` ). Returned by
-`list_proposals` alongside `rationale` so the admin review queue can
+`list_proposals`alongside`rationale` so the admin review queue can
   render the "Proposing against" panel.
 * `ask_history` — user, pack, question, answer excerpt, source,
   matched flag and token count. Powers the Recent asks chips, the
   History view and the AI's cross-session memory.
 
 `studio_history` records every Graph studio action per user: pack,
-action ( `ontology` / `preview` / `data-upload` / `ontology-upload` /
+action ( `ontology`/`preview`/`data-upload`/`ontology-upload` /
 `report` ), title and detail (for reports, the report uid). It powers
 the user-facing Generation history card.
 
-Migrations run in `modules/db.py:init_db` — e.g. `ontology_packs`
+Migrations run in `modules/db.py:init_db`— e.g.`ontology_packs`
 
-gains `origin` and `version` , `ask_history` gains `answer` , and
-`ontology_proposals` gains `evidence` , all via idempotent `ALTER TABLE`
+gains `origin`and`version`,`ask_history`gains`answer` , and
+`ontology_proposals`gains`evidence`, all via idempotent`ALTER TABLE`
 
 guards, so older databases upgrade in place.
 
@@ -146,7 +142,7 @@ guards, so older databases upgrade in place.
 Every write path that creates a pack records `origin` :
 
 * Graph studio: `Generated from data in Graph studio (tables: t1,
-  t2) by <username>` (plus `+ AI enrichment` when requested);
+  t2) by <username>`(plus`+ AI enrichment` when requested);
 * Admin import: `Imported from JSON file by <admin>`;
 * seed packs carry a descriptive origin.
 
@@ -166,11 +162,11 @@ including the table-level nodes X1–X8.
 ### 3.2 Graph studio provenance
 
 * `GET /api/graph-studio/sources` annotates every ontology table with
-  its source dataset ( `dataset_name` , `dataset_file` , `dataset_kind` ,
-`dataset_updated` from the newest `datasets` row).
+  its source dataset ( `dataset_name`,`dataset_file`,`dataset_kind` ,
+`dataset_updated`from the newest`datasets` row).
 * Every graph node carries `source {kind, detail}`; the UI provenance
   panel and the per-view "Sources used" list render it.
-* Views: `lineage` (default),    `schema`,  `columns` — built by
+* Views: `lineage`(default),`schema`,  `columns` — built by
 `ontology_service.build_studio_graph` .
 
 ### 3.3 Per-user scenario packs
@@ -179,14 +175,14 @@ including the table-level nodes X1–X8.
 the header dropdown. `routes/common.py:user_pack_id` resolves it with fallback
 to the admin-activated pack, and every user-facing read (graph,
 dashboard, analytics, Ask, Graph studio, reports, memory) goes
-through `resolve_pack` . `GET /api/packs` lists the visible packs with
-`is_active` / `selected` flags, origin and data-source summaries;
-`POST /api/my/pack` sets the selection, `{"pack_id": null}` resets it
+through `resolve_pack`.`GET /api/packs` lists the visible packs with
+`is_active`/`selected` flags, origin and data-source summaries;
+`POST /api/my/pack`sets the selection,`{"pack_id": null}` resets it
 to the system default.
 
 ### 3.4 Ask memory (short + long term)
 
-`routes/ask.py:ask_stream` assembles the LLM `history` from:
+`routes/ask.py:ask_stream`assembles the LLM`history` from:
 
 1. the current session's turns (client-supplied, short-term);
 2. the four most recent `ask_history` answers for this user + pack
@@ -215,12 +211,11 @@ with-ontology side inherits the month identically.
 
 ### 3.5 With / without ontology comparison
 
-`POST /api/ask/compare` (body `{question, mode?, history?}` ) answers
+`POST /api/ask/compare`(body`{question, mode?, history?}` ) answers
 one question twice and returns both sides plus a value summary. The
 same model config answers both; the difference is what context each
 side receives:
 
-<!-- markdownlint-disable MD013 -->
 ```json
 {
   "question": "...",
@@ -277,7 +272,6 @@ side receives:
   }
 }
 ```
-<!-- markdownlint-enable MD013 -->
 
 * **With ontology** runs the normal pipeline synchronously
   ( `qa_service.compare_answers` ) in three stages:
@@ -290,7 +284,7 @@ side receives:
   3. the two are concatenated (rule answer first, then the analysis
      body) and `retrieve_subgraph` builds the impact chain.
 
-`source` is `rules+analysis` , `rules` , or `analysis` accordingly. The
+`source`is`rules+analysis`,`rules`, or`analysis` accordingly. The
   analysis alone is enough to answer, so the grounded side still works
   when no model is configured. `analysis.depth` carries the counters
   quoted in `value` (steps, statistical tests, findings, tables joined,
@@ -309,9 +303,9 @@ side receives:
   — the **real uploaded data tables are included** so the model can
   reason over company figures, but the ontology layer (entity
   definitions, metric formulas, graph edges, impact chain) is
-  deliberately stripped. `graph` is always `null` because there is
+  deliberately stripped. `graph`is always`null` because there is
   nothing to trace. Grounding reports the same data tables the
-  ontology side saw ( `tables` , `table_count` ) with `metric_count: 0` .
+  ontology side saw ( `tables`,`table_count`) with`metric_count: 0` .
   No conversation history is forwarded, so ontology-grounded context
   cannot leak across.
 * Only the grounded answer is written to `ask_history`; the baseline is
@@ -340,9 +334,9 @@ auditable. It runs in a fixed order:
 3. **Decompose** — apply the declared identity per segment with
    sequential factor substitution, so the factor effects add exactly to
    the reported move.
-4. **Cross-check dimensions** — join `mix` → `product` for the weighted
+4. **Cross-check dimensions** — join `mix`→`product` for the weighted
    margin and split the change into mix vs product-margin effects; join
-`agent_monthly` → `agent_master` for churn-band, certification and
+`agent_monthly`→`agent_master` for churn-band, certification and
    tenure cohorts.
 5. **Statistics** — OLS slope + R², coefficient of variation, z-score of
    the move into the target month, 3-vs-3 momentum, Herfindahl
@@ -351,8 +345,8 @@ auditable. It runs in a fixed order:
    question type leads), a ranked finding list, a numbered reasoning
    trace and an annotated impact chain walked over the pack's graph.
 
-`detect_focus(question)` selects one of `level` , `movement` , `mix` ,
-`cohort` , `trend` ; follow-up questions inherit the month named earlier
+`detect_focus(question)`selects one of`level`,`movement`,`mix` ,
+`cohort`,`trend` ; follow-up questions inherit the month named earlier
 in the conversation, mirroring the rules engine's own memory.
 
 `POST /api/ask-stream` uses the same layer: a rule hit is followed by the
@@ -365,30 +359,28 @@ recomputing.
 A second, system-wide control decides whether the ontology is used at
 all. It is a **client-side preference**, not a server setting: both
 portals render the same **Use ontology ON / OFF** control from
-`Onti.ontology` in `static/js/common.js` , which persists the choice in
-`localStorage` under `onti.useOntology` (default `"on"` ) and broadcasts
+`Onti.ontology`in`static/js/common.js` , which persists the choice in
+`localStorage`under`onti.useOntology`(default`"on"` ) and broadcasts
 an `onti:ontology` DOM event on every change.
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Key     | `onti.useOntology` |
-| ------- | ---------------------------------------------------------------- |
-| Default | ON                                                               |
-| Scope   | Per browser; both portals on the same origin share it            |
-| Toggle  | `Onti.ontology.mount()` in the header of `app.js` and `admin.js` |
-| Read    | `Onti.ontology.enabled()` |
-<!-- markdownlint-enable MD013 MD060 -->
+|Key|`onti.useOntology`|
+|-------|----------------------------------------------------------------|
+|Default|ON|
+|Scope|Per browser; both portals on the same origin share it|
+|Toggle|`Onti.ontology.mount()`in the header of`app.js`and`admin.js`|
+|Read|`Onti.ontology.enabled()`|
 
 With the switch OFF, no data is sent anywhere different — the front end
 simply refuses to render ontology-derived output and says so:
 
 * `loadDashboard` replaces KPI cards with an off panel and hides
-`#dashGraphCard` ; `loadAnalytics` and `loadGraphStudio` render the same
+`#dashGraphCard`;`loadAnalytics`and`loadGraphStudio` render the same
   panel instead of charts; the admin `loaders.graph` does likewise.
-* `askCore` / `compareCore` delegate to `askWithoutOntology`, which calls
-`POST /api/ask/compare` and renders only its `without_ontology` side
+* `askCore`/`compareCore`delegate to`askWithoutOntology`, which calls
+`POST /api/ask/compare`and renders only its`without_ontology` side
   (badge “Without ontology”, no impact chain).
-* `POST /api/reports` accepts `use_ontology: false`; the server removes
-  the `evidence` , `charts` , `analytics` and `ontology` sections (and
+* `POST /api/reports`accepts`use_ontology: false`; the server removes
+  the `evidence`,`charts`,`analytics`and`ontology` sections (and
   falls back to `["summary"]` if that empties the list, so
 `report_builder.build_report` never re-applies its default section
   set), and suffixes the title with “— No ontology (text-only)”.
@@ -412,17 +404,15 @@ answered from a January-only slice of a 24-month table — and inflated the
 prompt (slow answers). The profile-first builder summarises each table over
 its **full active dataset**:
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Block                | Content                                                                                                                                                   | Cap                       |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| Column profile       | per column: type, `sum` / `avg` / `min` / `max` for numerics (percent-formatted columns render as %), full sorted distinct values otherwise                     | distinct list ≤ 48 values |
-| Month coverage       | month-like columns (key/label contains `month` , `period` or `date` ) always list their values, normalised to `YYYY-MM` ( `2023-01-01 00:00:00` → `2023-01` ) | ≤ 36 distinct             |
-| Per-month aggregates | one markdown table of month vs `sum` / `avg` per numeric column, computed in one pass ( `_month_buckets` )                                                    | ≤ 36 groups × 8 measures  |
-| Sample rows          | 3 verbatim rows for format illustration only                                                                                                              | 3                         |
-<!-- markdownlint-enable MD013 MD060 -->
+|Block|Content|Cap|
+|---|---|---|
+|Column profile|type + `sum`/`avg`/`min`/`max`, else distinct values|≤ 48|
+|Month coverage|month-like columns list values normalised to `YYYY-MM`|≤ 36|
+|Per-month aggregates|month vs `sum`/`avg` table per numeric column|≤ 36 × 8|
+|Sample rows|3 verbatim rows for format illustration only|3|
 
 Everything else (entities, relations, formulas, graph edges) is unchanged.
-Callers: `qa_service.stream_answer` / `compare_answers` and
+Callers: `qa_service.stream_answer`/`compare_answers` and
 `report_builder.build_report` — all pass no arguments, so all three share
 the same complete grounding. `compute_pack` itself always had every row; the
 truncation existed only in the prompt layer.
@@ -436,13 +426,12 @@ ever seeing a "rows omitted" note.
 * System models: `model_configs` (admin CRUD, encrypted keys).
 * User models: `user_model_configs` (owner-scoped CRUD via
 `/api/my/models*` , encrypted keys, duplicate names rejected 409).
-* Selection: `app_settings["user_model:{uid}"]` stores `sys:N`,
-`my:N` or empty. `routes/common.py:_effective_model_cfg` resolves it at ask
+* Selection: `app_settings["user_model:{uid}"]`stores`sys:N`,
+`my:N`or empty.`routes/common.py:_effective_model_cfg` resolves it at ask
   time with fallback to the system default.
 * `.env` registration (`llm_client.append_env_model`): writes a
   self-contained block
 
-<!-- markdownlint-disable MD013 -->
 ```text
   # >>> onti model: my_azure_gpt >>>
   ONTI_MODEL_MY_AZURE_GPT_NAME="My Azure GPT"
@@ -451,30 +440,29 @@ ever seeing a "rows omitted" note.
   ONTI_MODEL_MY_AZURE_GPT_MODEL="gpt-4o"
   # <<< onti model: my_azure_gpt <<<
   ```
-<!-- markdownlint-enable MD013 -->
 
   Existing blocks with the same slug are replaced; the DB stays the
   source of truth.
 
-* Testing: `POST /api/my/models/test` accepts `config_id: "my:N"`
+* Testing: `POST /api/my/models/test`accepts`config_id: "my:N"`
   (resolves the user's stored config server-side) or ad-hoc fields.
 * Oversight: `GET /api/admin/user-models` returns every user-created
   model with masked keys and owner username.
 
 ### 4.1 Connection-test contract
 
-`POST /api/admin/models/test` and `POST /api/my/models/test` share one
+`POST /api/admin/models/test`and`POST /api/my/models/test` share one
 response shape. A test that *ran* always answers **HTTP 200**, whatever
 the verdict — a negative result is a successful request, not a client
 error (encoding it as 400 used to make every failed test look like a
 malformed request in the server log and pushed the UI through its
 exception path, where the actionable hint is lost). 4xx is reserved for
 genuinely bad requests: unknown `config_id` (404), missing
-`base_url` / `model` (422).
+`base_url`/`model` (422).
 
 Response fields:
 
-* `ok` — `true` when connected. The single field the UI branches on.
+* `ok`—`true` when connected. The single field the UI branches on.
 * `error` — human-readable cause; never raw provider JSON.
 * `hint` — the next concrete step.
 * `provider_error` — the gateway's own body, or
@@ -482,11 +470,11 @@ Response fields:
 * `provider_code` — provider error code when the body carries one
   (e.g. `30014` ).
 * `category` — machine-readable class, see below.
-* `retryable` — `true` when repeating the test could succeed.
+* `retryable`—`true` when repeating the test could succeed.
 * `latency_ms` — round-trip time of the probe.
 
 Transport exceptions ( `httpx.RequestError` ) are classified by walking
-the whole `__cause__` / `__context__` chain — an
+the whole `__cause__`/`__context__` chain — an
 `ssl.SSLCertVerificationError` sits several layers below the
 `httpx.ConnectError` that surfaces:
 
@@ -503,19 +491,19 @@ the whole `__cause__` / `__context__` chain — an
 * `timeout` — "The provider did not answer in time"; retryable.
 * `unreachable` — "The provider could not be reached"; retryable.
 
-HTTP-level failures carry `auth` (401/403/30014), `model_not_found`
+HTTP-level failures carry `auth`(401/403/30014),`model_not_found`
 
-(404), `rate_limited` (429), `provider_error` (5xx) and `http_error`
+(404), `rate_limited`(429),`provider_error`(5xx) and`http_error`
 
-(any other status). Only `rate_limited` , `provider_error` and
-`408` / `425` are retryable.
+(any other status). Only `rate_limited`,`provider_error` and
+`408`/`425` are retryable.
 
 The distinct messages matter: lumping a certificate failure into "could
 not be reached" sent operators hunting for a network fault when the
 only wrong setting was **Verify SSL certificate**.
 
 The probe sends one `POST {base_url}/chat/completions` with a 5-token
-`ping` and **waits as long as the model's own `timeout` allows** — a
+`ping`and **waits as long as the model's own`timeout` allows** — a
 busy gateway can legitimately queue a trivial prompt for over a minute,
 and a shorter hard-coded ceiling turned that into a false "did not
 answer in time". Only the *connect* phase is capped (10 s), so a dead
@@ -548,14 +536,14 @@ report `uid` , and the title follows
 The report is linked from Graph studio's Generation history card
 ( `GET /api/graph-studio/history` ).
 
-### 5.1 Data import and AI proposals ( `importer.py` , `induction.py` )
+### 5.1 Data import and AI proposals ( `importer.py`,`induction.py` )
 
 `POST /api/admin/data/upload` carries the whole import in one endpoint
 and one shared pipeline ( `importer.analyse_upload` , used by both the
 preview and the commit):
 
 * **Sheet pick** — `importer.list_sheets` enumerates an workbook's tabs
-  (via `pandas.ExcelFile` ); `_resolve_sheet` maps a requested sheet
+  (via `pandas.ExcelFile`);`_resolve_sheet` maps a requested sheet
   name, a 0-based index, or the default (first sheet) to
 `pandas.read_excel(sheet_name=…)` . An unknown sheet raises an
 `UploadError` (4xx) that names the available sheets. Non-workbook
@@ -564,7 +552,7 @@ preview and the commit):
   table's non-derived columns by exact key then case-folded substring
   (length ≥ 3). The caller may override per header via the `mapping`
 
-  form field (JSON `header → column key` ); `apply_mapping_override`
+  form field (JSON `header → column key`);`apply_mapping_override`
 
   re-validates every override and maps `__ignore__` / blank / unknown
   targets to "not imported", so they drop into `unmapped_headers` .
@@ -576,21 +564,21 @@ preview and the commit):
 * **AI proposals + evidence** — a successful commit schedules
 `induction.induce_from_table` in the background. It sends the table's
   columns and sample rows to the model, which returns strict JSON
-  elements each carrying a `rationale` ; `_build_evidence` also stores
+  elements each carrying a `rationale`;`_build_evidence` also stores
   the exact table/columns/sample rows it saw in
 `ontology_proposals.evidence` , so the admin review queue can show the
   basis for each proposal.
 
-**Data-type JSON.** `parse_data_file` also accepts `.json` (registered
-in `config.ALLOWED_UPLOAD_EXT` ). `_read_json_records` decodes the bytes
+**Data-type JSON.** `parse_data_file`also accepts`.json` (registered
+in `config.ALLOWED_UPLOAD_EXT`).`_read_json_records` decodes the bytes
 across common encodings and normalises a top-level list, or a
 `{"records" | "data" | "rows": [...]}` wrapper, into rows; a bare
 object becomes a single row. A JSON file whose keys look like an
-ontology definition ( `entities` / `node_types` ) is rejected with an
+ontology definition ( `entities`/`node_types` ) is rejected with an
 `UploadError` pointing at the pack-import path instead.
 
 **Batch import** — `POST /api/admin/data/batch-upload` (form fields
-`pack_id` , `commit` , `plan` , one or more `files` ) reuses the same
+`pack_id`,`commit`,`plan`, one or more`files` ) reuses the same
 single-table pipeline for every unit of work. One *item* is a sheet of
 a workbook (via `importer.list_items` ) or the whole of a CSV/JSON file.
 
@@ -598,26 +586,26 @@ a workbook (via `importer.list_items` ) or the whole of a CSV/JSON file.
   folder uploads keep the browser's relative paths and `_basename` /
 `_stem` normalise the names before matching.
 * **Routing** — `analyse_batch` resolves each item's target table in
-  order of precedence: an explicit `plan` entry ( `target` = an existing
-  table key or the `__new__` sentinel), else `admin_service.find_table_by_name`
+  order of precedence: an explicit `plan`entry (`target` = an existing
+  table key or the `__new__`sentinel), else`admin_service.find_table_by_name`
 
   (exact key, then `ontology_service._key_tokens` set equality, then
   token intersection), else a new table inferred by `_infer_new_table` .
   Items matching no table become `__new__` proposals the admin
   confirms or re-routes in the review UI.
 * **New tables** — `admin_service.create_table` inserts the
-`pack_tables` row and its `pack_columns` wholesale; `commit_batch`
+`pack_tables`row and its`pack_columns`wholesale;`commit_batch`
 
-  first calls `ontology_service.upsert_entity` / `upsert_attribute`
+  first calls `ontology_service.upsert_entity`/`upsert_attribute`
 
   per column and runs `sync_visual_graph` , so a batch-created table is
   a first-class part of the ontology, not just a data table.
 * **Preview vs commit** — `analyse_batch(with_rows=False)` powers the
   preview and reports per item `{file, item, table key, mapping,
-  valid/invalid counts, skip}`;  `commit_batch` refuses the whole
+  valid/invalid counts, skip}`;`commit_batch` refuses the whole
   request ( `UploadError` , 4xx, nothing written) when any non-skipped
   item is empty or invalid, otherwise writes one activated dataset per
-  item and returns `items` plus the `created_tables` it built.
+  item and returns `items`plus the`created_tables` it built.
 
 ## 6. Reports
 
@@ -626,8 +614,8 @@ Markdown, HTML (print-friendly, base64 charts) and PDF. Section
 numbering adjusts to what is present. Notable sections:
 
 * `ontology` — pack nodes/links rendered via
-`report_charts.render_chain_graph` into `charts/ontology_graph.png` ;
-* `analytics` — `analytics.mom_attribution` (headcount / productivity
+`report_charts.render_chain_graph`into`charts/ontology_graph.png` ;
+* `analytics`—`analytics.mom_attribution` (headcount / productivity
   / mix effects vs. prior month) and `analytics.agent_stats`
 
   (per-channel registered/active/avg productivity) tables;
@@ -637,14 +625,14 @@ numbering adjusts to what is present. Notable sections:
 with the rules engine ( `raise_on_template_error=False` ), then builds a
 report with all sections — no AI cost. Its title carries the scenario
 and data sources (`Sample Analytics Report | Scenario: <pack> |
-Data: <sources>`). `GET /api/reports/{uid}/view` serves the HTML
+Data: <sources>`).`GET /api/reports/{uid}/view` serves the HTML
 inline.
 
 `GET /api/dashboard` assembles the user-portal dashboard in one call:
 the resolved pack (name, description, origin), its data sources (kind
 and row count), KPI cards and the monthly timeseries. **KPI cards are
 driven by the pack's own `metric_formulas`** — each formula whose input
-table has rows becomes one card, formatted by its `fmt` / `decimals` —
+table has rows becomes one card, formatted by its `fmt`/`decimals` —
 so any ontology shows its own metrics (VNB/APE, IFRS 17 CSM / ISR / EV,
 lapse rates, …) instead of a fixed VNB/APE key list. The response also
 returns `formula_count` , letting the UI tell "no formulas declared"
@@ -654,11 +642,11 @@ the pack carries a compatible monthly series, `analytics.company_series`
 adds latest-month APE / VNB / margin / MoM cards. On first call per
 user + pack it also generates a full
 **"Full Analytics Report"** via `_ensure_auto_report` (idempotent,
-flagged `auto_report:<user>:<pack>` in `app_settings` ) and returns it
+flagged `auto_report:<user>:<pack>`in`app_settings` ) and returns it
 as `auto_report` — the dashboard banner links to
 `/api/reports/{uid}/view` .
 `GET /api/graph-studio/history` returns the caller's 30
-newest `studio_history` rows. `GET /api/admin/user-settings` joins
+newest `studio_history`rows.`GET /api/admin/user-settings` joins
 users with their pack and model selections for the admin support
 table.
 
@@ -675,7 +663,6 @@ attribute/relation (mapped to its owner entity).
 The MoM decomposition is exact (sequential factor substitution, no
 residual), per channel:
 
-<!-- markdownlint-disable MD013 -->
 ```text
 VNB = active_agents × avg_productivity / 1000 × weighted_margin
 
@@ -683,20 +670,19 @@ agent effect  = (A1 − A0) × P0/1000 × M0
 prod effect   = A1 × (P1 − P0)/1000 × M0
 mix effect    = A1 × P1/1000 × (M1 − M0)
 ```
-<!-- markdownlint-enable MD013 -->
 
-Endpoints: `/api/analytics/timeseries` , `/attribution` , `/scenario` ,
+Endpoints: `/api/analytics/timeseries`,`/attribution`,`/scenario` ,
 `/agent-stats` . The driver-attribution, scenario and agent views read the
 built-in VNB/APE monthly schema ( `analytics.REQUIRED_TABLES` :
-`vnb_monthly` , `channel_monthly` , `agent_monthly` , `agent_master` ) and
+`vnb_monthly`,`channel_monthly`,`agent_monthly`,`agent_master` ) and
 activate only when the active pack carries those tables.
 
 **Every pack gets a trend.** `/api/analytics/timeseries` also returns a
-`generic` block built by `analytics.generic_monthly(data)` : the pack's own
-monthly table (the one whose `report_month` / `month` column holds `YYYY-MM`
+`generic`block built by`analytics.generic_monthly(data)` : the pack's own
+monthly table (the one whose `report_month`/`month`column holds`YYYY-MM`
 
 values — `report_month` preferred, then the table with more rows) with one
-measure per numeric column ( `sum` , or `mean` for rate-like names). When the
+measure per numeric column ( `sum`, or`mean` for rate-like names). When the
 pack holds a lapse count and an exposure column, an extra **annualised
 lapse rate** measure ( `12 × lapses ÷ exposure` ) is prepended and chosen as
 the default, matching the dashboard's annualised-lapse-rate KPI. The user
@@ -713,9 +699,9 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 ## 8. Security notes
 
 * Sessions are HttpOnly cookies whose value is an HMAC-signed
-`user_id|expires|nonce` payload ( `auth.issue_session_token` ; the random
+`user_id|expires|nonce`payload (`auth.issue_session_token` ; the random
   nonce keeps two logins in the same second from colliding on the
-`sessions` primary key). The token is also written to the `sessions`
+`sessions`primary key). The token is also written to the`sessions`
 
   table and, on logout, to `revoked_sessions` , so logout revokes it
   immediately; other serverless instances verify the signature and check
@@ -729,21 +715,21 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 * API keys (system and user) are encrypted with a machine-local key
   ( `.onti.key` ) and never returned unmasked by any API.
 * **Credential normalisation.** A key pasted from e-mail, a spreadsheet
-  or `.env` routinely carries wrapper quotes, a `Bearer` prefix or a
+  or `.env`routinely carries wrapper quotes, a`Bearer` prefix or a
   trailing newline. Sent verbatim, the provider answers
 `{"code":30014,"message":"Token is invalid."}` even though the key is
   valid. `llm_client.normalize_api_key` therefore strips whitespace,
   quotes (straight, back-tick, typographic), a leading `Bearer` scheme
-  and collapses known placeholders ( `sk-...` , `your-api-key` , …) to an
+  and collapses known placeholders ( `sk-...`,`your-api-key` , …) to an
   empty string; `normalize_base_url` trims spaces and trailing slashes.
-  Both run at **every boundary** — `create_config` / `update_config` ,
+  Both run at **every boundary** — `create_config`/`update_config` ,
   the per-user equivalents, `resolve_test_config` (including legacy rows
   written before normalisation existed) and `ConfiguredLLM.__init__` ,
   the last gate before the `Authorization` header is built. Dirty values
   are never persisted, and an empty key sends no `Authorization` header
   at all.
 * **Provider errors are translated.** `llm_client.describe_provider_error`
-  maps the provider's status/body into `error` (human cause), `hint`
+  maps the provider's status/body into `error`(human cause),`hint`
 
   (next step) and `provider_error` (raw body, 300 chars, for support),
   plus `provider_code` . The model form renders all three, so the admin
@@ -755,9 +741,10 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 
 ## 9. Testing
 
-<!-- markdownlint-disable MD013 -->
 ```bat
-python -m py_compile main.py (Get-ChildItem routes\*.py, modules\*.py | ForEach-Object { $_.FullName })   :: syntax gate
+python -m py_compile main.py ^
+  (Get-ChildItem routes\*.py, modules\*.py ^
+  | ForEach-Object { $_.FullName })   :: syntax gate
 python tests\verify_t1.py ... verify_t6.py  :: layer checks (no server)
 python tests\verify_model_key.py            :: key paste hygiene + error text
 python tests\smoke_http.py                  :: end-to-end HTTP matrix
@@ -771,36 +758,33 @@ python tests\verify_login.py                :: 24 checks — auth flows
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report
 ```
-<!-- markdownlint-enable MD013 -->
 
 Tests that talk to the server need the same database the server uses, so run
-them against `python main.py` on `127.0.0.1:8010` (not against a container
+them against `python main.py`on`127.0.0.1:8010` (not against a container
 whose volume is a separate copy). For a container, use the HTTP-only scripts
-( `smoke_http.py` , `verify_giteam.py` ) and the checks in
+( `smoke_http.py`,`verify_giteam.py` ) and the checks in
 README → Deploying with Docker. `verify_ontology_value.py` needs a live model;
 when the gateway is slow it reports `SKIP` instead of failing, because that is
 an environment condition, not an application defect.
 
 ### Run log
 
-`tests\run_all.py` executes every `tests\*.py` script — except `_` -prefixed
+`tests\run_all.py`executes every`tests\*.py`script — except`_` -prefixed
 helper modules such as `_seed_synthetic.py` , which tests import rather than
 execute — (or a filtered subset) as a subprocess and appends one JSON line per
-run to `data/run_log.jsonl` through `modules/run_log.py:record_run` :
+run to `data/run_log.jsonl`through`modules/run_log.py:record_run` :
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Field | Meaning |
-| ---------------------------------------------------- | ------------------------------------------------------- |
-| `run_id` , `started_at` , `finished_at` , `duration_ms` | identity and timing |
-| `actor` , `host` | OS user and machine that executed the script |
-| `script` | `tests/<name>.py` |
-| `status` | `PASS` / `FAIL` (a 900 s timeout is recorded as `FAIL` ) |
-| `summary` | last non-empty output line of the script |
-| `details` | free-form extras (exit code, filters) |
-<!-- markdownlint-enable MD013 MD060 -->
+|Field|Meaning|
+|----------------------------------------------------|-------------------------------------------------------|
+|`run_id`,`started_at`,`finished_at`,`duration_ms`|identity and timing|
+|`actor`,`host`|OS user and machine that executed the script|
+|`script`|`tests/<name>.py`|
+|`status`|`PASS`/`FAIL`(a 900 s timeout is recorded as`FAIL` )|
+|`summary`|last non-empty output line of the script|
+|`details`|free-form extras (exit code, filters)|
 
 The path and the retention cap come from the `runtime` block of
-`config/config.json` ( `run_log` , `run_log_max_entries` ); older lines are
+`config/config.json`(`run_log`,`run_log_max_entries` ); older lines are
 trimmed when the cap is exceeded. `python -m modules.run_log` prints the
 ten most recent entries.
 
@@ -854,30 +838,26 @@ definitions, no metric formulas, no graph).
 **Test matrix** (each question answered twice by the same model — once
 grounded in the full ontology, once grounded in raw uploaded tables):
 
-<!-- markdownlint-disable MD013 MD060 -->
-| #   | Pack           | Question                                                |
-| --- | -------------- | ------------------------------------------------------- |
-| 1   | 6 · VNB        | What is the VNB in April?                               |
-| 2   | 6 · VNB        | How does VNB in April compare to the previous month?    |
-| 3   | 6 · VNB        | Why is there such a movement in VNB during April?       |
-| 4   | 23 · Lapse Exp | What is the lapse experience in September?              |
-| 5   | 23 · Lapse Exp | How does September lapse compare to the previous month? |
-| 6   | 23 · Lapse Exp | Why is there such a movement in lapse during September? |
-<!-- markdownlint-enable MD013 MD060 -->
+|#|Pack|Question|
+|---|--------------|-------------------------------------------------------|
+|1|6 · VNB|What is the VNB in April?|
+|2|6 · VNB|How does VNB in April compare to the previous month?|
+|3|6 · VNB|Why is there such a movement in VNB during April?|
+|4|23 · Lapse Exp|What is the lapse experience in September?|
+|5|23 · Lapse Exp|How does September lapse compare to the previous month?|
+|6|23 · Lapse Exp|Why is there such a movement in lapse during September?|
 
 **Results (all 6 scenarios completed successfully):**
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Dimension                                         |               With Ontology                |     Without Ontology     |
-| ------------------------------------------------- | :----------------------------------------: | :----------------------: |
-| Answer source                                     | **Rules engine (6/6, 100% deterministic)** | LLM AI (6/6, stochastic) |
-| Structured tables in answer                       |                    5/6                     |           6/6            |
-| Impact-chain graph nodes                          |        59 total across 6 scenarios         |          **0**           |
-| Impact-chain graph edges                          |                  50 total                  |          **0**           |
-| Matched ontology concepts                         |               4–6 per answer               |          **—**           |
-| Metric definitions used                           |                7–9 per pack                |          **0**           |
-| Admits data limitation ("cannot determine cause") |           **0/3** why-questions            | 2/3 lapse why-questions  |
-<!-- markdownlint-enable MD013 MD060 -->
+|Dimension|With Ontology|Without Ontology|
+|-------------------------------------------------|:----------------------------------------:|:----------------------:|
+|Answer source|**Rules engine (6/6, 100% deterministic)**|LLM AI (6/6, stochastic)|
+|Structured tables in answer|5/6|6/6|
+|Impact-chain graph nodes|59 total across 6 scenarios|**0**|
+|Impact-chain graph edges|50 total|**0**|
+|Matched ontology concepts|4–6 per answer|**—**|
+|Metric definitions used|7–9 per pack|**0**|
+|Admits limitation ("cannot determine cause")|**0/3** why-questions|2/3 lapse why-questions|
 
 **Key findings.**
 
@@ -888,8 +868,8 @@ grounded in the full ontology, once grounded in raw uploaded tables):
 
 2. **Impact-chain graphs are ontology-exclusive.** Across 6 scenarios
    the ontology side visualised **59 graph nodes / 50 edges** that
-   matched concepts like `TotalVNB` , `AgentProductivity` ,
-`ActiveAgentCount` , `WeightedVNBMargin` , etc. The baseline side has
+   matched concepts like `TotalVNB`,`AgentProductivity` ,
+`ActiveAgentCount`,`WeightedVNBMargin` , etc. The baseline side has
    no graph and no matched concepts — it treats every column literally.
 
 3. **Lapse why-question is the clearest contrast.** With ontology:
@@ -900,15 +880,15 @@ grounded in the full ontology, once grounded in raw uploaded tables):
    *"I cannot determine a definitive cause … the uploaded tables
    contain lapse outcomes but do not include any explanatory
    variables"* — correctly identifying that the raw tables lack what
-   the ontology's `metric_formulas` , `graph_nodes` and
+   the ontology's `metric_formulas`,`graph_nodes` and
 `graph_edges` provide.
 
 4. **Rule-sort bug fix discovered during testing.** The VNB pack had
-`vnb_gap` ( `sort=4` ) preceding `mom_attribution` ( `sort=27` ). The
-   regex pattern `why.*vnb` in `vnb_gap` captured *"Why is there such
-   a movement in VNB"* before `mom_attribution` 's `movement` pattern
-   could run. Fix: raised `mom_attribution` to `sort=1` , dropped
-`vnb_gap` to `sort=28` . Post-fix the why-question now returns a
+`vnb_gap`(`sort=4`) preceding`mom_attribution`(`sort=27` ). The
+   regex pattern `why.*vnb`in`vnb_gap` captured*"Why is there such
+   a movement in VNB"* before `mom_attribution`'s`movement` pattern
+   could run. Fix: raised `mom_attribution`to`sort=1` , dropped
+`vnb_gap`to`sort=28` . Post-fix the why-question now returns a
    proper attribution table — *Active-agent effect +$0.045M,
    Productivity +$0.042M, Mix/margin +$0.012M, per-channel breakdown*
    — and 20 graph nodes instead of a 173-char gap paragraph.
@@ -920,7 +900,7 @@ grounded in the full ontology, once grounded in raw uploaded tables):
    to outcomes, and rule templates that compose them into answers.
 
 **Regression suites after all changes:**
-`tests/verify_login.py` 24/24 ✅ · `tests/verify_model_endpoints.py`
+`tests/verify_login.py`24/24 ✅ ·`tests/verify_model_endpoints.py`
 
 65/65 ✅. No pre-existing regressions introduced.
 
@@ -941,15 +921,13 @@ answered twice through `POST /api/ask/compare` by the same model.
 **Scored rubric (0–5 per axis):** business depth, logical rigour, data
 linkage, explainability.
 
-<!-- markdownlint-disable MD013 MD060 -->
-| Axis           | With ontology  |   Plain LLM   |   Delta    |
-| -------------- | :------------: | :-----------: | :--------: |
-| Business depth |    4.14 / 5    |   2.14 / 5    |   +2.00    |
-| Logical rigour |    5.00 / 5    |   0.43 / 5    |   +4.57    |
-| Data linkage   |    5.00 / 5    |   3.14 / 5    |   +1.86    |
-| Explainability |    5.00 / 5    |   1.00 / 5    |   +4.00    |
-| **Total**      | **19.14 / 20** | **6.71 / 20** | **+12.43** |
-<!-- markdownlint-enable MD013 MD060 -->
+|Axis|With ontology|Plain LLM|Delta|
+|--------------|:------------:|:-----------:|:--------:|
+|Business depth|4.14 / 5|2.14 / 5|+2.00|
+|Logical rigour|5.00 / 5|0.43 / 5|+4.57|
+|Data linkage|5.00 / 5|3.14 / 5|+1.86|
+|Explainability|5.00 / 5|1.00 / 5|+4.00|
+|**Total**|**19.14 / 20**|**6.71 / 20**|**+12.43**|
 
 Every scenario scored 19–20 for the ontology side; the baseline ranged
 1–10. The numbers are reproduced per question in
