@@ -39,6 +39,7 @@ uploaded tables in Graph studio
 
 ## 1. Quick start (Windows)
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 :: 1. (optional) create a virtual environment
 python -m venv .venv && .venv\Scripts\activate
@@ -50,6 +51,7 @@ start_server.bat
 pip install -r requirements.txt
 python main.py
 ```
+<!-- markdownlint-enable MD013 -->
 
 `start_server.bat` installs missing dependencies, then starts the
 server. On first launch the database is created automatically under
@@ -70,9 +72,11 @@ required:
 1. Open `C:\Windows\System32\drivers\etc\hosts` as administrator and
    append:
 
+<!-- markdownlint-disable MD013 -->
 ```text
 127.0.0.1  onti.local
 ```
+<!-- markdownlint-enable MD013 -->
 
 1. Flush DNS (`ipconfig /flushdns`) and browse to:
 
@@ -89,9 +93,11 @@ immediately. The credentials are **not displayed on the web pages** (to
 avoid exposing them to anyone who reaches the site); they are only shown
 in the local server console and recorded here for the operator:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Username | Password |
 | -------- | ----------- |
 | `admin` | `Onti@2026` |
+<!-- markdownlint-enable MD013 MD060 -->
 
 > **Change the default password after first login** (Admin console →
 > Users & audit → reset password). You can also create additional
@@ -103,11 +109,13 @@ in the local server console and recorded here for the operator:
 
 Behind a restricted network, install with a mirror:
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 pip install -r requirements.txt ^
   -i https://pypi.tuna.tsinghua.edu.cn/simple ^
   --trusted-host pypi.tuna.tsinghua.edu.cn
 ```
+<!-- markdownlint-enable MD013 -->
 
 ### AI models are optional
 
@@ -138,11 +146,13 @@ in the database, so each gateway can be configured independently.
 
 From `.env` , the same flag can be set with any of:
 
+<!-- markdownlint-disable MD013 -->
 ```bash
 NOVA_VERIFY_SSL=false      # canonical Nova-specific name
 LLM_VERIFY_SSL=false       # generic
 SKIP_SSL_VERIFY=1          # alternative trigger
 ```
+<!-- markdownlint-enable MD013 -->
 
 > **Important — base URLs and model ids are gateway-specific.**
 > The Base URL must be the provider's full API prefix — the platform
@@ -180,10 +190,12 @@ The two roles have separate URLs so the boundary stays obvious. The
 admin console header carries a one-way **← User portal** button back to
 `/app` ; the user portal deliberately has no link into `/admin` :
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Portal          | URL                           | Who               |
 | --------------- | ----------------------------- | ----------------- |
 | **User portal** | <http://localhost:8010/app>   | all accounts      |
 | **Admin**       | <http://localhost:8010/admin> | `admin` role only |
+<!-- markdownlint-enable MD013 MD060 -->
 
 The two sign-in pages are visually distinct (light user page vs. dark
 navy admin page). Visiting `/admin` while signed out redirects to
@@ -379,6 +391,7 @@ ontology's entities and relations ( `ontology_service._auto_generate_graph` ):
 Every edge is rendered with a colour + dash + width from a fixed
 palette; the legend shows a line sample for each type present:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Edge type | Colour | Dash | Meaning |
 | ------------- | --------- | -------- | ------------------------------------- |
 | `STRUCTURAL` | `#5B8DEF` | solid | Formula-derived identity relationship |
@@ -386,6 +399,7 @@ palette; the legend shows a line sample for each type present:
 | `MIX` | `#B45309` | `3,3` | Weighting to blended margin |
 | `CROSS_LINK` | `#7C3AED` | `10,4,2` | Cross-cutting multi-node dependency |
 | `RELATION` | `#2563EB` | solid | Entity relationship (class layer) |
+<!-- markdownlint-enable MD013 MD060 -->
 
 ### Interactions
 
@@ -432,11 +446,13 @@ so they start in sync.
 The **Open large view** modal carries a toolbar with analysis tools
 backed by server-side graph algorithms:
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Tool        | Endpoint                | What it does                      |
 | ----------- | ----------------------- | --------------------------------- |
 | Path finder | `GET /api/graph/path`   | BFS shortest directed path.       |
 | Impact      | `GET /api/graph/impact` | N-hop up/downstream reachability. |
 | Cycle check | `GET /api/graph/cycles` | DFS cycle detection.              |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Results render as a level-by-level chip list while the rest of the
 graph dims. **Reset** restores the full view.
@@ -835,11 +851,13 @@ Generation history.
 
 Outputs are written to `data/reports/<report-id>/` :
 
+<!-- markdownlint-disable MD013 MD060 -->
 | Format       | Characteristics                                        |
 | ------------ | ------------------------------------------------------ |
 | **HTML**     | Self-contained file, charts as base64, print-friendly. |
 | **PDF**      | A4 layout, cover, KPI cards, repeating headers.        |
 | **Markdown** | Clean Markdown with linked chart references.           |
+<!-- markdownlint-enable MD013 MD060 -->
 
 Each report card offers **🌐 View** (opens the HTML inline), the three
 downloads and delete. Empty sections are omitted and numbering adjusts
@@ -852,11 +870,13 @@ to the content.
 Every model configuration is a standard OpenAI-compatible Chat
 Completions endpoint:
 
+<!-- markdownlint-disable MD013 -->
 ```HTTP
 POST {base_url}/chat/completions
 Authorization: Bearer {api_key}
 {"model": "...", "messages": [...], "temperature": ..., "max_tokens": ...}
 ```
+<!-- markdownlint-enable MD013 -->
 
 Examples: OpenAI, DeepSeek, Moonshot, Together, SiliconFlow, and local
 servers such as Ollama, vLLM, LM Studio. The client reads the current
@@ -907,6 +927,7 @@ Related admin endpoints: `GET /api/admin/proposals` ,
 
 `config/config.json` holds only deployment-level settings:
 
+<!-- markdownlint-disable MD013 -->
 ```json
 {
   "system_name": "Onti",
@@ -921,6 +942,7 @@ Related admin endpoints: `GET /api/admin/proposals` ,
   }
 }
 ```
+<!-- markdownlint-enable MD013 -->
 
 Models, answer modes, packs and users are managed in the application /
 database, not in files.
@@ -959,19 +981,23 @@ generated reports survive restarts, and **self-registration stays open**
 `data/onti.db` , so pre-provisioned accounts (including a demo account for
 another team) are present on first start:
 
+<!-- markdownlint-disable MD013 -->
 ```bash
 docker compose up -d --build      # http://localhost:8010
 ```
+<!-- markdownlint-enable MD013 -->
 
 `docker-compose.yml` mounts the named volume `onti-data` at `/data`
 
 and sets `ONTI_DATA_DIR=/data` , so users, sessions, uploads and
 reports survive restarts and rolling updates. Without Compose:
 
+<!-- markdownlint-disable MD013 -->
 ```bash
 docker build -t onti .
 docker run -d --name onti -p 8010:8010 -v onti-data:/data onti
 ```
+<!-- markdownlint-enable MD013 -->
 
 For several replicas behind a load balancer, also pin one signing key on
 every container ( `ONTI_SECRET_KEY` ) so session cookies and encrypted
@@ -1096,7 +1122,7 @@ role.
   **POST** `/api/graph-studio/infer` , **POST**
 `/api/graph-studio/create-ontology` — source graphs (upload is
   in-memory only) and data → ontology generation with preview.
-* **GET** `/api/graph/path`,          `/api/graph/impact`,          `/api/graph/cycles`
+* **GET** `/api/graph/path`, `/api/graph/impact`, `/api/graph/cycles`
   — graph intelligence (path, N-hop impact, cycle detection).
 * **POST** `/api/ask-stream` — SSE answer stream
   ( `meta` → `token*` → `done` / `error` ); the `done` event carries
@@ -1105,7 +1131,7 @@ role.
 `with_ontology` (rules / grounded AI, with its impact chain) and
 `without_ontology` (same model, raw data tables only, no graph), plus
   a `value` summary of what the ontology contributed.
-* **GET** `/api/analytics/timeseries`,          `/attribution`,          `/scenario`,
+* **GET** `/api/analytics/timeseries`, `/attribution`, `/scenario`,
 `/agent-stats` — monthly analytics.
 * **POST/GET/DELETE** `/api/reports...` — generate, list, download,
   delete; **POST** `/api/reports/sample` — one-click demo report;
@@ -1131,9 +1157,11 @@ role.
 
 `/api/ask-stream` body:
 
+<!-- markdownlint-disable MD013 -->
 ```json
 { "question": "What is the total VNB?", "mode": "auto", "history": [] }
 ```
+<!-- markdownlint-enable MD013 -->
 
 `mode` is `auto` (rules first, AI fallback), `rules` , or `ai` .
 
@@ -1143,6 +1171,7 @@ role.
 
 With the server running on port 8010:
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 :: layer-level checks (no server needed)
 python tests\verify_t1.py
@@ -1186,6 +1215,7 @@ python tests\verify_permissions.py
 :: ontology value: 14 scenarios, with vs without ontology, scored report
 python tests\verify_ontology_value.py      :: writes docs\ONTOLOGY_VALUE_REPORT.md
 ```
+<!-- markdownlint-enable MD013 -->
 
 ### Run log (who ran what, when)
 
@@ -1195,24 +1225,30 @@ through the runner, and every execution is appended to
 timestamps, actor, host, script, status, exit code, last output line and
 duration):
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 :: every tests\*.py script (skips _-prefixed helpers)
 python tests\run_all.py
 python tests\run_all.py smoke verify_t9  :: only matching scripts
 ```
+<!-- markdownlint-enable MD013 -->
 
 Code style and static checks (config lives in `pyproject.toml` ):
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 python -m black .          :: format (88 columns)
 python -m ruff check .     :: lint — must report zero findings
 ```
+<!-- markdownlint-enable MD013 -->
 
 Inspect the most recent entries:
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 python -m modules.run_log              :: prints the last 10 runs
 ```
+<!-- markdownlint-enable MD013 -->
 
 Retention is capped by `runtime.run_log_max_entries` (default `5000` ) and
 the file location is `runtime.run_log` , both under the `runtime` block of
@@ -1263,11 +1299,13 @@ needs the same synthetic-demo pack and cleans up every table it creates.
 To reset to a clean state (re-seeds the sample pack and re-provisions
 the default admin):
 
+<!-- markdownlint-disable MD013 -->
 ```bat
 :: stop the server first
 del data\onti.db data\onti.db-wal data\onti.db-shm
 python -m modules.db
 ```
+<!-- markdownlint-enable MD013 -->
 
 ---
 
@@ -1278,6 +1316,7 @@ The codebase follows a **thin HTTP layer, fat service layer** split:
 router registration), the HTTP endpoints live in `routes/` , and all
 business logic lives in `modules/` .
 
+<!-- markdownlint-disable MD013 -->
 ```text
 Code/
 ├─ main.py              # FastAPI app assembly: lifespan, handlers, routers.
@@ -1338,6 +1377,7 @@ Code/
 ├─ templates/           # login, app, admin pages
 └─ static/              # app.css, common.js, graph.js, app.js, admin.js
 ```
+<!-- markdownlint-enable MD013 -->
 
 ### How a question flows through the modules
 
