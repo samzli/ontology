@@ -174,8 +174,9 @@ sign-in page. The split is deliberately simple:
   access, oversee everyone's knowledge bases, configure the available
   models, and monitor usage. They do not answer questions there.
 
-There is deliberately no navigation link between the two consoles — the
-two roles have separate URLs so the boundary stays obvious:
+The two roles have separate URLs so the boundary stays obvious. The
+admin console header carries a one-way **← User portal** button back to
+`/app`; the user portal deliberately has no link into `/admin`:
 
 | Portal          | URL                           | Who               |
 | --------------- | ----------------------------- | ----------------- |
@@ -950,13 +951,13 @@ multi-user workspace run the container with a persistent volume:
 docker compose up -d --build      # http://localhost:8010
 ```
 
-`docker-compose.yml` mounts the named volume `onti-data` at `/app/data`
-and sets `ONTI_DATA_DIR=/app/data`, so users, sessions, uploads and
+`docker-compose.yml` mounts the named volume `onti-data` at `/data`
+and sets `ONTI_DATA_DIR=/data`, so users, sessions, uploads and
 reports survive restarts and rolling updates. Without Compose:
 
 ```bash
 docker build -t onti .
-docker run -d --name onti -p 8010:8010 -v onti-data:/app/data onti
+docker run -d --name onti -p 8010:8010 -v onti-data:/data onti
 ```
 
 For several replicas behind a load balancer, also pin one signing key on
@@ -1252,7 +1253,7 @@ Code/
 ├─ requirements.txt
 ├─ pyproject.toml       # black (88 cols) + ruff lint configuration
 ├─ Dockerfile           # container image (python:3.12-slim)
-├─ docker-compose.yml   # persistent volume `onti-data` at /app/data
+├─ docker-compose.yml   # persistent volume `onti-data` at /data
 ├─ .dockerignore
 ├─ vercel.json          # serverless build/route config (all paths → main.py)
 ├─ config/config.json   # port, session, upload, runtime (run-log) settings

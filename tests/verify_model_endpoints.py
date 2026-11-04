@@ -30,6 +30,7 @@ models and user, and removes them again.
 
 from __future__ import annotations
 
+import ssl
 import sys
 import time
 from pathlib import Path
@@ -40,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules import auth  # noqa: E402
 from modules.db import get_conn, now  # noqa: E402
+from modules.llm_client import describe_transport_error  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 ADMIN_USER = auth.DEFAULT_ADMIN_USERNAME
@@ -184,15 +186,30 @@ def main() -> int:
         body = r.json()
         ok(r.status_code == 200, "self-signed gateway test -> 200", r.status_code)
         ok(body.get("ok") is False, "self-signed gateway -> ok:false", body)
+        if body.get("category") == "tls_certificate":
+            cert_error = (body.get("error") or "").lower()
+            cert_hint = (body.get("hint") or "").lower()
+        else:
+            # nova.deloitte.com.cn is only routable on the corporate network;
+            # off-network the call fails earlier (DNS/connect), so verify the
+            # classifier directly with a synthetic certificate error instead.
+            synthetic = httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+            synthetic.__cause__ = ssl.SSLCertVerificationError(
+                "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+                "self-signed certificate in certificate chain"
+            )
+            desc = describe_transport_error(synthetic)
+            cert_error = desc["error"].lower()
+            cert_hint = desc["hint"].lower()
         ok(
-            "certificate" in (body.get("error") or "").lower(),
+            "certificate" in cert_error,
             "self-signed gateway -> certificate error, not 'not reached'",
-            body.get("error"),
+            cert_error,
         )
         ok(
-            "verify ssl" in (body.get("hint") or "").lower(),
+            "verify ssl" in cert_hint,
             "self-signed gateway -> hint names the Verify SSL toggle",
-            body.get("hint"),
+            cert_hint,
         )
         r = admin.post(
             "/api/admin/models/test",
