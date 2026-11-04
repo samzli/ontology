@@ -320,6 +320,7 @@ def main() -> int:
     print("[10] Data upload validation + commit")
     tables = admin.get(f"/api/admin/data/tables?pack_id={PID}").json()["tables"]
     ch = next(t for t in tables if t["key"] == "channels")
+    prev_ch_ds = ch.get("active_dataset_id")
     csv_text = (
         "id,name,count,churn,prod\n"
         "DD,Digital Direct,12,0.08,40\n"
@@ -358,6 +359,15 @@ def main() -> int:
         ok(
             admin.delete(f"/api/admin/data/datasets/{dsid}").status_code == 200,
             "smoke dataset removed (state restored)",
+        )
+    if prev_ch_ds:
+        ok(
+            admin.post(
+                f"/api/admin/data/datasets/{prev_ch_ds}/activate",
+                json={"value": ch["id"]},
+            ).status_code
+            == 200,
+            "channels active dataset restored",
         )
     bad = {"file": ("evil.txt", b"hello", "text/plain")}
     r = admin.post(
