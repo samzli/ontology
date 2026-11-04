@@ -8,8 +8,10 @@ __pycache__
 .env.*
 tests
 docs
-data/onti.db
+# Ship the pre-seeded database (packs, KPI data, pre-provisioned accounts)
+# and the machine key, so every container starts from the same state and
+# can decrypt model API keys stored in that database. WAL side files and
+# generated reports stay out: SQLite recreates them on first write.
 data/onti.db-wal
 data/onti.db-shm
 data/reports
-data/.onti.key

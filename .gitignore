@@ -1,0 +1,22 @@
+# Local environment and secrets — never commit real credentials.
+.env
+.env.local
+
+# Python bytecode and caches (regenerated on every run)
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Test-run audit log (append-only output of tests/run_all.py)
+data/run_log.jsonl
+
+# SQLite write-ahead files (the database itself is committed on purpose)
+data/*.db-wal
+data/*.db-shm
+
+# Virtual environments and editor state
+.venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
