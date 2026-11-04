@@ -25,7 +25,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from common.values import is_num as _is_num, month_label
+from common.values import is_num as _is_num
+from common.values import month_label
 
 AGENCY_CHANNEL = "CH001"
 NON_AGENCY_CHANNELS = ("CH002", "CH003")

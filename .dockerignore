@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.*
+tests
+docs
+data/onti.db
+data/onti.db-wal
+data/onti.db-shm
+data/reports
+data/.onti.key

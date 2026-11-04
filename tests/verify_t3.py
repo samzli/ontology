@@ -16,8 +16,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.db import get_conn, now, set_setting
 from modules import ontology_service as svc
+from modules.db import get_conn, now, set_setting
 
 failures = []
 

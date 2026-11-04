@@ -21,7 +21,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from fastapi import Depends, HTTPException, Request
 
 from modules import config
-from modules.db import audit, get_conn, get_setting, now, session_signing_key
+from modules.db import (
+    EPHEMERAL_STORAGE,
+    audit,
+    get_conn,
+    get_setting,
+    now,
+    session_signing_key,
+)
 
 COOKIE_NAME = "onti_session"
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{3,64}$")
@@ -520,13 +527,22 @@ def register_account(
 
     Raises:
         AuthError: With 422 for invalid credentials, and 403 when
-            self-registration is disabled.
+            self-registration is disabled or the host uses ephemeral
+            (per-instance) storage.
 
     Example:
         >>> register_account(conn, "alice", "long-enough-password")["role"]
         'user'
     """
     validate_credentials(username, password)
+    if EPHEMERAL_STORAGE:
+        raise AuthError(
+            "This preview deployment runs on ephemeral serverless storage, so "
+            "new accounts are not kept between requests. Sign in with the "
+            "pre-provisioned demo account, or deploy Onti with a persistent "
+            "disk (README → Deployment).",
+            403,
+        )
     first = user_count(conn) == 0
     if not first and get_setting(conn, "allow_registration", "1") != "1":
         raise AuthError("Self-registration is disabled. Contact an administrator.", 403)

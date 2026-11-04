@@ -63,7 +63,16 @@ same seeded packs, accounts and report metadata. Files under
 from the bundled copy (`report_builder._abs`). The machine key
 (`data/.onti.key`) always stays next to the bundled data, so encrypted
 model API keys and signed session cookies are identical across
-instances.
+instances; `ONTI_SECRET_KEY` overrides it on hosts that cannot ship a key
+file (multi-replica or stateless deployments).
+
+`db.EPHEMERAL_STORAGE` is true whenever the writable directory differs
+from the bundled `data/` folder — i.e. every serverless instance. Writes
+there live only for that instance, so `auth.register_account` refuses to
+create accounts and `/api/auth/status` reports `ephemeral: true`; the
+sign-in pages then hide registration and explain how to run with a
+persistent disk. Use the Docker image with the `onti-data` volume
+(README → Deploying with Docker) for durable multi-user state.
 
 ## 2. Data model (SQLite)
 
@@ -669,7 +678,10 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   table and, on logout, to `revoked_sessions`, so logout revokes it
   immediately; other serverless instances verify the signature and check
   the revocation table before loading the user directly, so a cookie
-  survives cold starts and per-instance `/tmp` databases.
+  survives cold starts and per-instance `/tmp` databases. That fallback
+  still needs the user row, which another instance may not have, so
+  account creation is disabled on ephemeral storage
+  (`db.EPHEMERAL_STORAGE`).
   `/api/admin/*` requires the admin role; the admin UI is a separate page
   with no cross-links from the user portal.
 - API keys (system and user) are encrypted with a machine-local key
@@ -715,9 +727,10 @@ python tests\verify_ontology_value.py       :: 14 scenarios; writes the value re
 
 ### Run log
 
-`tests\run_all.py` executes every `tests\*.py` script (or a filtered
-subset) as a subprocess and appends one JSON line per run to
-`data/run_log.jsonl` through `modules/run_log.py:record_run`:
+`tests\run_all.py` executes every `tests\*.py` script — except `_`-prefixed
+helper modules such as `_seed_synthetic.py`, which tests import rather than
+execute — (or a filtered subset) as a subprocess and appends one JSON line per
+run to `data/run_log.jsonl` through `modules/run_log.py:record_run`:
 
 | Field                                                | Meaning                                                 |
 | ---------------------------------------------------- | ------------------------------------------------------- |

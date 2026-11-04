@@ -507,6 +507,11 @@ the Dashboard chat and the with/without ontology comparison alike.
 Users & audit → create the account (or enable self-registration) and
 share the user portal URL: `http://onti.local:8010/app` after the
 hosts mapping in the README, otherwise `http://localhost:8010/app`.
-On a Vercel deployment use the project's production URL (`https://…/app`)
-and make sure **Deployment Protection → Vercel Authentication** is
-disabled, otherwise only members of your Vercel team can open it.
+Self-registration and accounts created there need a persistent disk; on
+Vercel the function filesystem is per-instance, so registration is
+disabled (`/api/auth/status` → `ephemeral: true`) and the sign-in pages
+explain it. Use the Docker deployment (README → Deploying with Docker)
+for a real multi-user workspace. On Vercel use the project's production
+URL (`https://…/app`) and make sure **Deployment Protection → Vercel
+Authentication** is disabled, otherwise only members of your Vercel team
+can open it.

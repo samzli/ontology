@@ -267,7 +267,7 @@ def render(rows: List[Dict[str, Any]]) -> str:
         "## Scoring rubric (0–5 per axis)",
         "",
         "| Axis | What it measures |",
-        "|---|---|",
+        "| --- | --- |",
         "| Business depth | Sectioned decomposition, quantified findings, multiple analytical dimensions |",
         "| Logical rigour | Cross-table reconciliation, exact identity bridge, statistical tests |",
         "| Data linkage | Distinct tables/joins actually used and numbers cited |",
@@ -276,7 +276,7 @@ def render(rows: List[Dict[str, Any]]) -> str:
         "## Aggregate",
         "",
         "| Axis | With ontology | Plain LLM | Delta |",
-        "|---|---|---|---|",
+        "| --- | --- | --- | --- |",
     ]
     for a in AXES:
         label = a.replace("_", " ").title()
@@ -289,7 +289,7 @@ def render(rows: List[Dict[str, Any]]) -> str:
         "## Per-scenario results",
         "",
         "| # | Dimension | Question | With (0–20) | Plain LLM (0–20) | Steps | Findings | Tables joined | Reconciled |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for i, r in enumerate(rows, 1):
         L.append(

@@ -3,22 +3,15 @@
 from __future__ import annotations
 
 import re
+from typing import Any, Dict
 
-from typing import Any
-from typing import Dict
-
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from pydantic import Field
-from pydantic import field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from modules import auth
 from modules import config as cfg
-from modules.db import get_conn
-from modules.db import get_setting
+from modules.db import EPHEMERAL_STORAGE, get_conn, get_setting
 
 router = APIRouter()
 
@@ -83,16 +76,21 @@ class LoginIn(BaseModel):
 
 @router.get("/api/auth/status")
 async def auth_status():
-    """Report first-run state and whether self-registration is open.
+    """Report first-run state, registration availability and storage mode.
 
     Returns:
-        dict: ``{"first_run": bool, "allow_registration": bool}``.
+        dict: ``{"first_run": bool, "allow_registration": bool,
+        "ephemeral": bool}``. ``allow_registration`` is false when an
+        administrator closed self-registration **or** the host uses
+        ephemeral storage where new accounts would not persist.
     """
     with get_conn() as conn:
         count = conn.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
         return {
             "first_run": count == 0,
-            "allow_registration": get_setting(conn, "allow_registration", "1") == "1",
+            "allow_registration": get_setting(conn, "allow_registration", "1") == "1"
+            and not EPHEMERAL_STORAGE,
+            "ephemeral": EPHEMERAL_STORAGE,
         }
 
 

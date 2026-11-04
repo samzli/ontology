@@ -78,8 +78,24 @@
       const errBox = document.getElementById('authError');
       const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
 
+      // A 401 from any user-portal API call bounces here with ?expired=1.
+      if (new URLSearchParams(location.search).get('expired')) {
+        document.getElementById('authSub').textContent =
+          'Your session ended. Please sign in again.';
+      }
+
       api.get('/api/auth/status').then((s) => {
-        if (s.first_run) {
+        if (s.ephemeral) {
+          const banner = document.getElementById('firstRun');
+          banner.textContent =
+            'Preview deployment: serverless storage is per-instance, so new '
+            + 'accounts are not kept between refreshes. Sign in with the demo '
+            + 'account, or run Onti with a persistent disk '
+            + '(README → Deployment).';
+          banner.style.cssText =
+            'display:block;background:#fff7e6;border-color:#f0c36d;color:#7a5b00';
+        }
+        if (s.first_run && s.allow_registration) {
           mode = 'register';
           document.getElementById('firstRun').style.display = 'block';
           document.getElementById('fNameWrap').style.display = 'block';
@@ -88,12 +104,11 @@
           document.getElementById('authBtn').textContent = 'Create admin & continue';
           document.getElementById('switchText').textContent = 'You are setting up a new workspace.';
           document.getElementById('switchBtn').style.display = 'none';
-        } else {
-          if (!s.allow_registration) {
-            document.getElementById('switchBtn').style.display = 'none';
-            document.getElementById('switchText').textContent =
-              'Self-registration is closed — please contact an administrator.';
-          }
+        } else if (!s.allow_registration) {
+          document.getElementById('switchBtn').style.display = 'none';
+          document.getElementById('switchText').textContent = s.ephemeral
+            ? 'Account creation is unavailable on this preview deployment.'
+            : 'Self-registration is closed — please contact an administrator.';
         }
       }).catch(() => {});
 
