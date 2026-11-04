@@ -80,16 +80,15 @@ async def auth_status():
 
     Returns:
         dict: ``{"first_run": bool, "allow_registration": bool,
-        "ephemeral": bool}``. ``allow_registration`` is false when an
-        administrator closed self-registration **or** the host uses
-        ephemeral storage where new accounts would not persist.
+        "ephemeral": bool}``. ``allow_registration`` is false only when an
+        administrator closed self-registration; ``ephemeral`` reports the
+        storage mode for diagnostics (registration itself stays available).
     """
     with get_conn() as conn:
         count = conn.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
         return {
             "first_run": count == 0,
-            "allow_registration": get_setting(conn, "allow_registration", "1") == "1"
-            and not EPHEMERAL_STORAGE,
+            "allow_registration": get_setting(conn, "allow_registration", "1") == "1",
             "ephemeral": EPHEMERAL_STORAGE,
         }
 
