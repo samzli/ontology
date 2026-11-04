@@ -1,8 +1,13 @@
 # Ontology value report — rule engine + deterministic analysis vs plain LLM
 
-Pack under test: `bp-planning-v4` built from `BPTablesTest_v4_clean.xlsx` (6 tables, 3,552 rows, no pre-written narrative column).
+Pack under test: `bp-planning-v4` built from `BPTablesTest_v4_clean.xlsx`
 
-Every scenario below is executed through `POST /api/ask/compare`, the same endpoint the user portal calls. Both sides receive the same question and the same raw data; the only difference is the ontology layer (entities, relations, metric formulas, rules engine, deterministic analysis, impact graph).
+(6 tables, 3, 552 rows, no pre-written narrative column).
+
+Every scenario below is executed through `POST /api/ask/compare` , the same
+endpoint the user portal calls. Both sides receive the same question and the
+same raw data; the only difference is the ontology layer (entities, relations,
+metric formulas, rules engine, deterministic analysis, impact graph).
 
 ## Scoring rubric (0–5 per axis)
 
@@ -44,13 +49,25 @@ Every scenario below is executed through `POST /api/ask/compare`, the same endpo
 
 ## What the ontology side does that the plain LLM cannot
 
-1. **Exact factor bridge.** VNB is decomposed per segment with sequential factor substitution over the declared identity `VNB = Active agents × Avg productivity × VNB margin`; the effects sum to the reported move with a residual of $0.000M.
-2. **Cross-table proof.** The product-mix margin is recomputed by joining `mix` to `product` on `product_id`, then shown to equal the channel's implied VNB/APE margin.
-3. **Agent cohorts.** `agent_monthly` joined to `agent_master` on `agent_id` yields productivity and APE contribution by churn band, certification and tenure.
-4. **Statistical diagnostics.** OLS trend with R², coefficient of variation, z-score against history, momentum, Herfindahl concentration and driver correlation.
-5. **Reasoning trace.** Every answer carries numbered steps naming the method, the tables joined and the result, plus an impact chain walked over the ontology graph.
+1. **Exact factor bridge.** VNB is decomposed per segment with sequential
+   factor substitution over the declared identity
+`VNB = Active agents × Avg productivity × VNB margin` ; the effects sum to
+   the reported move with a residual of $0.000M.
+2. **Cross-table proof.** The product-mix margin is recomputed by joining
+`mix` to `product` on `product_id` , then shown to equal the channel's
+   implied VNB/APE margin.
+3. **Agent cohorts.** `agent_monthly` joined to `agent_master` on `agent_id`
+   yields productivity and APE contribution by churn band, certification and
+   tenure.
+4. **Statistical diagnostics.** OLS trend with R², coefficient of variation,
+   z-score against history, momentum, Herfindahl concentration and driver
+   correlation.
+5. **Reasoning trace.** Every answer carries numbered steps naming the
+   method, the tables joined and the result, plus an impact chain walked
+   over the ontology graph.
 
-The plain-LLM side can only restate the table it was shown; it has no schema, no joins, no identity and no graph, so it cannot produce 1–5.
+The plain-LLM side can only restate the table it was shown; it has no schema,
+no joins, no identity and no graph, so it cannot produce 1–5.
 
 ## Appendix — representative side-by-side
 
@@ -59,6 +76,7 @@ The plain-LLM side can only restate the table it was shown; it has no schema, no
 **With ontology** (rules engine + deterministic analysis, first 900 chars):
 
 ```text
+
 ## VNB in Apr 2025
 
 | Metric | Apr 2025 | Mar 2025 | Delta |
