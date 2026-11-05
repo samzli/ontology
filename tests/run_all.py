@@ -61,6 +61,46 @@ def _last_line(text: str) -> str:
     return (lines[-1] if lines else "")[:300]
 
 
+# Accounts the test scripts register for their own scenarios. They must never
+# survive a test run: the bundled database ships in the deployment, so a
+# leftover ``perm_…`` or ``freshbot_…`` login would show up in the live admin
+# console and confuse real users.
+_SYNTHETIC_PREFIXES = ("user_", "freshbot", "perm_", "repro", "t6_", "smoke")
+_SYNTHETIC_NAMES = {"testuser99", "edgebot", "alice", "bob", "rootadmin"}
+
+
+def _clean_test_accounts() -> int:
+    """Delete throw-away accounts created by the test scripts.
+
+    Only names that match the synthetic patterns are removed, so real
+    accounts (``admin``, ``giteam``, ``ais123``, …) are never touched.
+
+    Returns:
+        int: Number of accounts deleted.
+
+    Example:
+        >>> _clean_test_accounts()  # doctest: +SKIP
+        3
+    """
+    from modules.db import get_conn
+
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, username FROM users").fetchall()
+        drop = [
+            row["id"]
+            for row in rows
+            if row["username"] in _SYNTHETIC_NAMES
+            or row["username"].startswith(_SYNTHETIC_PREFIXES)
+        ]
+        if drop:
+            marks = ",".join("?" * len(drop))
+            conn.execute(f"DELETE FROM users WHERE id IN ({marks})", drop)
+            conn.execute(
+                "DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)"
+            )
+    return len(drop)
+
+
 def main(argv: Sequence[str]) -> int:
     """Run the selected scripts, log every result and return an exit code.
 
@@ -105,6 +145,8 @@ def main(argv: Sequence[str]) -> int:
         failures += 0 if status == "PASS" else 1
 
     print(f"\nRun log: {run_log.RUN_LOG_PATH}")
+    removed = _clean_test_accounts()
+    print(f"Test accounts removed: {removed}")
     return 0 if failures == 0 else 1
 
 

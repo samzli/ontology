@@ -23,30 +23,30 @@ engine, deterministic analysis, impact graph).
 
 | Axis | With ontology | Plain LLM | Delta |
 | --- | --- | --- | --- |
-| Business Depth | 1.00 / 5 | 2.07 / 5 | +-1.07 |
-| Logical Rigour | 0.43 / 5 | 0.29 / 5 | +0.14 |
-| Data Linkage | 1.14 / 5 | 2.71 / 5 | +-1.57 |
-| Explainability | 0.79 / 5 | 1.07 / 5 | +-0.29 |
-| **Total** | **3.36 / 20** | **6.14 / 20** | **+-2.79** |
+| Business Depth | 0.86 / 5 | 1.14 / 5 | +-0.29 |
+| Logical Rigour | 0.36 / 5 | 0.43 / 5 | +-0.07 |
+| Data Linkage | 1.00 / 5 | 1.86 / 5 | +-0.86 |
+| Explainability | 0.71 / 5 | 0.79 / 5 | +-0.07 |
+| **Total** | **2.93 / 20** | **4.21 / 20** | **+-1.29** |
 
 ## Per-scenario results
 
 | # | Dimension | With | Plain | Steps | Findings | Tables | OK |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Level | 5 | 0 | 0 | 0 | 0 | no |
-| 2 | Level | 4 | 5 | 0 | 0 | 0 | no |
+| 2 | Level | 0 | 0 | 0 | 0 | 0 | no |
 | 3 | Level | 0 | 8 | 0 | 0 | 0 | no |
-| 4 | Movement | 0 | 8 | 0 | 0 | 0 | no |
-| 5 | Movement | 8 | 11 | 0 | 0 | 0 | no |
+| 4 | Movement | 0 | 3 | 0 | 0 | 0 | no |
+| 5 | Movement | 8 | 4 | 0 | 0 | 0 | no |
 | 6 | Movement | 5 | 10 | 0 | 0 | 0 | no |
 | 7 | Mix | 1 | 8 | 0 | 0 | 0 | no |
-| 8 | Mix | 5 | 8 | 0 | 0 | 0 | no |
-| 9 | Cohort | 2 | 2 | 0 | 0 | 0 | no |
-| 10 | Cohort | 2 | 0 | 0 | 0 | 0 | no |
-| 11 | Trend | 5 | 4 | 0 | 0 | 0 | no |
-| 12 | Trend | 2 | 4 | 0 | 0 | 0 | no |
-| 13 | Coverage | 8 | 10 | 0 | 0 | 0 | no |
-| 14 | Coverage | 0 | 8 | 0 | 0 | 0 | no |
+| 8 | Mix | 5 | 1 | 0 | 0 | 0 | no |
+| 9 | Cohort | 1 | 0 | 0 | 0 | 0 | no |
+| 10 | Cohort | 2 | 1 | 0 | 0 | 0 | no |
+| 11 | Trend | 5 | 8 | 0 | 0 | 0 | no |
+| 12 | Trend | 2 | 6 | 0 | 0 | 0 | no |
+| 13 | Coverage | 7 | 6 | 0 | 0 | 0 | no |
+| 14 | Coverage | 0 | 4 | 0 | 0 | 0 | no |
 
 ### Scenario questions
 
@@ -112,8 +112,8 @@ MoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity
 **Plain LLM** (same model, same raw data, no ontology — full):
 
 ```text
-Total VNB in **April 2025** was **$1.32M** (from the `vnb_monthly` table:
-2025-04 Total VNB = 1.32055).
+Total **VNB** in April 2025 was **$1.32M** (from the `vnb_monthly` table:
+2025-04 total VNB = 1.32055).
 ```
 
 ## Reproduce

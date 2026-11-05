@@ -555,17 +555,29 @@ the Dashboard chat and the with/without ontology comparison alike.
 Users & audit → create the account (or enable self-registration) and
 share the user portal URL: `http://onti.local:8010/app` after the
 hosts mapping in the README, otherwise `http://localhost:8010/app` .
+Never share a `localhost` or `onti.local` address with a colleague: those
+names only resolve on the machine running the server. For remote access
+use the deployment domain ( `https://…/app` ).
 Self-registration works on every host, but accounts created at runtime
 need a persistent disk to survive: on Vercel the function filesystem is
 per-instance ( `/api/auth/status`→`ephemeral: true` ), so a registered
-account lives on one instance only. The Docker deployment keeps the
-volume, so accounts persist there ( `ephemeral: false` ) — use it
-(README → Deploying with Docker)
-for a real multi-user workspace. On Vercel use the project's production
-URL ( `https://…/app` ) and make sure **Deployment Protection → Vercel
-Authentication** is disabled, otherwise only members of your Vercel team
-can open it. Mind the URL: `vercel.com/<team>/<project>/<url>` is a
-dashboard path that always answers 404; the app lives on its own domain.
+account lives on one instance only. A session stays signed in across
+instances (the signed cookie carries the identity claims), but the
+account still has to be recreated if the cookie is lost. The Docker
+deployment keeps the volume, so accounts persist there
+( `ephemeral: false` ) — use it (README → Deploying with Docker)
+for a real multi-user workspace.
+**Pre-provision accounts before deploying.** Serverless instances always
+start from the committed `data/onti.db` : create the accounts you want to
+hand out on a local or Docker instance, then commit the database and
+redeploy. Accounts added inside the deployed admin console are
+per-instance and vanish on the next cold start. The bundled database
+ships only the real accounts — the test suite deletes the throw-away
+logins it creates, so `data/onti.db` never accumulates synthetic users.
+On Vercel make sure **Deployment Protection → Vercel Authentication** is
+disabled, otherwise only members of your Vercel team can open the app.
+Mind the URL: `vercel.com/<team>/<project>/<url>` is a dashboard path that
+always answers 404; the app lives on its own domain.
 
 **Q:** A team (e.g. GI) wants to build an ontology demo — do they need
 admin accounts?

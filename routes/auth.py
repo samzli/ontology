@@ -80,9 +80,12 @@ async def auth_status():
 
     Returns:
         dict: ``{"first_run": bool, "allow_registration": bool,
-        "ephemeral": bool}``. ``allow_registration`` is false only when an
-        administrator closed self-registration; ``ephemeral`` reports the
-        storage mode for diagnostics (registration itself stays available).
+        "ephemeral": bool, "accounts_persist": bool}``.
+        ``allow_registration`` is false only when an administrator closed
+        self-registration; ``ephemeral`` reports the storage mode for
+        diagnostics (registration itself stays available) and
+        ``accounts_persist`` is its inverse, so the sign-in page can warn
+        users that accounts are not shared between instances.
     """
     with get_conn() as conn:
         count = conn.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
@@ -90,6 +93,7 @@ async def auth_status():
             "first_run": count == 0,
             "allow_registration": get_setting(conn, "allow_registration", "1") == "1",
             "ephemeral": EPHEMERAL_STORAGE,
+            "accounts_persist": not EPHEMERAL_STORAGE,
         }
 
 
@@ -101,14 +105,28 @@ async def register(data: LoginIn):
         data (LoginIn): Username, password and optional display name.
 
     Returns:
-        JSONResponse: Body ``{"user": {...}}`` plus the session cookie.
+        JSONResponse: Body ``{"user": {...}, "notice": str}`` plus the
+        session cookie. ``notice`` is a non-empty, user-facing explanation
+        only on hosts that cannot persist accounts between instances.
     """
     with get_conn() as conn:
         user = auth.register_account(
             conn, data.username.strip(), data.password, data.display_name.strip(), ""
         )
         result = auth.authenticate(conn, data.username.strip(), data.password)
-        resp = JSONResponse({"user": user})
+        resp = JSONResponse(
+            {
+                "user": user,
+                "notice": (
+                    ""
+                    if not EPHEMERAL_STORAGE
+                    else "This demo deployment keeps accounts per instance."
+                    " Stay signed in on this browser; if you are asked to"
+                    " sign in again, register again or use a"
+                    " pre-provisioned account."
+                ),
+            }
+        )
         resp.set_cookie(
             auth.COOKIE_NAME,
             result["token"],
