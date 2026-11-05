@@ -48,8 +48,7 @@ async def admin_user_settings(admin: Dict[str, Any] = Depends(auth.require_admin
     """
     with get_conn() as conn:
         users = conn.execute(
-            "SELECT id, username, display_name, role, last_login FROM users "
-            "ORDER BY id"
+            "SELECT id, username, display_name, role, last_login FROM users ORDER BY id"
         ).fetchall()
         out = []
         for u in users:
