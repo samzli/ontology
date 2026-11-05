@@ -62,11 +62,45 @@ class IdIn(BaseModel):
     value: Any
 
 
+def can_access_pack(conn, user: Dict[str, Any], pid: int) -> bool:
+    """Check whether a non-admin user may access a given pack.
+
+    Admin users always get True. For regular users the pack must be one
+    of: the globally active pack, a built-in pack, or a pack they created.
+
+    Args:
+        conn: Open database connection.
+        user (Dict[str, Any]): Signed-in user record.
+        pid (int): Pack id to check.
+
+    Returns:
+        bool: True if the user may access the pack.
+
+    Example:
+        >>> can_access_pack(conn, {"role": "admin"}, 99)
+        True
+    """
+    if user.get("role") == "admin":
+        return True
+    row = conn.execute(
+        "SELECT created_by, is_builtin, is_active FROM ontology_packs WHERE id=?",
+        (pid,),
+    ).fetchone()
+    if row is None:
+        return False
+    username = user.get("username", "")
+    created_by = row["created_by"] or ""
+    return bool(
+        row["is_active"] or row["is_builtin"] or (created_by and created_by == username)
+    )
+
+
 def user_pack_id(conn, user: Dict[str, Any]) -> Optional[int]:
     """Resolve the pack this user is working in.
 
     The user's personal selection (persisted via the portal scenario dropdown)
-    wins; otherwise the globally active pack is used.
+    wins — but only if they may still access it. Otherwise the globally active
+    pack is used (if they can access it).
 
     Args:
         conn: Open database connection.
@@ -76,7 +110,7 @@ def user_pack_id(conn, user: Dict[str, Any]) -> Optional[int]:
         Optional[int]: Id of the effective pack, or ``None`` when no pack exists.
 
     Example:
-        >>> user_pack_id(conn, {"id": 7})
+        >>> user_pack_id(conn, {"id": 7, "role": "user"})
         3
     """
     raw = get_setting(conn, f"user_pack:{user['id']}", "")
@@ -85,14 +119,12 @@ def user_pack_id(conn, user: Dict[str, Any]) -> Optional[int]:
             pid = int(raw)
         except (TypeError, ValueError):
             pid = None
-        if (
-            pid is not None
-            and conn.execute(
-                "SELECT 1 FROM ontology_packs WHERE id=?", (pid,)
-            ).fetchone()
-        ):
+        if pid is not None and can_access_pack(conn, user, pid):
             return pid
-    return adm.active_pack_id(conn)
+    active = adm.active_pack_id(conn)
+    if active is not None and can_access_pack(conn, user, active):
+        return active
+    return None
 
 
 def resolve_pack(conn, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:

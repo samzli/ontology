@@ -16,6 +16,7 @@ from modules.db import audit, get_conn, set_setting
 from modules.seed import PACK_SLUG as SAMPLE_PACK_SLUG
 from routes.common import (
     _ensure_auto_report,
+    can_access_pack,
     pack_data_sources,
     resolve_pack,
     user_pack_id,
@@ -26,9 +27,11 @@ router = APIRouter()
 
 @router.get("/api/packs")
 async def list_packs(user: Dict[str, Any] = Depends(auth.current_user)):
-    """Scenario picker data: every ontology pack with its provenance.
+    """Scenario picker data: ontology packs the user may access.
 
-    Lets the user switch the working scenario from the portal header.
+    Admins see every pack. Regular users see only: packs they created,
+    the globally active pack, and built-in packs. This guarantees strict
+    data isolation between non-admin accounts.
 
     Args:
         user (Dict[str, Any]): Injected by the ``current_user`` dependency.
@@ -41,14 +44,26 @@ async def list_packs(user: Dict[str, Any] = Depends(auth.current_user)):
     with get_conn() as conn:
         chosen = user_pack_id(conn, user)
         active = adm.active_pack_id(conn)
+        is_admin = user.get("role") == "admin"
+        username = user.get("username", "")
         out = []
         for r in conn.execute(
-            "SELECT p.id, p.slug, p.name, p.description, p.origin, p.is_builtin, "
-            "p.created_at, "
+            "SELECT p.id, p.slug, p.name, p.description, p.origin, p.created_by, "
+            "p.is_builtin, p.is_active, p.created_at, "
             "(SELECT COUNT(*) FROM entities e WHERE e.pack_id=p.id) AS entities, "
             "(SELECT COUNT(*) FROM datasets d WHERE d.pack_id=p.id) AS datasets "
             "FROM ontology_packs p ORDER BY p.id"
         ).fetchall():
+            # Permission filter: admin sees everything; user sees only their
+            # own + builtin + globally active packs.
+            if not is_admin:
+                created_by = r["created_by"] or ""
+                if not (
+                    r["is_active"]
+                    or r["is_builtin"]
+                    or (created_by and created_by == username)
+                ):
+                    continue
             out.append(
                 {
                     "id": r["id"],
@@ -87,7 +102,9 @@ async def choose_pack(
 ):
     """Persist the user's scenario selection (survives reloads).
 
-    Passing ``pack_id=null`` falls back to the globally active pack.
+    Passing ``pack_id=null`` falls back to the globally active pack. Non-admin
+    users may only select packs they are allowed to access (their own, built-in,
+    or globally active); any other id returns 403.
 
     Args:
         data (MyPackIn): Requested pack id (or ``None`` to reset).
@@ -95,7 +112,7 @@ async def choose_pack(
 
     Returns:
         dict | JSONResponse: ``{"ok": true, "pack_id": int}``; 404 JSON when the
-        pack does not exist.
+        pack does not exist, 403 when the user may not access it.
 
     Example:
         >>> choose_pack(MyPackIn(pack_id=3), user)
@@ -110,6 +127,12 @@ async def choose_pack(
             "SELECT 1 FROM ontology_packs WHERE id=?", (data.pack_id,)
         ).fetchone():
             return JSONResponse(status_code=404, content={"error": "Unknown pack."})
+        # Permission gate — non-admins cannot pick an arbitrary pack.
+        if not can_access_pack(conn, user, data.pack_id):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "You may not access this ontology."},
+            )
         set_setting(conn, f"user_pack:{user['id']}", str(data.pack_id))
         name = conn.execute(
             "SELECT name FROM ontology_packs WHERE id=?", (data.pack_id,)
@@ -185,7 +208,7 @@ async def dashboard_data(user: Dict[str, Any] = Depends(auth.current_user)):
         mom = None
         if prev and prev.get("total_vnb"):
             mom = (latest.get("total_vnb") or 0) / prev["total_vnb"] - 1
-        fnum = lambda v, d=3: ("—" if v is None else f"{v:,.{d}f}")  # noqa: E731
+        fnum = lambda v, d=3: "—" if v is None else f"{v:,.{d}f}"  # noqa: E731
         latest_kpis = [
             {
                 "key": "latest_ape",

@@ -438,7 +438,15 @@ async def graph_studio_create(
             payload = svc.infer_ontology(pack, data.table_ids, name, slug)
             if data.ai_enrich:
                 _ai_enrich_ontology(conn, pack, payload, data.table_ids)
-            pid = adm.import_pack(conn, user["username"], payload, activate=True)
+            # Only admins may activate a pack globally on creation; regular
+            # users' packs stay private to them (is_active=0) so no other
+            # account sees them until an admin explicitly activates.
+            pid = adm.import_pack(
+                conn,
+                user["username"],
+                payload,
+                activate=(user.get("role") == "admin"),
+            )
             # Provenance: record how this ontology was created and from what.
             # Table ids refer to the SOURCE pack — resolve names there.
             src_names = [

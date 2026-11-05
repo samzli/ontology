@@ -564,6 +564,7 @@ CREATE TABLE IF NOT EXISTS ontology_packs (
     schema_version TEXT NOT NULL DEFAULT 'onti-pack/v1',
     narrative      TEXT NOT NULL DEFAULT '',
     origin         TEXT NOT NULL DEFAULT '',
+    created_by     TEXT NOT NULL DEFAULT '',
     version        INTEGER NOT NULL DEFAULT 1,
     is_builtin     INTEGER NOT NULL DEFAULT 0,
     is_active      INTEGER NOT NULL DEFAULT 0,
@@ -916,6 +917,25 @@ def init_db(seed: bool = True) -> None:
             conn.execute(
                 "ALTER TABLE ontology_packs ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
             )
+        if "created_by" not in cols:
+            conn.execute(
+                "ALTER TABLE ontology_packs ADD COLUMN created_by TEXT NOT NULL DEFAULT ''"
+            )
+            # Best-effort backfill: parse usernames out of origin strings like
+            # "Generated in Graph studio by <user> from …" or
+            # "Imported from JSON file by <user>".
+            rows = conn.execute(
+                "SELECT id, origin FROM ontology_packs WHERE created_by='' AND origin<>''"
+            ).fetchall()
+            import re as _re
+
+            for pid, origin in rows:
+                m = _re.search(r"by\s+(\w+)\s+(?:from|$)", origin)
+                if m:
+                    conn.execute(
+                        "UPDATE ontology_packs SET created_by=? WHERE id=?",
+                        (m.group(1), pid),
+                    )
         cols = {r[1] for r in conn.execute("PRAGMA table_info(ask_history)").fetchall()}
         if cols and "answer" not in cols:
             conn.execute(

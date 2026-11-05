@@ -185,6 +185,23 @@ admin console header carries a one-way **← User portal** button back to
 |**User portal**|<http://localhost:8010/app>|all accounts|
 |**Admin**|<http://localhost:8010/admin>|`admin` role only|
 
+### Data isolation
+
+Every `ontology_packs` row now carries a `created_by` username. On top of
+that, the picker (and every endpoint that accepts a `pack_id`) applies a
+hard permission gate in `routes/common.py` :
+
+* **Admin** → sees every pack in the system.
+* **Regular user** → sees only packs that are:
+  * built-in (`is_builtin = 1`), or
+  * globally active (`is_active = 1`, an admin decision), or
+  * created by themselves (`created_by = <their username>`).
+
+Constructing a direct `POST /api/my/pack {pack_id: <someone-else's-id>}`
+returns **403 Forbidden**. Regular users who build an ontology in Graph
+studio get a pack that is private to them by default (`is_active = 0`);
+no other account can see or select it until an admin activates it.
+
 The two sign-in pages are visually distinct (light user page vs. dark
 navy admin page). Visiting `/admin` while signed out redirects to
 `/admin/login` ; a regular (non-admin) account is redirected back to

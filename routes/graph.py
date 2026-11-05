@@ -286,7 +286,7 @@ def _insight_analysis(
                     "kind": "formula",
                     "key": key,
                     "title": f.get("label") or key,
-                    "description": "Derived metric formula in the active " "ontology.",
+                    "description": "Derived metric formula in the active ontology.",
                     "facts": facts,
                     "paragraph": f"The formula **{f.get('label') or key}** "
                     f"computes `{f.get('expression', '')}`"
@@ -363,9 +363,7 @@ def _insight_analysis(
                     ),
                 ]
             )
-        paragraph = (
-            f"**{title}** (`{ent['key']}`) is an entity in the active " f"ontology."
-        )
+        paragraph = f"**{title}** (`{ent['key']}`) is an entity in the active ontology."
         if tbls:
             paragraph += (
                 f" Its data is stored in the knowledge-base table"
