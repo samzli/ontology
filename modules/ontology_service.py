@@ -151,7 +151,9 @@ def _safe_eval(expr: str, namespace: Dict[str, Any]) -> Any:
         if isinstance(node, ast.Name) and node.id not in namespace:
             raise EvalError(f"Unknown name in expression: {node.id}")
     code = compile(tree, "<ontology-formula>", "eval")
-    return eval(code, {"__builtins__": {}}, namespace)  # noqa: S307 - AST is whitelisted
+    return eval(
+        code, {"__builtins__": {}}, namespace
+    )  # noqa: S307 - AST is whitelisted
 
 
 # ===========================================================================

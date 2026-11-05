@@ -103,18 +103,24 @@ def _prepare_data_dir() -> None:
     if _READY:
         return
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if (
-        DB_PATH != _BUNDLED_DB_PATH
-        and not DB_PATH.exists()
-        and _BUNDLED_DB_PATH.exists()
-    ):
-        # Ship the pre-seeded database with the deployment so every cold start
-        # exposes the same packs, accounts and reports.
-        shutil.copy2(_BUNDLED_DB_PATH, DB_PATH)
-        for suffix in ("-wal", "-shm"):
-            side = Path(str(DB_PATH) + suffix)
-            if side.exists():
-                side.unlink()
+    if DB_PATH != _BUNDLED_DB_PATH and not DB_PATH.exists():
+        restored = False
+        if EPHEMERAL_STORAGE:
+            # A previous instance may have pushed a snapshot to the external
+            # store; prefer it over the bundled database so accounts survive
+            # cold starts. No backend configured -> plain False, no cost.
+            from modules import snapshot
+
+            restored = snapshot.restore_latest(DB_PATH)
+        if not restored and _BUNDLED_DB_PATH.exists():
+            # Ship the pre-seeded database with the deployment so every cold
+            # start exposes the same packs, accounts and reports.
+            shutil.copy2(_BUNDLED_DB_PATH, DB_PATH)
+        if restored or _BUNDLED_DB_PATH.exists():
+            for suffix in ("-wal", "-shm"):
+                side = Path(str(DB_PATH) + suffix)
+                if side.exists():
+                    side.unlink()
     _READY = True
 
 

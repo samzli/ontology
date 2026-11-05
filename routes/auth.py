@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from modules import auth
+from modules import auth, snapshot
 from modules import config as cfg
 from modules.db import EPHEMERAL_STORAGE, get_conn, get_setting
 
@@ -80,20 +80,22 @@ async def auth_status():
 
     Returns:
         dict: ``{"first_run": bool, "allow_registration": bool,
-        "ephemeral": bool, "accounts_persist": bool}``.
+        "ephemeral": bool, "accounts_persist": bool, "snapshot_sync": bool}``.
         ``allow_registration`` is false only when an administrator closed
         self-registration; ``ephemeral`` reports the storage mode for
-        diagnostics (registration itself stays available) and
-        ``accounts_persist`` is its inverse, so the sign-in page can warn
-        users that accounts are not shared between instances.
+        diagnostics; ``snapshot_sync`` tells whether a snapshot backend is
+        configured, and ``accounts_persist`` is true whenever the host is
+        persistent *or* snapshots carry accounts across instances.
     """
     with get_conn() as conn:
         count = conn.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
+        synced = snapshot.enabled()
         return {
             "first_run": count == 0,
             "allow_registration": get_setting(conn, "allow_registration", "1") == "1",
             "ephemeral": EPHEMERAL_STORAGE,
-            "accounts_persist": not EPHEMERAL_STORAGE,
+            "snapshot_sync": synced,
+            "accounts_persist": (not EPHEMERAL_STORAGE) or synced,
         }
 
 
@@ -114,27 +116,31 @@ async def register(data: LoginIn):
             conn, data.username.strip(), data.password, data.display_name.strip(), ""
         )
         result = auth.authenticate(conn, data.username.strip(), data.password)
-        resp = JSONResponse(
-            {
-                "user": user,
-                "notice": (
-                    ""
-                    if not EPHEMERAL_STORAGE
-                    else "This demo deployment keeps accounts per instance."
-                    " Stay signed in on this browser; if you are asked to"
-                    " sign in again, register again or use a"
-                    " pre-provisioned account."
-                ),
-            }
-        )
-        resp.set_cookie(
-            auth.COOKIE_NAME,
-            result["token"],
-            httponly=True,
-            samesite="lax",
-            max_age=cfg.SESSION_DAYS * 86400,
-        )
-        return resp
+    # The account row is committed now — push a snapshot before this instance
+    # can be replaced (no-op when no snapshot backend is configured).
+    snapshot.request_sync()
+    persists = (not EPHEMERAL_STORAGE) or snapshot.enabled()
+    resp = JSONResponse(
+        {
+            "user": user,
+            "notice": (
+                ""
+                if persists
+                else "This demo deployment keeps accounts per instance."
+                " Stay signed in on this browser; if you are asked to"
+                " sign in again, register again or use a"
+                " pre-provisioned account."
+            ),
+        }
+    )
+    resp.set_cookie(
+        auth.COOKIE_NAME,
+        result["token"],
+        httponly=True,
+        samesite="lax",
+        max_age=cfg.SESSION_DAYS * 86400,
+    )
+    return resp
 
 
 @router.post("/api/auth/login")

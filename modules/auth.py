@@ -909,6 +909,12 @@ def _unknown_account_message() -> str:
     base = "Invalid username or password."
     if not EPHEMERAL_STORAGE:
         return base
+    from modules import snapshot  # local import: keeps module load order free
+
+    if snapshot.enabled():
+        # Snapshots carry accounts across instances, so the per-instance
+        # hint would be misleading.
+        return base
     return (
         base
         + " This demo deployment does not share accounts between instances."

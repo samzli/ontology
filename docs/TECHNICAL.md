@@ -75,11 +75,24 @@ present, or when `ONTI_EPHEMERAL=1` is set explicitly. It is **not**
 derived from the data-directory path: a Docker container points
 `ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent.
 On an ephemeral host writes live only for that instance, so
-`/api/auth/status`reports`ephemeral: true` ; registration stays open
-(new accounts work for the life of that instance) but the accounts are
-not shared between instances. Use the
-Docker image with the `onti-data` volume (README → Deploying with Docker)
-for durable multi-user state.
+`/api/auth/status`reports`ephemeral: true` ; `modules/snapshot.py`
+closes the durability gap by mirroring the database to an external store
+(see below). Without a snapshot backend, accounts stay per-instance: use
+the Docker image with the `onti-data` volume (README → Deploying with
+Docker) for guaranteed durable multi-user state.
+
+**Snapshot sync ( `modules/snapshot.py` ).** Two backends, selected by
+environment: `BLOB_READ_WRITE_TOKEN` → Vercel Blob (REST, snapshot stored
+under an unguessable prefix derived from the signing key because Blob
+URLs are public), or `ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` → any
+HTTP endpoint ( `PUT` to upload, `GET` to download). On cold start
+`db._prepare_data_dir` restores the latest snapshot before falling back
+to the bundled database; uploads happen after every account mutation
+(`snapshot.request_sync`, burst-collapsed to one upload per 5 s) and on
+a schedule via `GET /api/internal/snapshot-sync` (wired as a daily Vercel
+Cron, authenticated by `CRON_SECRET` when set). All failures are logged
+and swallowed, so a store outage never breaks a request; with no backend
+configured every call is a no-op.
 
 ## 2. Data model (SQLite)
 
@@ -797,12 +810,14 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   so the visitor stays signed in instead of looping back to `/login`. The
   fallback is **scoped to ephemeral hosts**; a persistent host keeps the
   strict row check, and a row that exists but is disabled is always
-  rejected. Runtime accounts are still per-instance — this only prevents
-  the session loop, it does not make the account durable.
-* `/api/auth/status` publishes `ephemeral` and `accounts_persist` so the
-  sign-in page can show the **Demo deployment** banner before the user
-  registers. `POST /api/auth/register` returns a non-empty `notice` in
-  the same situation, and an unknown-username 401 keeps the stable
+  rejected. Without a snapshot backend runtime accounts are still
+  per-instance — this prevents the session loop; snapshot sync is what
+  makes the account itself durable.
+* `/api/auth/status` publishes `ephemeral`, `snapshot_sync` and
+  `accounts_persist` (true when the host is persistent *or* a snapshot
+  backend is configured). `POST /api/auth/register` returns a non-empty
+  `notice` only when accounts genuinely cannot persist, and an
+  unknown-username 401 keeps the stable
   `Invalid username or password.` prefix but appends the per-instance
   explanation.
 * `/api/admin/*` requires the admin role; the admin UI is a separate page

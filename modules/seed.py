@@ -2561,9 +2561,7 @@ def _load_monthly_pack(wb: Any):
                         "decimals": (
                             4
                             if cfmt == "percent"
-                            else 3
-                            if cfmt in ("currency_m", "currency_k")
-                            else 0
+                            else 3 if cfmt in ("currency_m", "currency_k") else 0
                         ),
                     }
                     for ck, clabel, ctype, cunit, cfmt in cols
