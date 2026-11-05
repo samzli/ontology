@@ -21,5 +21,15 @@
       ".json",
       ".txt"
     ]
+  },
+  "snapshot": {
+    "blob_api_base": "https://blob.vercel-storage.com",
+    "blob_api_version": "7",
+    "prefix": "onti",
+    "timeout_s": 20,
+    "min_interval_s": 5,
+    "blob_token_env": "BLOB_READ_WRITE_TOKEN",
+    "http_url_env": "ONTI_SNAPSHOT_URL",
+    "http_token_env": "ONTI_SNAPSHOT_TOKEN"
   }
 }

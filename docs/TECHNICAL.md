@@ -788,7 +788,7 @@ explicit "what this view needs" panel — not an error — with three routes:
 switch the Scenario selector to a compatible sales pack, upload the four
 tables through Data centre, or use the pack's own Dashboard metrics.
 
-## 8. Security notes
+## 8. Security, deployment and performance
 
 * Sessions are HttpOnly cookies whose value is an HMAC-signed JSON
   payload (`auth.issue_session_token`). The payload holds the user id,
@@ -848,6 +848,34 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   Python is rejected at save time.
 * All state-changing endpoints require confirmation in the UI and
   write to the `audit` table.
+
+### 8.1 Deployment topology (Vercel vs Docker)
+
+* **Vercel.** Vercel detects the FastAPI `app` in `main.py` and routes
+  every path to that single function. `vercel.json` must therefore
+  **not** contain a catch-all `rewrites` entry: rewriting to
+  `/main.py` replaces the request path with the file name, so every
+  route answers `{"detail":"Not Found"}`. The file only sets
+  `functions.main.py.maxDuration` and the daily snapshot cron;
+  `/static` is promoted to the CDN by the framework integration.
+* **Docker.** `ONTI_DATA_DIR=/data` on the `onti-data` volume makes the
+  host persistent (`ephemeral: false`), so no snapshot backend is
+  needed; set `ONTI_SECRET_KEY` when running several replicas.
+* **Configuration switching.** `ONTI_CONFIG` selects another config
+  file and `ONTI_ENV=docker` deep-merges `config/config.<env>.json`
+  over `config/config.json`; secrets stay in environment variables
+  named by the `snapshot` block.
+
+### 8.2 Data-processing performance
+
+CSV/XLSX ingestion stays on pandas: the workbook path relies on the
+`openpyxl` engine (`.xlsx` ) and the legacy `.xls` reader, which
+polars does not cover without an extra calamine dependency, and polars
+would add tens of megabytes to the 500 MB serverless bundle. The hot
+paths were instead made vectorised — question-list import uses
+`Series.str.strip` plus `to_dict("records")` rather than `iterrows` —
+while per-row validation keeps an explicit loop because it must report
+the row number and field-level error for every rejected row.
 
 ## 9. Testing
 

@@ -132,17 +132,18 @@ def parse_question_file(filename: str, content: bytes) -> List[Dict[str, str]]:
     ccol = next((c for c in df.columns if "categ" in c.lower()), None)
     if qcol is None:
         qcol = df.columns[0]
-    items = []
-    for _, row in df.iterrows():
-        q = str(row.get(qcol, "")).strip()
-        if q:
-            items.append(
-                {
-                    "question": q,
-                    "category": str(row.get(ccol, "")).strip() if ccol else "",
-                }
-            )
-    return items
+    # Vectorised extraction: no per-row Python loop over the frame.
+    picked = pd.DataFrame(
+        {
+            "question": df[qcol].astype(str).str.strip(),
+            "category": (
+                df[ccol].astype(str).str.strip()
+                if ccol
+                else pd.Series("", index=df.index, dtype=str)
+            ),
+        }
+    )
+    return picked[picked["question"] != ""].to_dict("records")
 
 
 # ---------------------------------------------------------------------------

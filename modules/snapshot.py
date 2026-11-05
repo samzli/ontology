@@ -20,6 +20,7 @@ from __future__ import annotations
 import hmac
 import os
 import sqlite3
+import tempfile
 import time
 from pathlib import Path
 from typing import Optional
@@ -27,17 +28,26 @@ from typing import Optional
 import httpx
 
 from common.logger import AppLogger
+from modules import config as cfg
 
 _LOG = AppLogger("snapshot")
 
-_TIMEOUT = 20.0
+# Every tunable comes from config/config.json (``snapshot`` section) so hosts
+# can adjust timeouts and the Blob prefix without touching code; secrets stay
+# in environment variables named there.
+_SNAP = cfg.SNAPSHOT
+_TIMEOUT = float(_SNAP.get("timeout_s", 20))
 # Collapse bursts of account changes (e.g. an admin creating several users)
 # into a single upload.
-_MIN_INTERVAL_S = 5.0
-_last_sync = 0.0
+_MIN_INTERVAL_S = float(_SNAP.get("min_interval_s", 5))
+_BLOB_API = str(_SNAP.get("blob_api_base", "https://blob.vercel-storage.com"))
+_BLOB_API_VERSION = str(_SNAP.get("blob_api_version", "7"))
+_PREFIX = str(_SNAP.get("prefix", "onti")).strip("/")
+_BLOB_TOKEN_ENV = str(_SNAP.get("blob_token_env", "BLOB_READ_WRITE_TOKEN"))
+_HTTP_URL_ENV = str(_SNAP.get("http_url_env", "ONTI_SNAPSHOT_URL"))
+_HTTP_TOKEN_ENV = str(_SNAP.get("http_token_env", "ONTI_SNAPSHOT_TOKEN"))
 
-_BLOB_API = "https://blob.vercel-storage.com"
-_BLOB_API_VERSION = "7"
+_last_sync = 0.0
 
 
 def _env(name: str) -> str:
@@ -55,9 +65,9 @@ def backend() -> str:
         >>> backend() in ("blob", "http", "")
         True
     """
-    if _env("BLOB_READ_WRITE_TOKEN"):
+    if _env(_BLOB_TOKEN_ENV):
         return "blob"
-    if _env("ONTI_SNAPSHOT_URL"):
+    if _env(_HTTP_URL_ENV):
         return "http"
     return ""
 
@@ -94,23 +104,34 @@ def _namespace() -> str:
 def _db_bytes() -> bytes:
     """Read a consistent copy of the live database.
 
-    A WAL checkpoint runs first so the main ``.db`` file alone carries every
-    committed transaction and no sidecar needs uploading.
+    Uses SQLite's online backup API instead of copying the file or forcing a
+    WAL checkpoint: the backup sees a committed snapshot even while the app
+    is writing, so no ``-wal``/``-shm`` sidecar ever has to be shipped.
 
     Returns:
         bytes: Raw SQLite file contents.
 
     Raises:
-        sqlite3.Error: When the database cannot be checkpointed or read.
+        sqlite3.Error: When the database cannot be opened or backed up.
     """
     from modules import db
 
-    conn = sqlite3.connect(str(db.DB_PATH), timeout=30)
+    fd, name = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    tmp = Path(name)
     try:
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        src = sqlite3.connect(str(db.DB_PATH), timeout=30)
+        try:
+            dst = sqlite3.connect(str(tmp))
+            try:
+                src.backup(dst)
+            finally:
+                dst.close()
+        finally:
+            src.close()
+        return tmp.read_bytes()
     finally:
-        conn.close()
-    return Path(db.DB_PATH).read_bytes()
+        tmp.unlink(missing_ok=True)
 
 
 def _looks_like_sqlite(data: bytes) -> bool:
@@ -128,7 +149,7 @@ def _looks_like_sqlite(data: bytes) -> bool:
 def _blob_headers() -> dict:
     """Authorization headers shared by every Vercel Blob call."""
     return {
-        "authorization": f"Bearer {_env('BLOB_READ_WRITE_TOKEN')}",
+        "authorization": f"Bearer {_env(_BLOB_TOKEN_ENV)}",
         "x-api-version": _BLOB_API_VERSION,
     }
 
@@ -142,7 +163,7 @@ def _upload_blob(data: bytes) -> bool:
     Returns:
         bool: ``True`` on HTTP 2xx.
     """
-    path = f"onti/{_namespace()}/onti.db"
+    path = f"{_PREFIX}/{_namespace()}/onti.db"
     resp = httpx.put(
         f"{_BLOB_API}/{path}",
         content=data,
@@ -167,7 +188,7 @@ def _download_blob() -> Optional[bytes]:
         Optional[bytes]: Database contents, or ``None`` when no snapshot
             exists yet or the request failed.
     """
-    prefix = f"onti/{_namespace()}/"
+    prefix = f"{_PREFIX}/{_namespace()}/"
     resp = httpx.get(
         f"{_BLOB_API}?prefix={prefix}&limit=10",
         headers=_blob_headers(),
@@ -197,9 +218,9 @@ def _upload_http(data: bytes) -> bool:
         bool: ``True`` on HTTP 2xx.
     """
     resp = httpx.put(
-        _env("ONTI_SNAPSHOT_URL"),
+        _env(_HTTP_URL_ENV),
         content=data,
-        headers={"authorization": f"Bearer {_env('ONTI_SNAPSHOT_TOKEN')}"},
+        headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
         timeout=_TIMEOUT,
     )
     if resp.status_code >= 300:
@@ -215,8 +236,8 @@ def _download_http() -> Optional[bytes]:
         Optional[bytes]: Database contents, or ``None`` on failure.
     """
     resp = httpx.get(
-        _env("ONTI_SNAPSHOT_URL"),
-        headers={"authorization": f"Bearer {_env('ONTI_SNAPSHOT_TOKEN')}"},
+        _env(_HTTP_URL_ENV),
+        headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
         timeout=_TIMEOUT,
     )
     if resp.status_code >= 300:

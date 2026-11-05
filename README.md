@@ -970,9 +970,24 @@ Engine: `modules/self_iterate.py` (see TECHNICAL §3.8).
     "allow_registration": true,
     "upload_max_mb": 10,
     "allowed_upload_ext": [".csv", ".xlsx", ".xls", ".json", ".txt"]
+  },
+  "snapshot": {
+    "blob_api_base": "https://blob.vercel-storage.com",
+    "blob_api_version": "7",
+    "prefix": "onti",
+    "timeout_s": 20,
+    "min_interval_s": 5,
+    "blob_token_env": "BLOB_READ_WRITE_TOKEN",
+    "http_url_env": "ONTI_SNAPSHOT_URL",
+    "http_token_env": "ONTI_SNAPSHOT_TOKEN"
   }
 }
 ```
+
+`ONTI_CONFIG` points the app at a different file, and `ONTI_ENV=docker`
+deep-merges `config/config.<env>.json` over the base, so one image can
+serve several environments. Secrets never live in these files: the
+`snapshot` block only names the environment variables that hold them.
 
 Models, answer modes, packs and users are managed in the application /
 database, not in files.
@@ -1047,11 +1062,17 @@ The Vercel project deploys either from Git or from the Vercel CLI. When
 the project is Git-connected, a push to the production branch triggers a
 deployment; this checkout is **not** linked (there is no `.vercel/`
 folder), so publish with `vercel deploy --prod` unless the project
-auto-builds it. `vercel.json` maps `main.py` in `functions`
-( `maxDuration: 60` ), rewrites **every** path to it, and registers a
-daily cron for `GET /api/internal/snapshot-sync` — FastAPI serves the
-Jinja pages and the `/static` assets itself, so no separate static build
-is involved.
+auto-builds it.
+
+**Do not add `rewrites` to `vercel.json` .** Vercel detects the FastAPI
+`app` instance in `main.py` and routes every path to that function
+itself; a catch-all rewrite to `/main.py` replaces the incoming path
+with the file name, so FastAPI answers `{"detail":"Not Found"}` on
+every route (including `/` and `/login` ). `vercel.json` therefore only
+maps `main.py` in `functions`( `maxDuration: 60` ) and registers a daily
+cron for `GET /api/internal/snapshot-sync`. FastAPI serves the Jinja
+pages itself, and `/static` is promoted to the CDN at build time, so no
+separate static build is involved.
 
 **Dependencies and the production branch.** Vercel's Python runtime
 chooses its installer from the repository: when a `pyproject.toml` is
@@ -1152,6 +1173,22 @@ Account persistence uses separate variables: `BLOB_READ_WRITE_TOKEN`
 `ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` for your own endpoint, and
 `CRON_SECRET` to authenticate the daily snapshot-sync cron (Vercel sends
 it as a Bearer token once set).
+
+**Connecting a Vercel Blob store (recommended).** *Storage → Create →
+Blob* adds `BLOB_READ_WRITE_TOKEN` to the project environment
+automatically; redeploy afterwards. On the next cold start the instance
+restores the newest snapshot, and every registration, role change,
+password reset or account enable/disable uploads a fresh copy before the
+request returns. The daily cron (`0 3 * * *` ) covers everything else.
+Snapshots live under `onti/<derived-id>/onti.db` ; the id is derived from
+`ONTI_SECRET_KEY` (or the bundled `.onti.key` ), so keep that key stable
+or the old snapshots become unreachable. Blob URLs are public, which is
+why the path is derived from the key rather than guessable.
+
+To verify persistence, call `GET /api/auth/status` : `snapshot_sync`
+must be `true` and `accounts_persist` must stay `true` even though
+`ephemeral` is `true`. Register a user, wait for a cold start, then sign
+in again — the account must still exist.
 
 **Health check.** `GET /health` returns JSON without authentication and
 is the quickest way to confirm a deployment is alive.
@@ -1415,7 +1452,7 @@ Code/
 ├─ Dockerfile           # container image (python:3.12-slim)
 ├─ docker-compose.yml   # persistent volume `onti-data` at /data
 ├─ .dockerignore
-├─ vercel.json          # functions + rewrites + daily snapshot cron
+├─ vercel.json          # functions (maxDuration) + daily snapshot cron
 ├─ config/config.json   # port, session, upload, runtime (run-log) settings
 ├─ modules/
 │  ├─ db.py             # schema, connections, settings, audit, crypto
