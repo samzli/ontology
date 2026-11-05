@@ -923,11 +923,23 @@ def init_db(seed: bool = True) -> None:
     """
     _prepare_data_dir()
     if EPHEMERAL_STORAGE:
-        _BOOT_LOG.warn(
-            "Ephemeral storage in use (%s): new accounts, sessions and uploads "
-            "are per-instance and lost on cold starts. Point ONTI_DATA_DIR at a "
-            "persistent volume for multi-user deployments." % DATA_DIR
-        )
+        from modules import snapshot
+
+        if snapshot.enabled():
+            _BOOT_LOG.info(
+                "Ephemeral storage in use (%s); accounts persist through the "
+                "%s snapshot backend (restored on cold start, uploaded after "
+                "account changes and by the daily cron)."
+                % (DATA_DIR, snapshot.backend())
+            )
+        else:
+            _BOOT_LOG.warn(
+                "Ephemeral storage in use (%s): new accounts, sessions and "
+                "uploads are per-instance and lost on cold starts. Connect a "
+                "Vercel Blob store (BLOB_READ_WRITE_TOKEN) or set "
+                "ONTI_SNAPSHOT_URL to persist them across instances, or point "
+                "ONTI_DATA_DIR at a persistent volume." % DATA_DIR
+            )
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
         for key, value in DEFAULT_SETTINGS.items():

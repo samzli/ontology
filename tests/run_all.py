@@ -68,6 +68,22 @@ def _last_line(text: str) -> str:
 _SYNTHETIC_PREFIXES = ("user_", "freshbot", "perm_", "repro", "t6_", "smoke")
 _SYNTHETIC_NAMES = {"testuser99", "edgebot", "alice", "bob", "rootadmin"}
 
+# Packs the scripts create as scratch spaces (permission matrix, import labs,
+# restore copies). Real packs (the built-in sample, uploaded actuarial / BP
+# packs) never match these prefixes.
+_TEST_PACK_PREFIXES = (
+    "perm-user-ontology-",
+    "perm-admin-ontology-",
+    "t5-import-lab",
+    "t6-empty-lab",
+    "restored-copy",
+    "lapse_clean_verify",
+)
+
+# The shipped sample pack is identified by slug as well as the ``is_builtin``
+# flag, because older databases were seeded before that flag existed.
+_SAMPLE_PACK_SLUG = "vnb-ape-sample"
+
 
 def _clean_test_accounts() -> int:
     """Delete throw-away accounts created by the test scripts.
@@ -101,6 +117,100 @@ def _clean_test_accounts() -> int:
     return len(drop)
 
 
+def _clean_test_packs() -> int:
+    """Delete scratch packs left behind by the test scripts.
+
+    Deleting a pack cascades to its graph, tables, columns and datasets
+    (``ON DELETE CASCADE``), so the admin console and the shipped database
+    contain only real ontologies after a run.
+
+    Returns:
+        int: Number of packs deleted.
+
+    Example:
+        >>> _clean_test_packs()  # doctest: +SKIP
+        12
+    """
+    from modules.db import get_conn
+
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, slug, is_active FROM ontology_packs ORDER BY id"
+        ).fetchall()
+        drop = [r["id"] for r in rows if r["slug"].startswith(_TEST_PACK_PREFIXES)]
+        if not drop:
+            return 0
+        if any(r["is_active"] for r in rows if r["id"] in drop):
+            builtin = conn.execute(
+                "SELECT id FROM ontology_packs "
+                "WHERE is_builtin=1 OR slug=? ORDER BY id LIMIT 1",
+                (_SAMPLE_PACK_SLUG,),
+            ).fetchone()
+            if builtin is None:
+                return 0
+            conn.execute("UPDATE ontology_packs SET is_active=0")
+            conn.execute(
+                "UPDATE ontology_packs SET is_active=1 WHERE id=?", (builtin["id"],)
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO app_settings (key, value) "
+                "VALUES ('active_pack_id', ?)",
+                (str(builtin["id"]),),
+            )
+        marks = ",".join("?" * len(drop))
+        conn.execute(f"DELETE FROM ontology_packs WHERE id IN ({marks})", drop)
+        conn.execute(
+            f"DELETE FROM app_settings WHERE key IN " f"({','.join('?' * len(drop))})",
+            [f"analysis:{pid}" for pid in drop],
+        )
+    return len(drop)
+
+
+def _restore_seed_datasets() -> int:
+    """Drop test uploads from the built-in pack and re-activate its seed data.
+
+    The upload tests push scratch CSVs/XLSXs into the sample pack's tables.
+    Leaving them active changes what the demo computes, so every built-in
+    table is pointed back at its ``kind='seed'`` dataset.
+
+    Returns:
+        int: Number of uploaded datasets removed.
+
+    Example:
+        >>> _restore_seed_datasets()  # doctest: +SKIP
+        4
+    """
+    from modules.db import get_conn
+
+    with get_conn() as conn:
+        sample = "SELECT id FROM ontology_packs WHERE is_builtin=1 OR slug=?"
+        slug = (_SAMPLE_PACK_SLUG,)
+        uploaded = conn.execute(
+            "SELECT COUNT(*) n FROM datasets WHERE kind <> 'seed' "
+            f"AND pack_id IN ({sample})",
+            slug,
+        ).fetchone()["n"]
+        conn.execute(
+            "DELETE FROM datasets WHERE kind <> 'seed' " f"AND pack_id IN ({sample})",
+            slug,
+        )
+        conn.execute(
+            "UPDATE pack_tables SET active_dataset_id = ("
+            "  SELECT d.id FROM datasets d "
+            "  WHERE d.table_id = pack_tables.id AND d.kind = 'seed' "
+            "  ORDER BY d.id LIMIT 1"
+            ") "
+            f"WHERE pack_id IN ({sample}) "
+            "AND EXISTS (SELECT 1 FROM datasets d "
+            "            WHERE d.table_id = pack_tables.id AND d.kind = 'seed') "
+            "AND active_dataset_id NOT IN "
+            "    (SELECT id FROM datasets WHERE kind = 'seed')",
+            slug,
+        )
+        conn.execute("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)")
+    return uploaded
+
+
 def main(argv: Sequence[str]) -> int:
     """Run the selected scripts, log every result and return an exit code.
 
@@ -115,6 +225,11 @@ def main(argv: Sequence[str]) -> int:
         0
     """
     failures = 0
+    # Start from a clean workspace: a previous run (or a half-finished one)
+    # may have left scratch accounts or packs that would make today's run fail.
+    _clean_test_accounts()
+    _clean_test_packs()
+    _restore_seed_datasets()
     for script in _scripts(argv):
         started = time.time()
         try:
@@ -145,8 +260,13 @@ def main(argv: Sequence[str]) -> int:
         failures += 0 if status == "PASS" else 1
 
     print(f"\nRun log: {run_log.RUN_LOG_PATH}")
-    removed = _clean_test_accounts()
-    print(f"Test accounts removed: {removed}")
+    removed_users = _clean_test_accounts()
+    removed_packs = _clean_test_packs()
+    removed_datasets = _restore_seed_datasets()
+    print(
+        f"Test state cleaned: {removed_users} accounts, "
+        f"{removed_packs} packs, {removed_datasets} datasets"
+    )
     return 0 if failures == 0 else 1
 
 
