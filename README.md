@@ -89,9 +89,9 @@ immediately. The credentials are **not displayed on the web pages** (to
 avoid exposing them to anyone who reaches the site); they are only shown
 in the local server console and recorded here for the operator:
 
-|Username|Password|
-|--------|-----------|
-|`admin`|`Onti@2026`|
+| Username | Password    |
+| -------- | ----------- |
+| `admin`  | `Onti@2026` |
 
 > **Change the default password after first login** (Admin console →
 > Users & audit → reset password). You can also create additional
@@ -180,10 +180,10 @@ The two roles have separate URLs so the boundary stays obvious. The
 admin console header carries a one-way **← User portal** button back to
 `/app`; the user portal deliberately has no link into`/admin` :
 
-|Portal|URL|Who|
-|---------------|-----------------------------|-----------------|
-|**User portal**|<http://localhost:8010/app>|all accounts|
-|**Admin**|<http://localhost:8010/admin>|`admin` role only|
+| Portal          | URL                           | Who               |
+| --------------- | ----------------------------- | ----------------- |
+| **User portal** | <http://localhost:8010/app>   | all accounts      |
+| **Admin**       | <http://localhost:8010/admin> | `admin` role only |
 
 ### Data isolation
 
@@ -396,13 +396,13 @@ ontology's entities and relations ( `ontology_service._auto_generate_graph` ):
 Every edge is rendered with a colour + dash + width from a fixed
 palette; the legend shows a line sample for each type present:
 
-|Edge type|Colour|Dash|Meaning|
-|-------------|---------|--------|-------------------------------------|
-|`STRUCTURAL`|`#5B8DEF`|solid|Formula-derived identity relationship|
-|`OPERATIONAL`|`#0E7C5F`|`6,3`|Driver to component relationship|
-|`MIX`|`#B45309`|`3,3`|Weighting to blended margin|
-|`CROSS_LINK`|`#7C3AED`|`10,4,2`|Cross-cutting multi-node dependency|
-|`RELATION`|`#2563EB`|solid|Entity relationship (class layer)|
+| Edge type     | Colour    | Dash     | Meaning                               |
+| ------------- | --------- | -------- | ------------------------------------- |
+| `STRUCTURAL`  | `#5B8DEF` | solid    | Formula-derived identity relationship |
+| `OPERATIONAL` | `#0E7C5F` | `6,3`    | Driver to component relationship      |
+| `MIX`         | `#B45309` | `3,3`    | Weighting to blended margin           |
+| `CROSS_LINK`  | `#7C3AED` | `10,4,2` | Cross-cutting multi-node dependency   |
+| `RELATION`    | `#2563EB` | solid    | Entity relationship (class layer)     |
 
 ### Interactions
 
@@ -449,11 +449,11 @@ so they start in sync.
 The **Open large view** modal carries a toolbar with analysis tools
 backed by server-side graph algorithms:
 
-|Tool|Endpoint|What it does|
-|-----------|-----------------------|---------------------------------|
-|Path finder|`GET /api/graph/path`|BFS shortest directed path.|
-|Impact|`GET /api/graph/impact`|N-hop up/downstream reachability.|
-|Cycle check|`GET /api/graph/cycles`|DFS cycle detection.|
+| Tool        | Endpoint                | What it does                      |
+| ----------- | ----------------------- | --------------------------------- |
+| Path finder | `GET /api/graph/path`   | BFS shortest directed path.       |
+| Impact      | `GET /api/graph/impact` | N-hop up/downstream reachability. |
+| Cycle check | `GET /api/graph/cycles` | DFS cycle detection.              |
 
 Results render as a level-by-level chip list while the rest of the
 graph dims. **Reset** restores the full view.
@@ -852,11 +852,11 @@ Generation history.
 
 Outputs are written to `data/reports/<report-id>/` :
 
-|Format|Characteristics|
-|------------|------------------------------------------------------|
-|**HTML**|Self-contained file, charts as base64, print-friendly.|
-|**PDF**|A4 layout, cover, KPI cards, repeating headers.|
-|**Markdown**|Clean Markdown with linked chart references.|
+| Format       | Characteristics                                        |
+| ------------ | ------------------------------------------------------ |
+| **HTML**     | Self-contained file, charts as base64, print-friendly. |
+| **PDF**      | A4 layout, cover, KPI cards, repeating headers.        |
+| **Markdown** | Clean Markdown with linked chart references.           |
 
 Each report card offers **🌐 View** (opens the HTML inline), the three
 downloads and delete. Empty sections are omitted and numbering adjusts
@@ -917,6 +917,41 @@ Related admin endpoints: `GET /api/admin/proposals` ,
 `POST /api/admin/proposals/{id}/approve|reject` ,
 `POST /api/admin/packs/{pack_id}/proposals/approve-all` ,
 `POST /api/admin/data/tables/{table_id}/analyze` .
+
+### Self-iterating agent — dual-loop evolution (opt-in)
+
+The self-iterating agent improves answers *and* the ontology itself
+through two cooperating loops. It is **off by default**: every user
+flips their own `⟳ Self-iterate` switch in the header (persisted
+per user as the `self_iter:<user_id>` setting). With the switch off,
+nothing in this section runs.
+
+**Inner loop** (per question, up to 3 rounds): the agent answers, then
+a deterministic critic scores the draft (rule match, analysis depth,
+graph/metric evidence, substance — 0–90 scale, pass at 70). Below the
+bar, the critique is injected into the prompt and the model re-answers;
+the best-scoring draft wins and the full iteration trace is kept.
+
+**Outer loop** (across sessions, human-gated): every session is stored
+(`self_iter_sessions`) together with the ontology gaps it exposed —
+missing rules, coverage gaps, metric gaps (`self_iter_findings`).
+**⟳ Insights → ✨ Propose ontology improvements** harvests open gaps
+into additive `node` proposals in the existing **Admin → AI proposals**
+queue; an administrator approves them through the normal validated
+write path and the pack evolves (with a version snapshot). The loop
+never mutates the ontology on its own.
+
+**Compare ×3** — with the switch on, the Ask compare becomes a
+three-way visualization so Life and GI analysts can judge the effect
+of each layer on complex scenarios: 🟣 the self-iterated answer (with
+score trace and lift), 🟢 the original ontology pipeline, and ⚪ the
+no-ontology baseline — plus a quantitative strip (scores, rounds,
+impact-chain nodes, metrics used, answer size).
+
+Endpoints: `GET /api/self-iterate/status` ,
+`PUT /api/self-iterate/toggle` , `POST /api/ask/compare3` ,
+`GET /api/self-iterate/findings` , `POST /api/self-iterate/harvest` .
+Engine: `modules/self_iterate.py` (see TECHNICAL §3.8).
 
 ---
 
@@ -1122,6 +1157,12 @@ role.
 `with_ontology` (rules / grounded AI, with its impact chain) and
 `without_ontology` (same model, raw data tables only, no graph), plus
   a `value` summary of what the ontology contributed.
+* **POST** `/api/ask/compare3` — three-way comparison (self-iterated /
+  original / no ontology) with the inner-loop trace; **GET**
+  `/api/self-iterate/status` , **PUT** `/api/self-iterate/toggle` ,
+  **GET** `/api/self-iterate/findings` , **POST**
+  `/api/self-iterate/harvest` — the self-iterating agent (per-user
+  opt-in, default off).
 * **GET** `/api/analytics/timeseries`, `/attribution`, `/scenario`,
 `/agent-stats` — monthly analytics.
 * **POST/GET/DELETE** `/api/reports...` — generate, list, download,
@@ -1199,6 +1240,9 @@ python tests\verify_giteam.py
 
 :: registration on every host + ontology creation rights & admin visibility
 python tests\verify_permissions.py
+
+:: self-iterating agent: toggle gate, critic, dual loop, compare3, evolution
+python tests\verify_self_iterate.py          :: offline temp DB, no server
 
 :: ontology value: 14 scenarios, with vs without ontology, scored report
 python tests\verify_ontology_value.py      :: writes docs\ONTOLOGY_VALUE_REPORT.md
@@ -1312,6 +1356,7 @@ Code/
 │  ├─ graph.py          # graph, path/impact/cycles, search + insight
 │  ├─ analytics.py      # timeseries, attribution, scenario, agent stats
 │  ├─ ask.py            # SSE ask stream, compare, history
+│  ├─ self_iterate.py   # self-iterating agent: toggle, compare3, outer loop
 │  ├─ reports.py        # report CRUD and file downloads
 │  ├─ admin_packs.py    # packs, ontology, proposals, question bank
 │  ├─ admin_data.py     # datasets, rows, upload, batch import, analysis
@@ -1345,6 +1390,7 @@ Code/
 │  ├─ importer.py       # CSV/XLSX/JSON parse (sheet pick), single + batch
 │  │                      # import, column mapping, validation
 │  ├─ induction.py      # AI ontology induction (pending proposals + evidence)
+│  ├─ self_iterate.py   # dual-loop engine: critic, inner loop, harvest, stats
 │  ├─ report_builder.py # MD/HTML/PDF assembly
 │  └─ report_charts.py  # matplotlib charts + chain graph
 ├─ data/

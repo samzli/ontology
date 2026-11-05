@@ -58,6 +58,8 @@
     try {
       state.config = await api.get('/api/config');
       Onti.ontology.mount();
+      Onti.selfIter.mount();
+      wireSelfIterate();
       const p = state.config.pack;
       const pill = document.getElementById('packPill');
       pill.innerHTML = '<span>' + (p && p.name
@@ -985,13 +987,98 @@
     state.compare = !state.compare;
     compareBtn.setAttribute('aria-pressed', state.compare);
     document.getElementById('sendBtn').textContent = state.compare ? 'Compare' : 'Send';
+    const three = Onti.selfIter && Onti.selfIter.enabled();
     document.getElementById('modeNote').innerHTML = state.compare
-      ? '<b>Compare</b> — each question is answered twice: once grounded in the ' +
-      'active ontology (with its impact chain) and once with no ontology at all. ' +
-      'This costs two model calls per question.'
+      ? (three
+        ? '<b>Compare ×3</b> — one question, three runs: the self-iterating agent ' +
+        '(answer → critique → refine), the original ontology pipeline, and the ' +
+        'no-ontology baseline. Scores and the iteration trace are shown inline.'
+        : '<b>Compare</b> — each question is answered twice: once grounded in the ' +
+        'active ontology (with its impact chain) and once with no ontology at all. ' +
+        'This costs two model calls per question.')
       : modeNotes[state.mode];
     toast(state.compare ? 'Comparison mode on' : 'Comparison mode off', '', 1800);
   };
+
+  /* Self-iteration wiring: relabel compare (×3) and toggle the insights
+     button whenever the per-user switch flips. */
+  let siInsightsBtn = null;
+  function wireSelfIterate() {
+    const sync = () => {
+      const on = !!(Onti.selfIter && Onti.selfIter.enabled());
+      compareBtn.innerHTML = on
+        ? '◐ Compare ×3: self-iterated / original / none'
+        : '◐ Compare: with / without ontology';
+      if (!siInsightsBtn) {
+        siInsightsBtn = el('button', {
+          class: 'btn btn-ghost btn-xs',
+          id: 'siInsightsBtn',
+          style: 'display:none',
+          title: 'Outer-loop evolution: scores, findings and ontology proposals',
+        }, '⟳ Insights');
+        compareBtn.insertAdjacentElement('afterend', siInsightsBtn);
+        siInsightsBtn.onclick = openSiInsights;
+      }
+      siInsightsBtn.style.display = on ? '' : 'none';
+    };
+    document.addEventListener('onti:selfiter', sync);
+    sync();
+  }
+
+  async function openSiInsights() {
+    let data;
+    try {
+      data = await api.get('/api/self-iterate/findings');
+    } catch (e) {
+      toast(e.message || 'Could not load insights.', 'err');
+      return;
+    }
+    const s = data.stats || {};
+    const rows = (data.findings || []).slice(0, 30);
+    const body =
+      '<div class="grid grid-4" style="margin-bottom:14px">' +
+      [['Sessions', s.sessions], ['Avg score', (s.avg_initial_score || 0) + ' → ' + (s.avg_final_score || 0)],
+      ['Improved', (s.improved_pct || 0) + '%'], ['Open findings', s.findings_open]].map((kv) =>
+        '<div class="card"><div class="card-b" style="text-align:center">' +
+        '<div style="font-size:20px;font-weight:700">' + escHtml(String(kv[1] == null ? 0 : kv[1])) + '</div>' +
+        '<div class="small muted">' + escHtml(kv[0]) + '</div></div></div>').join('') +
+      '</div>' +
+      '<div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<b>Ontology gaps detected by the inner loop</b>' +
+      '<button class="btn btn-primary btn-xs" id="siHarvestBtn">✨ Propose ontology improvements</button></div>' +
+      '<p class="small muted" style="margin-top:0">Proposals enter the admin review queue (AI proposals) ' +
+      'and are only applied on approval — the ontology never changes itself.</p>' +
+      (rows.length
+        ? '<table class="tbl"><thead><tr><th>Time</th><th>Kind</th><th>Question</th><th>Status</th></tr></thead><tbody>' +
+        rows.map((f) =>
+          '<tr><td class="small">' + escHtml(fmtDate(f.ts)) + '</td>' +
+          '<td><span class="badge neutral">' + escHtml(f.kind) + '</span></td>' +
+          '<td class="small">' + escHtml(f.question || '') + '</td>' +
+          '<td class="small">' + escHtml(f.status) + '</td></tr>').join('') +
+        '</tbody></table>'
+        : '<p class="small muted">No findings yet — run a few Compare ×3 questions first.</p>');
+    const m = openModal({
+      title: '⟳ Self-iteration insights — outer evolution loop',
+      body,
+      wide: true,
+      footer: null,
+    });
+    const hb = m.querySelector('#siHarvestBtn');
+    if (hb) hb.onclick = async () => {
+      hb.disabled = true;
+      try {
+        const r = await api.post('/api/self-iterate/harvest', {});
+        toast('Proposed ' + (r.proposed || []).length + ' ontology improvements ' +
+          '(skipped ' + (r.skipped || 0) + ' duplicates). An admin reviews them ' +
+          'under AI proposals.', 'ok', 5000);
+        m.close();
+        openSiInsights();
+      } catch (e) {
+        toast(e.message || 'Harvest failed.', 'err');
+        hb.disabled = false;
+      }
+    };
+  }
 
   /* ------------------------------------------------------------------- send */
 
@@ -1214,6 +1301,8 @@
     if (!state.config || !state.config.pack.id) {
       toast('No active ontology pack — contact an administrator.', 'warn'); return null;
     }
+    // Self-iteration on → three-way comparison with iteration trace.
+    if (Onti.selfIter && Onti.selfIter.enabled()) return compare3Core(question);
     state.busy = true;
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('chatIntro').style.display = 'none';
@@ -1258,6 +1347,154 @@
       document.getElementById('sendBtn').disabled = false;
       card.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
+  }
+
+  /* -------------------------------------------------------- compare ×3 */
+
+  async function compare3Core(question) {
+    state.busy = true;
+    document.getElementById('sendBtn').disabled = true;
+    document.getElementById('chatIntro').style.display = 'none';
+
+    const thread = document.getElementById('thread');
+    thread.appendChild(addUserCard(question));
+    const card = el('div', { class: 'msg-ai' });
+    const head = el('div', { class: 'msg-head' });
+    head.appendChild(el('span', { class: 'badge si' }, '⟳ Compare ×3'));
+    head.appendChild(el('span', { class: 'meta' },
+      'self-iterated · original ontology · no ontology'));
+    const body = el('div', { class: 'msg-body cursor-blink' },
+      'Running the inner loop and both baselines…');
+    card.appendChild(head);
+    card.appendChild(body);
+    thread.appendChild(card);
+
+    try {
+      const resp = await fetch('/api/ask/compare3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, mode: state.mode }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || 'Comparison failed (' + resp.status + ')');
+      body.classList.remove('cursor-blink');
+      body.innerHTML = '';
+      renderCompare3Card(body, data);
+      state.qaLog.push({
+        question,
+        answer: (data.self_iterated.answer || '').slice(0, 1200),
+        source: data.self_iterated.source,
+        matched: (data.self_iterated.source || '').indexOf('rules') === 0,
+        latency_ms: 0,
+        graph: data.self_iterated.graph,
+        suggestions: [],
+      });
+    } catch (e) {
+      body.classList.remove('cursor-blink');
+      body.innerHTML = '<p>' + escHtml(e.message) + '</p>';
+      toast(e.message, 'err');
+    } finally {
+      state.busy = false;
+      document.getElementById('sendBtn').disabled = false;
+      card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }
+
+  function _cmpColumn(css, icon, label, src, answer) {
+    const col = el('div', { class: 'cmp-col ' + css });
+    col.appendChild(el('div', { class: 'cmp-head' }, [
+      icon + ' ' + escHtml(label),
+      el('span', { class: 'cmp-src' }, '· ' + escHtml(CMP_SOURCE_LABEL[src] || src || '')),
+    ]));
+    const ans = el('div', { class: 'cmp-answer' });
+    ans.innerHTML = renderMd(answer || '');
+    col.appendChild(ans);
+    return col;
+  }
+
+  function _siTrace(host, si) {
+    const rounds = si.iterations || [];
+    if (!rounds.length) return;
+    const wrap = el('div', { class: 'si-trace' });
+    wrap.appendChild(el('div', { class: 'si-trace-head' }, [
+      '⟳ Inner-loop trace',
+      el('span', { class: 'small muted' },
+        ' score ' + si.initial_score + ' → ' + si.final_score +
+        (si.improved ? ' (+' + (Math.round((si.final_score - si.initial_score) * 10) / 10) + ')' : ' (no lift)')),
+    ]));
+    rounds.forEach((it) => {
+      const row = el('div', { class: 'si-round' });
+      const pct = Math.max(2, Math.min(100, it.score || 0));
+      row.appendChild(el('div', { class: 'si-round-lab' }, 'Round ' + it.round));
+      const barWrap = el('div', { class: 'si-bar-wrap' });
+      const bar = el('div', { class: 'si-bar' + (it.score >= 70 ? ' pass' : '') });
+      bar.style.width = pct + '%';
+      barWrap.appendChild(bar);
+      row.appendChild(barWrap);
+      row.appendChild(el('div', { class: 'si-round-score' }, String(it.score)));
+      const issues = (it.issues || []).join(', ');
+      if (issues) row.appendChild(el('div', { class: 'si-round-issues' }, '⚑ ' + issues));
+      wrap.appendChild(row);
+    });
+    host.appendChild(wrap);
+  }
+
+  function renderCompare3Card(host, data) {
+    const si = data.self_iterated || {};
+    const w = data.with_ontology || {};
+    const b = data.without_ontology || {};
+    const v = data.value || {};
+
+    const grid = el('div', { class: 'cmp-grid cmp-grid-3' });
+    const siCol = _cmpColumn('cmp-si', '🟣', si.label || 'Self-iterated', si.source, si.answer);
+    _siTrace(siCol, si);
+    const siChain = el('div', { class: 'cmp-chain' });
+    siCol.appendChild(siChain);
+    const withCol = _cmpColumn('cmp-with', '🟢', w.label || 'With ontology', w.source, w.answer);
+    const withChain = el('div', { class: 'cmp-chain' });
+    withCol.appendChild(withChain);
+    grid.appendChild(siCol);
+    grid.appendChild(withCol);
+    grid.appendChild(_cmpColumn('cmp-without', '⚪', b.label || 'Without ontology', b.source, b.answer));
+    host.appendChild(grid);
+
+    const strip = el('div', { class: 'si-value' });
+    strip.innerHTML =
+      '<span>Score <b>' + (v.initial_score == null ? '—' : v.initial_score) +
+      ' → ' + (v.final_score == null ? '—' : v.final_score) + '</b> (' +
+      (v.score_lift > 0 ? '+' : '') + (v.score_lift == null ? 0 : v.score_lift) + ')</span>' +
+      '<span>Rounds <b>' + (v.rounds || 1) + '</b></span>' +
+      '<span>Impact-chain nodes 🟣' + (v.si_chain_nodes || 0) +
+      ' · 🟢' + (v.original_chain_nodes || 0) + ' · ⚪0</span>' +
+      '<span>Metrics 🟣' + (v.si_metrics_used || 0) +
+      ' · 🟢' + (v.original_metrics_used || 0) + ' · ⚪0</span>' +
+      '<span>Answer chars 🟣' + (v.si_chars || 0) +
+      ' · 🟢' + (v.original_chars || 0) + ' · ⚪' + (v.baseline_chars || 0) + '</span>';
+    host.appendChild(strip);
+
+    // Impact chains for the two grounded sides.
+    [['graph', si.graph, siChain], ['graph', w.graph, withChain]].forEach((pair) => {
+      const g = pair[1];
+      const chainHost = pair[2];
+      if (g && state.fullGraph && state.fullGraph.nodes) {
+        const chain = Onti.Graph.fromEvidence(state.fullGraph, g);
+        if (chain.nodes.length) {
+          const wrap = el('div', { class: 'chain-card' });
+          const chead = el('div', { class: 'chain-head' }, [
+            '🔗 Impact chain', el('span', { class: 'spacer' }),
+          ]);
+          const svgWrap = el('div', { class: 'chain-svg-wrap' });
+          const openBtn = el('button', { class: 'btn btn-ghost btn-xs' }, 'Open full graph ↗');
+          openBtn.onclick = openFullGraph;
+          chead.appendChild(openBtn);
+          wrap.appendChild(chead);
+          wrap.appendChild(svgWrap);
+          chainHost.appendChild(wrap);
+          requestAnimationFrame(() =>
+            Onti.Graph.render(svgWrap, chain, { compact: true, legend: false }));
+        }
+      }
+    });
   }
 
   function renderCompareCard(host, data) {

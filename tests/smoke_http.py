@@ -338,7 +338,7 @@ def main() -> int:
         and r.json()["error_count"] == 1,
         "preview reports 1 valid / 1 invalid row",
     )
-    csv_ok = "id,name,count,churn,prod\n" "DD,Digital Direct,12,0.08,40\n"
+    csv_ok = "id,name,count,churn,prod\nDD,Digital Direct,12,0.08,40\n"
     files = {"file": ("smoke_channels.csv", csv_ok.encode(), "text/csv")}
     r = admin.post(
         "/api/admin/data/upload",

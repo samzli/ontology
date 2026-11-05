@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
 
 from modules import admin_service as adm
 from modules import auth
-from modules import llm_client as llm
 from modules import ontology_service as svc
 from modules import qa_service as qa
 from modules.constants import (
@@ -21,24 +19,15 @@ from modules.constants import (
     MEMORY_ANSWER_CHARS,
 )
 from modules.db import get_conn
-from routes.common import _effective_model_cfg, logger, user_pack_id
+from routes.common import (
+    AskIn,
+    _effective_model_cfg,
+    _log_llm_call,
+    logger,
+    user_pack_id,
+)
 
 router = APIRouter()
-
-
-class AskIn(BaseModel):
-    """Payload shared by the streaming and compare ask endpoints.
-
-    Attributes:
-        question (str): The natural-language question.
-        mode (str): ``auto`` (default), ``rules`` or ``ai``.
-        history (Optional[List[Dict[str, str]]]): Prior turns shaped as
-            ``[{"role": "user"|"assistant", "content": "..."}]``.
-    """
-
-    question: str
-    mode: str = "auto"  # auto | rules | ai
-    history: Optional[List[Dict[str, str]]] = None
 
 
 def _sse(obj: Dict[str, Any]) -> str:
@@ -55,19 +44,6 @@ def _sse(obj: Dict[str, Any]) -> str:
         'data: {"type": "token", "content": "Hi"}\\n\\n'
     """
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
-
-
-def _log_llm_call(**kwargs: Any) -> None:
-    """Persist an LLM call record (callback used by the QA pipeline).
-
-    Args:
-        **kwargs (Any): Call fields forwarded verbatim to ``llm.log_call``.
-
-    Returns:
-        None: The record is written to the database; failures propagate.
-    """
-    with get_conn() as conn:
-        llm.log_call(conn, **kwargs)
 
 
 @router.post("/api/ask-stream")
