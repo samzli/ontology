@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules import admin_service as adm
-from modules import auth
+from modules import auth, snapshot
 from modules import config as cfg
 from modules import db as db_mod
 from modules import importer as imp
@@ -189,6 +189,33 @@ _ROUTERS = (
 
 for _router_module in _ROUTERS:
     app.include_router(_router_module.router)
+
+
+# ---------------------------------------------------------------------------
+# Scheduled snapshot sync — wired in vercel.json ``crons`` (Vercel Cron calls
+# this path with a GET and, when CRON_SECRET is set, a Bearer token).
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/internal/snapshot-sync")
+async def snapshot_sync(request: Request) -> JSONResponse:
+    """Push a database snapshot to the configured store on a schedule.
+
+    Args:
+        request (Request): The incoming cron request.
+
+    Returns:
+        JSONResponse: ``{"ok": true, "synced": bool}``; 401 when CRON_SECRET
+            is configured and the caller does not present it.
+    """
+    import os
+
+    secret = os.environ.get("CRON_SECRET", "").strip()
+    if secret:
+        authz = request.headers.get("authorization", "")
+        if authz != f"Bearer {secret}":
+            return JSONResponse(status_code=401, content={"error": "Unauthorized."})
+    return JSONResponse({"ok": True, "synced": snapshot.sync_now()})
 
 
 if __name__ == "__main__":

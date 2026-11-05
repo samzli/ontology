@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from modules import admin_service as adm
-from modules import auth
+from modules import auth, snapshot
 from modules import report_builder as rb
 from modules.db import get_conn, get_setting, set_setting
 from routes.common import IdIn, _parse_model_pref, _user_model_pref, user_pack_id
@@ -117,6 +117,7 @@ async def admin_user_create(
         uid = auth.create_user(
             conn, data.username, data.password, data.display_name, data.role
         )
+    snapshot.request_sync()
     return {"id": uid}
 
 
@@ -137,6 +138,7 @@ async def admin_user_role(
     """
     with get_conn() as conn:
         auth.set_user_role(conn, admin_user, uid, str(body.value))
+    snapshot.request_sync()
     return {"ok": True}
 
 
@@ -157,6 +159,7 @@ async def admin_user_enabled(
     """
     with get_conn() as conn:
         auth.set_user_enabled(conn, admin_user, uid, bool(body.value))
+    snapshot.request_sync()
     return {"ok": True}
 
 
@@ -177,6 +180,7 @@ async def admin_user_pw(
     """
     with get_conn() as conn:
         auth.reset_password(conn, admin_user, uid, str(body.value))
+    snapshot.request_sync()
     return {"ok": True}
 
 

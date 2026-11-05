@@ -37,12 +37,6 @@
             First-time setup: the account you create now becomes the platform
             administrator.
           </div>
-          <div class="firstrun-banner" id="demoBanner" style="display:none">
-            <strong>Demo deployment.</strong> Accounts are held per server
-            instance, so registration made here may not be visible after the
-            page reloads. Stay signed in on this browser, or ask an
-            administrator for a pre-provisioned account.
-          </div>
           <div class="auth-error" id="authError"></div>
           <form id="authForm" autocomplete="off">
             <label class="fld" id="fNameWrap" style="display:none">
@@ -93,9 +87,6 @@
       }
 
       api.get('/api/auth/status').then((s) => {
-        if (s.accounts_persist === false) {
-          document.getElementById('demoBanner').style.display = 'block';
-        }
         if (s.first_run && s.allow_registration) {
           mode = 'register';
           document.getElementById('firstRun').style.display = 'block';

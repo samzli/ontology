@@ -185,13 +185,15 @@ def main() -> int:
         body,
     )
 
-    # [16] status exposes the account-storage contract used by the sign-in
-    # page to warn demo users that registration is instance-local.
+    # [16] status exposes the account-storage contract: accounts persist when
+    # the host is persistent OR a snapshot backend carries them across
+    # instances.
     s = httpx.get(f"{BASE}/api/auth/status", timeout=15).json()
     ok("accounts_persist" in s, "[16] status exposes accounts_persist", s)
+    ok("snapshot_sync" in s, "[16] status exposes snapshot_sync", s)
     ok(
-        s["accounts_persist"] == (not s["ephemeral"]),
-        "[16] accounts_persist mirrors ephemeral",
+        s["accounts_persist"] == ((not s["ephemeral"]) or s["snapshot_sync"]),
+        "[16] accounts_persist = persistent host or snapshot sync",
         s,
     )
 

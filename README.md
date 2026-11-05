@@ -1031,20 +1031,27 @@ model secrets stay identical across hosts.
 
 ### Deploying to Vercel (serverless)
 
-> **Preview/demo only.** Each function instance gets its own `/tmp` , so
-> self-registration works but the new account is kept per instance and is
-> not shared between instances (another instance only has the bundled,
-> pre-provisioned accounts). `/api/auth/status`reports`ephemeral: true`
-> there — use a pre-provisioned account, or the Docker deployment above,
-> for real multi-user work.
+> **Accounts survive cold starts when a snapshot store is configured.**
+> Each function instance gets its own `/tmp` , but
+> `modules/snapshot.py` mirrors the database to an external store and
+> restores it on boot: set `BLOB_READ_WRITE_TOKEN` (connect a Vercel Blob
+> store to the project) or point `ONTI_SNAPSHOT_URL` +
+> `ONTI_SNAPSHOT_TOKEN` at any HTTP endpoint you own. Snapshots upload
+> after every account change and once a day via Vercel Cron, so
+> self-registration works for real users. Without a backend the host
+> falls back to per-instance accounts: `/api/auth/status`reports
+> `ephemeral: true, accounts_persist: false` — use pre-provisioned
+> accounts or the Docker deployment above for guaranteed durability.
 
 The Vercel project deploys either from Git or from the Vercel CLI. When
 the project is Git-connected, a push to the production branch triggers a
 deployment; this checkout is **not** linked (there is no `.vercel/`
 folder), so publish with `vercel deploy --prod` unless the project
-auto-builds it. `vercel.json`builds`main.py` with`@vercel/python` and
-routes **every** path to it — FastAPI serves the Jinja pages and the
-`/static` assets itself, so no separate static build is involved.
+auto-builds it. `vercel.json` maps `main.py` in `functions`
+( `maxDuration: 60` ), rewrites **every** path to it, and registers a
+daily cron for `GET /api/internal/snapshot-sync` — FastAPI serves the
+Jinja pages and the `/static` assets itself, so no separate static build
+is involved.
 
 **Dependencies and the production branch.** Vercel's Python runtime
 chooses its installer from the repository: when a `pyproject.toml` is
@@ -1060,20 +1067,23 @@ to the public domain; feature branches produce preview URLs.
 **Writable storage.** `modules/db.py`detects`VERCEL` and switches to
 `/tmp/onti-data`(`ONTI_DATA_DIR` overrides the location on any host):
 
-* On the first request of each instance the bundled, pre-seeded
-`data/onti.db` is copied to the writable directory, so every visitor
-  sees the same packs, KPI data, demo reports and pre-provisioned
-  accounts — including `admin`/`Onti@2026` .
+* On the first request of each instance the latest snapshot is
+  downloaded from the configured store (Blob or HTTP); when no snapshot
+  exists the bundled, pre-seeded `data/onti.db` is copied instead, so
+  every visitor sees the same packs, KPI data, demo reports and
+  pre-provisioned accounts — including `admin`/`Onti@2026` .
 * Reports that were generated before the deployment are read from the
   bundled `data/reports/` folder when they are absent from the writable
   directory.
 * Writes made **inside the app** (new registrations, uploaded data,
-  generated reports, model configs) live as long as the function instance
-  and are not shared between instances. Self-registration stays available
-  so preview visitors can try the full flow, but those accounts are
-  per-instance — and so are accounts an admin adds there. For durable
-  multi-user writes, use the Docker deployment above or point
-  `ONTI_DATA_DIR` at a persistent volume.
+  generated reports, model configs) live as long as the function
+  instance; account changes additionally trigger a snapshot upload, and
+  the daily cron keeps the store fresh, so accounts registered on
+  serverless survive cold starts and appear on every instance. Other
+  writes (uploads, reports) ride along in the same snapshot but are only
+  guaranteed after the next sync. For fully durable multi-user writes,
+  use the Docker deployment above or point `ONTI_DATA_DIR` at a
+  persistent volume.
 * Session cookies are signed with the bundled key and are also validated
   statelessly. The token carries the caller's username, display name and
   role, so an instance that never saw the login can rebuild the session
@@ -1102,11 +1112,12 @@ accounts in **Admin → Users & audit**.
 > answers **404 – Page Not Found**: that is the dashboard rejecting the
 > malformed path, not the application. Share
 > `<domain>/app`(user portal) or`<domain>/admin` (governance console).
-> **Accounts must be provisioned before deploying.** Serverless instances
-> start from the committed `data/onti.db` , so create the accounts you want
-> to hand out (e.g. a shared demo account for another team) on a local or
-> Docker instance first, then commit the updated database and push. Accounts
-> created at runtime are per-instance and disappear on the next cold start.
+> **Accounts must be provisioned before deploying** unless a snapshot
+> store is configured. Serverless instances start from the committed
+> `data/onti.db` (or the latest snapshot), so without a store create the
+> accounts you want to hand out (e.g. a shared demo account for another
+> team) on a local or Docker instance first, then commit the updated
+> database and push.
 >
 > **Troubleshooting "I cannot sign in".** Work through these in order —
 > each one has a distinct symptom:
@@ -1123,9 +1134,10 @@ accounts in **Admin → Users & audit**.
 >    production domain (see above).
 > 3. *The sign-in form rejects the credentials*: the account does not exist
 >    on that instance. Use a pre-provisioned account, or register again —
->    the sign-in page shows a **Demo deployment** banner and the error
->    message explains the per-instance behaviour when the host is
->    ephemeral (`accounts_persist: false` in `/api/auth/status`).
+>    when the host is ephemeral and no snapshot store is configured,
+>    `/api/auth/status` reports `accounts_persist: false` and the
+>    registration response carries a `notice` explaining the per-instance
+>    behaviour.
 
 **Environment variables.** Set `LLM_API_KEY`,`LLM_BASE_URL`,`LLM_MODEL_NAME`
 
@@ -1134,6 +1146,12 @@ read from `os.environ` on first startup and imported once into the
 encrypted model configuration (the same bootstrap also accepts
 `LLM_VERIFY_SSL=false`/`SKIP_SSL_VERIFY=1` ). AI features stay optional —
 the rules engine, graph, imports and reports work without a model.
+
+Account persistence uses separate variables: `BLOB_READ_WRITE_TOKEN`
+(set automatically when a Vercel Blob store is connected) or
+`ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` for your own endpoint, and
+`CRON_SECRET` to authenticate the daily snapshot-sync cron (Vercel sends
+it as a Bearer token once set).
 
 **Health check.** `GET /health` returns JSON without authentication and
 is the quickest way to confirm a deployment is alive.
@@ -1397,12 +1415,13 @@ Code/
 ├─ Dockerfile           # container image (python:3.12-slim)
 ├─ docker-compose.yml   # persistent volume `onti-data` at /data
 ├─ .dockerignore
-├─ vercel.json          # serverless build/route config (all paths → main.py)
+├─ vercel.json          # functions + rewrites + daily snapshot cron
 ├─ config/config.json   # port, session, upload, runtime (run-log) settings
 ├─ modules/
 │  ├─ db.py             # schema, connections, settings, audit, crypto
 │  ├─ seed.py           # idempotent built-in sample pack
 │  ├─ auth.py           # accounts, PBKDF2, sessions, roles
+│  ├─ snapshot.py       # DB snapshot sync (Blob/HTTP) for serverless
 │  ├─ constants.py      # shared UI/operation constants (no magic numbers)
 │  ├─ run_log.py        # append-only run/audit log for test executions
 │  ├─ ontology_service.py  # rule engine, formulas, graph, search,

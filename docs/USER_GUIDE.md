@@ -43,10 +43,10 @@ order:
   it off for the public address.
 * **The login form rejects your details.** Your account does not exist on
   that server. Ask an administrator for an account, or press **Create
-  account**. On the demo deployment a **Demo deployment** banner explains
-  that accounts are kept per server instance, so an account you register
-  there may have to be created again later; for day-to-day work ask for a
-  pre-provisioned account.
+  account**. When the host keeps accounts per server instance and no
+  snapshot store is configured, the registration flow explains that an
+  account you create may have to be created again later; for day-to-day
+  work ask for a pre-provisioned account.
 
 If the browser shows a network error when you press **Sign in**, the app
 now says so explicitly: check your connection, VPN or firewall, reload

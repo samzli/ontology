@@ -21,7 +21,9 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-sys.path.insert(0, str(ROOT))  # noqa: E402  (twice on purpose; ROOT is root of this project)
+sys.path.insert(
+    0, str(ROOT)
+)  # noqa: E402  (twice on purpose; ROOT is root of this project)
 from modules.seed import _env_value  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"

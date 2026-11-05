@@ -1,19 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [
+  "functions": {
+    "main.py": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
     {
-      "src": "main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxDuration": 60
-      }
+      "source": "/(.*)",
+      "destination": "/main.py"
     }
   ],
-  "routes": [
+  "crons": [
     {
-      "src": "/(.*)",
-      "dest": "main.py"
+      "path": "/api/internal/snapshot-sync",
+      "schedule": "0 3 * * *"
     }
   ]
 }
