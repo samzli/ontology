@@ -21,9 +21,7 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-sys.path.insert(
-    0, str(ROOT)
-)  # noqa: E402  (twice on purpose; ROOT is root of this project)
+sys.path.insert(0, str(ROOT))  # noqa: E402  (twice on purpose; ROOT is root of this project)
 from modules.seed import _env_value  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
@@ -56,7 +54,7 @@ def ok(cond, label, note=""):
 # [1] .env mutation tests (in-process, no server needed)
 # ---------------------------------------------------------------------------
 def section(title):
-    print(f"\n{'='*60}\n  {title}\n{'='*60}")
+    print(f"\n{'=' * 60}\n  {title}\n{'=' * 60}")
     REPORT.append(f"\n## {title}")
 
 
@@ -424,9 +422,9 @@ def http_api_tests():
 
 
 def print_summary():
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  TOTAL: {PASS + FAIL} tests — {PASS} passed, {FAIL} failed")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     return 0 if FAIL == 0 else 1
 
 

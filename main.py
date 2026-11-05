@@ -39,6 +39,7 @@ from routes import (
 from routes import analytics as analytics_routes
 from routes import auth as auth_routes
 from routes import config as config_routes
+from routes import self_iterate as self_iterate_routes
 
 BASE_DIR = cfg.BASE_DIR
 
@@ -177,6 +178,7 @@ _ROUTERS = (
     analytics_routes,
     ask,
     reports,
+    self_iterate_routes,
     admin_packs,
     admin_data,
     admin_models,
