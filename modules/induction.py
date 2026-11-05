@@ -236,7 +236,7 @@ def _existing_keys(conn, pack_id: int) -> Dict[str, set]:
         >>> _existing_keys(conn, 4)["node"]
         {'VNB', 'APE'}
     """
-    pack = svc.load_pack(conn, pack_id)
+    pack = svc.load_pack(conn, pack_id) or {}
     return {
         "entity": {e["key"] for e in pack.get("entities", [])},
         "relation": {r["key"] for r in pack.get("relations", [])},

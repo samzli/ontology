@@ -7,6 +7,7 @@ dependency-free so the Onti platform can run on a stock Python install.
 from __future__ import annotations
 
 import sys
+import traceback
 from datetime import datetime
 
 
@@ -83,3 +84,26 @@ class AppLogger:
             message (str): Text to log.
         """
         self._emit("ERROR", "\033[31m", message)
+
+    def exception(self, message: str) -> None:
+        """Log an ``ERROR`` message followed by the active traceback.
+
+        Background tasks (for example the post-upload ontology induction) run
+        outside the request/response cycle, so their failures never reach the
+        FastAPI exception handlers. Call this from the task's ``except`` block
+        to keep the traceback on the operator's console instead of losing it.
+
+        Args:
+            message (str): Text to log before the traceback.
+
+        Example:
+            >>> logger = AppLogger("onti", "DEBUG")
+            >>> try: 1 / 0
+            ... except ZeroDivisionError:
+            ...     logger.exception("division failed")   # doctest: +SKIP
+            [2026-10-30 09:00:00] [ERROR] [onti] division failed
+            Traceback (most recent call last):
+            ...
+        """
+        self.error(message)
+        traceback.print_exc(file=sys.stderr)
