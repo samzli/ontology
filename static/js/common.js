@@ -450,9 +450,80 @@
     },
   };
 
+  /* ------------------------------------------- self-iteration toggle */
+
+  // Server-backed per-user switch (default OFF). ON turns the Ask compare
+  // into a three-way view (self-iterated / original ontology / no ontology)
+  // and lets the outer loop collect ontology-evolution findings.
+  const selfIter = {
+    _state: { available: false, enabled: false, stats: {} },
+    available() { return !!selfIter._state.available; },
+    enabled() { return !!selfIter._state.enabled; },
+    stats() { return selfIter._state.stats || {}; },
+    async refresh() {
+      try {
+        const r = await api.get('/api/self-iterate/status');
+        selfIter._state = {
+          available: !!r.available,
+          enabled: !!r.enabled,
+          stats: r.stats || {},
+        };
+      } catch (e) {
+        selfIter._state = { available: false, enabled: false, stats: {} };
+      }
+      document.dispatchEvent(
+        new CustomEvent('onti:selfiter', { detail: Object.assign({}, selfIter._state) }));
+      return selfIter._state;
+    },
+    async set(on) {
+      await api.put('/api/self-iterate/toggle', { enabled: !!on });
+      selfIter._state.enabled = !!on;
+      document.dispatchEvent(
+        new CustomEvent('onti:selfiter', { detail: Object.assign({}, selfIter._state) }));
+    },
+    mount() {
+      const bar = document.querySelector('.topbar');
+      if (bar && !bar.querySelector('.si-switch')) {
+        const box = document.createElement('div');
+        box.className = 'onto-switch si-switch';
+        box.title = 'Self-iterating agent: answer → critique → refine inner loop, ' +
+          'plus human-gated outer-loop ontology evolution';
+        box.innerHTML =
+          '<span class="onto-switch-label">⟳ Self-iterate</span>' +
+          '<button class="onto-switch-btn" data-si="on" aria-pressed="false">ON</button>' +
+          '<button class="onto-switch-btn" data-si="off" aria-pressed="true">OFF</button>';
+        bar.insertBefore(box, bar.querySelector('.userbox') || null);
+        box.querySelectorAll('[data-si]').forEach((btn) => {
+          btn.onclick = async () => {
+            const on = btn.dataset.si === 'on';
+            try {
+              await selfIter.set(on);
+              toast(on
+                ? 'Self-iteration ON — compare shows ×3 and answers self-refine'
+                : 'Self-iteration OFF', on ? 'ok' : 'warn');
+            } catch (e) {
+              toast(e.message || 'Could not save the toggle.', 'err');
+            }
+          };
+        });
+      }
+      const sync = () => {
+        const st = selfIter._state;
+        document.querySelectorAll('.si-switch [data-si]').forEach((btn) => {
+          const isOn = btn.dataset.si === 'on';
+          btn.classList.toggle('active', isOn === st.enabled);
+          btn.setAttribute('aria-pressed', String(isOn === st.enabled));
+        });
+      };
+      document.addEventListener('onti:selfiter', sync);
+      selfIter.refresh();
+      sync();
+    },
+  };
+
   window.Onti = {
     api, ApiError, toast, openModal, confirmAction,
     escHtml, renderMd, inlineMd, fmtDate, initials, el, emptyState,
-    helpMount, helpOpen, ontology,
+    helpMount, helpOpen, ontology, selfIter,
   };
 })();

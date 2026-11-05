@@ -100,13 +100,13 @@ answers and full reports.
 orange banner at the top of every page says **“Ontology is OFF.”** Nothing is
 broken; this is the deliberate demonstration state:
 
-|Area|What you see with the ontology OFF|
-|---|---|
-|Dashboard|KPI cards and graph replaced by an “Ontology is OFF” panel|
-|Performance analytics|Same panel — no trend chart, no driver attribution|
-|Knowledge graph / Graph studio|A panel explaining graph views need the ontology|
-|Ask|Answers grounded in raw tables, **no ontology layer**; “Without ontology” badge|
-|My reports|Reports generated but **text-only**: no graph, evidence, chart, or analytics|
+| Area                     | What you see with the ontology OFF             |
+| ------------------------ | ---------------------------------------------- |
+| Dashboard                | KPI cards and graph replaced by an “OFF” panel |
+| Performance analytics    | Same panel — no trend chart or drivers         |
+| Knowledge graph / studio | Panel: graph views need the ontology           |
+| Ask                      | Raw-table answers + “Without ontology” badge   |
+| My reports               | Text-only reports, no graph/evidence/charts    |
 
 Turn the switch back to **ON**— or press**Turn ontology back on** in the
 banner or panel — to restore every visual immediately. This is the fastest
@@ -192,7 +192,48 @@ call.
 
 Press the yellow button again to return to normal single answers.
 
-### 2.2.2 Batch questions and memory
+### 2.2.2 Self-iterating agent — refine answers and evolve the ontology
+
+The **⟳ Self-iterate** switch in the header (next to Use ontology) turns
+on the self-iterating agent for your account only — it is **off by
+default** for everyone, and your choice is remembered between sessions.
+Two things happen while it is on:
+
+**1. Your answers refine themselves (inner loop).** Each question is
+answered, then automatically *critiqued* (does it cite the ontology's
+rules, metrics, impact chain and data deeply enough?), and — when the
+draft scores below the bar — rewritten with that critique injected, up
+to three rounds. You keep the best-scoring version. Nothing about the
+process is hidden: the score trace is part of the answer card.
+
+**2. The ontology learns from what it could not answer (outer loop).**
+Every run records the gaps it exposed (a missing rule, an uncovered
+concept, a missing metric). Press **⟳ Insights** (next to Compare) to
+see your evolution stats and the gap list, and **✨ Propose ontology
+improvements** to turn the open gaps into reviewable proposals. An
+administrator approves them in the Admin console → **AI proposals**
+queue — the ontology never changes itself without a human decision, and
+every approved change is versioned as usual.
+
+**Compare ×3.** With the switch on, the yellow compare button becomes
+**◐ Compare ×3** and answers one question three ways in a single card:
+
+* **🟣 Self-iterated** — the inner-loop result, with the round-by-round
+  score bars and any refinement notes inline.
+* **🟢 Original ontology** — the standard grounded pipeline (rules +
+  analysis), exactly as in §2.2.1.
+* **⚪ No ontology** — the same model with the same raw tables but no
+  ontology layer at all.
+
+A strip underneath quantifies the three runs (initial → final score,
+rounds, impact-chain nodes, metrics used, answer length), so Life and
+GI teams can point at *which* layer moved the answer and by how much on
+complex business scenarios.
+
+Turn the switch off at any time and everything returns to the classic
+single / two-way behaviour — the switch only affects your own account.
+
+### 2.2.3 Batch questions and memory
 
 Press **📋 Batch** to paste a whole list of questions (one per line,
 up to 20). Each is asked in sequence, and later questions use the
@@ -205,11 +246,11 @@ the results.
 
 The **badge colour** next to an answer tells you its source:
 
-|Badge|Meaning|Trust level|
-|-----|-------------------------------------------|-----------------|
-|Green|Deterministic rule (configured by an admin)|Highest — cite it|
-|Amber|No matching rule|Only suggestions|
-|Blue|AI model answer|Reference only|
+| Badge | Meaning                                     | Trust level       |
+| ----- | ------------------------------------------- | ----------------- |
+| Green | Deterministic rule (configured by an admin) | Highest — cite it |
+| Amber | No matching rule                            | Only suggestions  |
+| Blue  | AI model answer                             | Reference only    |
 
 Every answer includes an **impact chain graph** showing which factors
 make up the number — handy for screenshots when presenting to
@@ -287,12 +328,12 @@ Two extra section checkboxes make reports self-contained:
    pack declares on the **Dashboard**, and explore how they connect in the
    **Knowledge graph**or**Graph studio**.
 
-|Required table|Key columns|What it powers|
-|-----------------|----------------------|-----------------------------------------------------|
-|`vnb_monthly`|`month`|Company trend chart and the month-on-month VNB bridge|
-|`channel_monthly`|`month, channel_id`|Channel breakdown and the driver attribution|
-|`agent_monthly`|`month, channel_id`|Agent productivity table|
-|`agent_master`|`agent_id, channel_id`|Agent names and reporting lines|
+| Required table    | Key columns            | What it powers               |
+| ----------------- | ---------------------- | ---------------------------- |
+| `vnb_monthly`     | `month`                | Trend chart + MoM VNB bridge |
+| `channel_monthly` | `month, channel_id`    | Channel breakdown + drivers  |
+| `agent_monthly`   | `month, channel_id`    | Agent productivity table     |
+| `agent_master`    | `agent_id, channel_id` | Agent names, reporting lines |
 
 No questions yet? Press **⚡ Sample report** — the platform answers
 the ontology's recommended questions instantly with the rules engine

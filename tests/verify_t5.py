@@ -218,7 +218,7 @@ with get_conn() as conn:
     check("zero rows persisted from bad CSV", n_rows == 0, str(n_rows))
 
     good_csv = (
-        "ID,Widget Name,Score,Grade\n" "W1,Alpha,92.5,A\nW2,Beta,81,B\nW3,Gamma,70,C\n"
+        "ID,Widget Name,Score,Grade\nW1,Alpha,92.5,A\nW2,Beta,81,B\nW3,Gamma,70,C\n"
     ).encode("utf-8")
     _, preview = importer.preview_upload(table_id, "good.csv", good_csv)
     check(
@@ -310,7 +310,7 @@ with get_conn() as conn:
         str(r1),
     )
     csv_q = (
-        "Question,Category\n" "What is a widget?,general\nNew widget question?,ops\n"
+        "Question,Category\nWhat is a widget?,general\nNew widget question?,ops\n"
     ).encode("utf-8")
     r2 = adm.import_questions(
         conn, ACTOR, tid_pack, importer.parse_question_file("q.csv", csv_q)

@@ -26,6 +26,7 @@ import json
 import re
 import statistics
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -262,6 +263,39 @@ def main() -> int:
 AXES = ["business_depth", "logical_rigour", "data_linkage", "explainability"]
 
 
+def _wrap(text: str, width: int = 78, indent: str = "") -> List[str]:
+    """Hard-wrap text to ``width`` columns for markdownlint-clean output."""
+    out: List[str] = []
+    for para in (text or "").splitlines() or [""]:
+        if not para.strip():
+            out.append("")
+            continue
+        out.extend(
+            textwrap.wrap(
+                para,
+                width=width,
+                initial_indent=indent,
+                subsequent_indent=indent,
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
+            or [indent.rstrip()]
+        )
+    return out
+
+
+def _item(marker: str, text: str, width: int = 78) -> List[str]:
+    """Wrap one list item, aligning continuation lines under its content."""
+    return textwrap.wrap(
+        text,
+        width=width,
+        initial_indent=marker,
+        subsequent_indent=" " * len(marker),
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
+
+
 def render(rows: List[Dict[str, Any]]) -> str:
     w_avg = statistics.mean(sum(r["with_score"].values()) for r in rows)
     b_avg = statistics.mean(sum(r["without_score"].values()) for r in rows)
@@ -269,24 +303,26 @@ def render(rows: List[Dict[str, Any]]) -> str:
     axis_b = {a: statistics.mean(r["without_score"][a] for r in rows) for a in AXES}
 
     L = [
-        "# Ontology value report — rule engine + deterministic analysis vs plain LLM",
+        "# Ontology value report — rule engine + analysis vs plain LLM",
         "",
-        "Pack under test: `bp-planning-v4` built from `BPTablesTest_v4_clean.xlsx` "
-        "(6 tables, 3,552 rows, no pre-written narrative column).",
+        "Pack under test: `bp-planning-v4` built from",
+        "`BPTablesTest_v4_clean.xlsx` (6 tables, 3,552 rows, no pre-written",
+        "narrative column).",
         "",
-        "Every scenario below is executed through `POST /api/ask/compare`, the same "
-        "endpoint the user portal calls. Both sides receive the same question and the "
-        "same raw data; the only difference is the ontology layer (entities, relations, "
-        "metric formulas, rules engine, deterministic analysis, impact graph).",
+        "Every scenario below is executed through `POST /api/ask/compare`,",
+        "the same endpoint the user portal calls. Both sides receive the",
+        "same question and the same raw data; the only difference is the",
+        "ontology layer (entities, relations, metric formulas, rules",
+        "engine, deterministic analysis, impact graph).",
         "",
         "## Scoring rubric (0–5 per axis)",
         "",
         "| Axis | What it measures |",
         "| --- | --- |",
-        "| Business depth | Sectioned decomposition, quantified findings, multiple analytical dimensions |",
-        "| Logical rigour | Cross-table reconciliation, exact identity bridge, statistical tests |",
-        "| Data linkage | Distinct tables/joins actually used and numbers cited |",
-        "| Explainability | Numbered reasoning trace, provenance of every table, causal language |",
+        "| Business depth | Sectioned decomposition, quantified findings |",
+        "| Logical rigour | Reconciliation, identity bridge, statistics |",
+        "| Data linkage | Distinct tables/joins used and numbers cited |",
+        "| Explainability | Reasoning trace, provenance, causal language |",
         "",
         "## Aggregate",
         "",
@@ -296,56 +332,93 @@ def render(rows: List[Dict[str, Any]]) -> str:
     for a in AXES:
         label = a.replace("_", " ").title()
         L.append(
-            f"| {label} | {axis_w[a]:.2f} / 5 | {axis_b[a]:.2f} / 5 | +{axis_w[a] - axis_b[a]:.2f} |"
+            f"| {label} | {axis_w[a]:.2f} / 5 | {axis_b[a]:.2f} / 5 "
+            f"| +{axis_w[a] - axis_b[a]:.2f} |"
         )
     L += [
-        f"| **Total** | **{w_avg:.2f} / 20** | **{b_avg:.2f} / 20** | **+{w_avg - b_avg:.2f}** |",
+        f"| **Total** | **{w_avg:.2f} / 20** | **{b_avg:.2f} / 20** "
+        f"| **+{w_avg - b_avg:.2f}** |",
         "",
         "## Per-scenario results",
         "",
-        "| # | Dimension | Question | With (0–20) | Plain LLM (0–20) | Steps | Findings | Tables joined | Reconciled |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| # | Dimension | With | Plain | Steps | Findings | Tables | OK |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for i, r in enumerate(rows, 1):
         L.append(
-            f"| {i} | {r['dimension']} | {r['question']} | {sum(r['with_score'].values())} "
-            f"| {sum(r['without_score'].values())} | {r['reasoning_steps']} | {r['findings']} "
-            f"| {r['tables_joined']} | {'yes' if r['reconciled'] else 'no'} |"
+            f"| {i} | {r['dimension']} | {sum(r['with_score'].values())} "
+            f"| {sum(r['without_score'].values())} | {r['reasoning_steps']} "
+            f"| {r['findings']} | {r['tables_joined']} "
+            f"| {'yes' if r['reconciled'] else 'no'} |"
         )
+    L += ["", "### Scenario questions", ""]
+    for i, r in enumerate(rows, 1):
+        L += _item(f"{i}. ", f"**{r['dimension']}** — {r['question']}")
 
     L += [
         "",
         "## What the ontology side does that the plain LLM cannot",
         "",
-        "1. **Exact factor bridge.** VNB is decomposed per segment with sequential factor "
-        "substitution over the declared identity `VNB = Active agents × Avg productivity × VNB margin`; "
-        "the effects sum to the reported move with a residual of $0.000M.",
-        "2. **Cross-table proof.** The product-mix margin is recomputed by joining `mix` to "
-        "`product` on `product_id`, then shown to equal the channel's implied VNB/APE margin.",
-        "3. **Agent cohorts.** `agent_monthly` joined to `agent_master` on `agent_id` yields "
-        "productivity and APE contribution by churn band, certification and tenure.",
-        "4. **Statistical diagnostics.** OLS trend with R², coefficient of variation, z-score "
-        "against history, momentum, Herfindahl concentration and driver correlation.",
-        "5. **Reasoning trace.** Every answer carries numbered steps naming the method, the "
-        "tables joined and the result, plus an impact chain walked over the ontology graph.",
-        "",
-        "The plain-LLM side can only restate the table it was shown; it has no schema, no "
-        "joins, no identity and no graph, so it cannot produce 1–5.",
+    ]
+    L += _item(
+        "1. ",
+        "**Exact factor bridge.** VNB is decomposed per segment with "
+        "sequential factor substitution over the declared identity "
+        "`VNB = Active agents × Avg productivity × VNB margin`; the "
+        "effects sum to the reported move with a residual of $0.000M.",
+    )
+    L += _item(
+        "2. ",
+        "**Cross-table proof.** The product-mix margin is recomputed by "
+        "joining `mix` to `product` on `product_id`, then shown to equal "
+        "the channel's implied VNB/APE margin.",
+    )
+    L += _item(
+        "3. ",
+        "**Agent cohorts.** `agent_monthly` joined to `agent_master` on "
+        "`agent_id` yields productivity and APE contribution by churn "
+        "band, certification and tenure.",
+    )
+    L += _item(
+        "4. ",
+        "**Statistical diagnostics.** OLS trend with R², coefficient of "
+        "variation, z-score against history, momentum, Herfindahl "
+        "concentration and driver correlation.",
+    )
+    L += _item(
+        "5. ",
+        "**Reasoning trace.** Every answer carries numbered steps naming "
+        "the method, the tables joined and the result, plus an impact "
+        "chain walked over the ontology graph.",
+    )
+    L += [""]
+    L += _wrap(
+        "The plain-LLM side can only restate the table it was shown; it "
+        "has no schema, no joins, no identity and no graph, so it cannot "
+        "produce 1–5."
+    )
+    L += [
         "",
         "## Appendix — representative side-by-side",
         "",
-        f"**Question:** {rows[0]['question']}",
+    ]
+    L += _wrap(f"**Question:** {rows[0]['question']}")
+    L += [
         "",
-        "**With ontology** (rules engine + deterministic analysis, first 900 chars):",
+        "**With ontology** (rules engine + analysis, first 900 chars):",
         "",
         "```text",
-        rows[0]["with_answer"][:900],
+    ]
+    L += _wrap(rows[0]["with_answer"][:900])
+    L += [
         "```",
         "",
-        "**Plain LLM** (same model, same raw data, no ontology — full answer):",
+        "**Plain LLM** (same model, same raw data, no ontology — full):",
         "",
         "```text",
-        rows[0]["without_answer"],
+    ]
+    L += _wrap(rows[0]["without_answer"])
+    L += [
         "```",
         "",
         "## Reproduce",

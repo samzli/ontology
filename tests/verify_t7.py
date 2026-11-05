@@ -108,8 +108,7 @@ def main():
                 "file": (
                     XLSX.name,
                     XLSX.read_bytes(),
-                    "application/vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
             }
             return c.post("/api/admin/data/upload", data=data, files=files)

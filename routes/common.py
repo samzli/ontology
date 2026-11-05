@@ -24,7 +24,7 @@ from modules.constants import (
     AUTO_REPORT_QUESTION_TARGET,
     SOURCE_SUMMARY_LIMIT,
 )
-from modules.db import get_setting, set_setting
+from modules.db import get_conn, get_setting, set_setting
 
 # Application-wide logger shared by every router.
 logger = AppLogger("onti")
@@ -60,6 +60,34 @@ class IdIn(BaseModel):
     """
 
     value: Any
+
+
+class AskIn(BaseModel):
+    """Payload shared by the streaming and compare ask endpoints.
+
+    Attributes:
+        question (str): The natural-language question.
+        mode (str): ``auto`` (default), ``rules`` or ``ai``.
+        history (Optional[List[Dict[str, str]]]): Prior turns shaped as
+            ``[{"role": "user"|"assistant", "content": "..."}]``.
+    """
+
+    question: str
+    mode: str = "auto"  # auto | rules | ai
+    history: Optional[List[Dict[str, str]]] = None
+
+
+def _log_llm_call(**kwargs: Any) -> None:
+    """Persist an LLM call record (callback used by the QA pipeline).
+
+    Args:
+        **kwargs (Any): Call fields forwarded verbatim to ``llm.log_call``.
+
+    Returns:
+        None: The record is written to the database; failures propagate.
+    """
+    with get_conn() as conn:
+        llm.log_call(conn, **kwargs)
 
 
 def can_access_pack(conn, user: Dict[str, Any], pid: int) -> bool:

@@ -41,6 +41,8 @@ FastAPI app (main.py)        ← app assembly + exception handlers only
   │                            mapping + validation; single-file and
   │                            multi-file / folder batch import
   ├── modules/induction.py   ← AI ontology proposals (+ evidence)
+  ├── modules/self_iterate.py ← dual-loop engine: critic, inner loop,
+  │                             harvest → proposals, evolution stats
   ├── modules/constants.py   ← operational literals (truncation, snippet,
   │                            report/import limits) — no magic numbers
   ├── modules/run_log.py     ← append-only run/audit trail (JSONL)
@@ -83,25 +85,25 @@ for durable multi-user state.
 
 Core tables (selection):
 
-|Table|Purpose|
-|---------------------------------------|-----------------------------------------------|
-|`users`|accounts, PBKDF2 hashes, roles|
-|`sessions`|session tokens (signed + stored)|
-|`revoked_sessions`|tokens revoked by logout (checked before use)|
-|`ontology_packs`|one row per ontology (see origin note below)|
-|`entities`/`attributes`/`relations`|the ontology schema|
-|`graph_nodes`/`graph_edges`|the impact graph (auto-generated if empty)|
-|`metric_formulas`/`question_rules`|computation + rules engine|
-|`tables`/`datasets`|logical data tables and their versioned sources|
-|`question_bank`|canonical questions|
-|`user_questions`|per-user private question lists|
-|`ask_history`|one row per answered question (see memory note)|
-|`studio_history`|Graph studio generation history log|
-|`model_configs`|admin-registered models (keys encrypted)|
-|`user_model_configs`|per-user Model centre entries (keys encrypted)|
-|`llm_calls`|token metering: caller, model, success, latency|
-|`audit`|append-only write log|
-|`app_settings`|key/value store: user model + pack selections|
+* `users` — accounts, PBKDF2 hashes, roles
+* `sessions` — session tokens (signed + stored)
+* `revoked_sessions` — tokens revoked by logout (checked before use)
+* `ontology_packs` — one row per ontology (see origin note below)
+* `entities`, `attributes`, `relations` — the ontology schema
+* `graph_nodes`, `graph_edges` — impact graph (auto-generated if empty)
+* `metric_formulas`, `question_rules` — computation + rules engine
+* `tables`, `datasets` — logical data tables and versioned sources
+* `question_bank` — canonical questions
+* `user_questions` — per-user private question lists
+* `ask_history` — one row per answered question (see memory note)
+* `studio_history` — Graph studio generation history log
+* `model_configs` — admin-registered models (keys encrypted)
+* `user_model_configs` — per-user Model centre entries (keys encrypted)
+* `llm_calls` — token metering: caller, model, success, latency
+* `audit` — append-only write log
+* `app_settings` — key/value store: user model + pack selections
+* `self_iter_sessions` — inner-loop runs: scores, rounds, improved flag
+* `self_iter_findings` — outer-loop ontology gaps (open/proposed)
 
 Four columns deserve detail:
 
@@ -363,12 +365,12 @@ portals render the same **Use ontology ON / OFF** control from
 `localStorage`under`onti.useOntology`(default`"on"` ) and broadcasts
 an `onti:ontology` DOM event on every change.
 
-|Key|`onti.useOntology`|
-|-------|----------------------------------------------------------------|
-|Default|ON|
-|Scope|Per browser; both portals on the same origin share it|
-|Toggle|`Onti.ontology.mount()`in the header of`app.js`and`admin.js`|
-|Read|`Onti.ontology.enabled()`|
+| Key     | `onti.useOntology`                                           |
+| ------- | ------------------------------------------------------------ |
+| Default | ON                                                           |
+| Scope   | Per browser; both portals on the same origin share it        |
+| Toggle  | `Onti.ontology.mount()`in the header of`app.js`and`admin.js` |
+| Read    | `Onti.ontology.enabled()`                                    |
 
 With the switch OFF, no data is sent anywhere different — the front end
 simply refuses to render ontology-derived output and says so:
@@ -404,12 +406,12 @@ answered from a January-only slice of a 24-month table — and inflated the
 prompt (slow answers). The profile-first builder summarises each table over
 its **full active dataset**:
 
-|Block|Content|Cap|
-|---|---|---|
-|Column profile|type + `sum`/`avg`/`min`/`max`, else distinct values|≤ 48|
-|Month coverage|month-like columns list values normalised to `YYYY-MM`|≤ 36|
-|Per-month aggregates|month vs `sum`/`avg` table per numeric column|≤ 36 × 8|
-|Sample rows|3 verbatim rows for format illustration only|3|
+| Block                | Content                               | Cap      |
+| -------------------- | ------------------------------------- | -------- |
+| Column profile       | type + sum/avg/min/max or value list  | ≤ 48     |
+| Month coverage       | month columns normalised to `YYYY-MM` | ≤ 36     |
+| Per-month aggregates | month × numeric-column sums/averages  | ≤ 36 × 8 |
+| Sample rows          | 3 verbatim rows for format demo       | 3        |
 
 Everything else (entities, relations, formulas, graph edges) is unchanged.
 Callers: `qa_service.stream_answer`/`compare_answers` and
@@ -420,6 +422,83 @@ truncation existed only in the prompt layer.
 Monthly experience tables are therefore fully covered: the model can list
 every month and quote per-month totals (e.g. Aug 55 / Sep 63 lapses) without
 ever seeing a "rows omitted" note.
+
+### 3.8 Self-iterating agent — dual-loop architecture
+
+Opt-in self-improvement for answers *and* the ontology, implemented by
+`modules/self_iterate.py` (engine) and `routes/self_iterate.py` (HTTP).
+
+**Feature gate.** Per-user setting `self_iter:<user_id>` in
+`app_settings`, default **off** (`"0"`). `GET /api/self-iterate/status`
+returns `{"available", "enabled", "stats"}`; `PUT
+/api/self-iterate/toggle` persists the switch and writes an audit row.
+Every endpoint re-checks the flag server-side — the UI switch is only a
+convenience, never the boundary.
+
+**Inner loop** (`run_inner_loop`, max `MAX_ROUNDS = 3` rounds):
+
+1. *Answer* — mirrors the standard grounded pipeline: rules engine
+   first (`qa_service.rule_answer`), then the deterministic deep-analysis
+   layer (`deep_analysis.analyze`), else the model with the ontology
+   system prompt.
+2. *Critique* — `critique()` is a **deterministic** scorer (no model
+   needed): rule match +25, analysis +10, reasoning depth ≤ +10, graph
+   evidence +10/+5, metrics +10, tables +5, substance ≤ +15 (max 90).
+   Missing components become machine-readable `issues`
+   (`missing_rule`, `shallow_analysis`, `coverage_gap`, `metric_gap`,
+   `thin_answer`) with human-readable `hints`.
+3. *Refine* — while the score is below `PASS_SCORE = 70` and a model is
+   available, `_refine_prompt()` appends the draft plus its critique to
+   the system prompt and the model re-answers; the best-scoring draft
+   wins. The full `iterations` trace (round, answer, score, issues) is
+   returned for the UI's score bars.
+
+**Outer loop** (human-gated evolution):
+
+* `record_session()` persists every run in `self_iter_sessions`
+  (scores, rounds, improved flag) and writes the gap-kind issues as rows
+  in `self_iter_findings` (`open`).
+* `harvest()` turns open findings into additive `node` proposals in the
+  existing `ontology_proposals` queue (key `si_<kind>_<slug>`, deduped
+  against pending proposals and existing graph keys) and marks the
+  findings `proposed`. An administrator approves through
+  `induction.approve_proposal` — the same validated `upsert_*` write
+  path as every other ontology change, with a pack-version snapshot.
+* `stats()` aggregates evolution metrics (sessions, average
+  initial/final score, improved share, average rounds, finding counts).
+
+**HTTP surface** (`routes/self_iterate.py`):
+
+| Endpoint                         | Meaning                           |
+| -------------------------------- | --------------------------------- |
+| `GET /api/self-iterate/status`   | availability + toggle + stats     |
+| `PUT /api/self-iterate/toggle`   | flip the per-user switch          |
+| `POST /api/ask/compare3`         | three-way comparison payload      |
+| `GET /api/self-iterate/findings` | findings of the caller's pack     |
+| `POST /api/self-iterate/harvest` | open findings → pending proposals |
+
+`POST /api/ask/compare3` runs the inner loop and `qa_service.compare_answers`
+concurrently (`asyncio.gather` + `asyncio.to_thread`), returning
+`self_iterated` (answer, iterations, scores), `with_ontology`,
+`without_ontology` and a `value` strip (score lift, rounds, chain
+nodes/edges, metrics used, answer chars). It answers **403** while the
+caller's switch is off.
+
+**Frontend.** `static/js/common.js` gains an `Onti.selfIter` helper that
+mounts the header switch, keeps state server-side and dispatches
+`onti:selfiter`. `static/js/app.js` relabels the compare toggle
+(◐ Compare ×3), renders the three-column result with the iteration
+trace and a quantitative strip, and adds **⟳ Insights** — a modal with
+evolution stats, the findings table and the harvest button. Styles:
+`.cmp-grid-3`, `.si-trace`, `.si-bar`, `.si-value` in
+`static/css/app.css`.
+
+**Tests.** `tests/verify_self_iterate.py` runs against a throwaway
+`ONTI_DATA_DIR` and covers the toggle default/round-trip, the critic,
+proposal keys, session recording, harvest + dedup, approval
+materialisation, the stubbed-model inner loop (refinement, rules-only
+single round, round cap) and the full HTTP flow including the 403 gate
+and the end-to-end pack evolution.
 
 ## 4. Models — system, user, resolution
 
@@ -774,14 +853,16 @@ helper modules such as `_seed_synthetic.py` , which tests import rather than
 execute — (or a filtered subset) as a subprocess and appends one JSON line per
 run to `data/run_log.jsonl`through`modules/run_log.py:record_run` :
 
-|Field|Meaning|
-|----------------------------------------------------|-------------------------------------------------------|
-|`run_id`,`started_at`,`finished_at`,`duration_ms`|identity and timing|
-|`actor`,`host`|OS user and machine that executed the script|
-|`script`|`tests/<name>.py`|
-|`status`|`PASS`/`FAIL`(a 900 s timeout is recorded as`FAIL` )|
-|`summary`|last non-empty output line of the script|
-|`details`|free-form extras (exit code, filters)|
+| Field                       | Meaning                                 |
+| --------------------------- | --------------------------------------- |
+| `run_id`                    | unique identifier of the run            |
+| `started_at`, `finished_at` | ISO-8601 start / finish                 |
+| `duration_ms`               | wall-clock duration of the run          |
+| `actor`, `host`             | OS user and machine that ran the script |
+| `script`                    | `tests/<name>.py`                       |
+| `status`                    | `PASS`/`FAIL`; 900 s timeout = `FAIL`   |
+| `summary`                   | last non-empty output line              |
+| `details`                   | free-form extras (exit code, filters)   |
 
 The path and the retention cap come from the `runtime` block of
 `config/config.json`(`run_log`,`run_log_max_entries` ); older lines are
@@ -838,26 +919,26 @@ definitions, no metric formulas, no graph).
 **Test matrix** (each question answered twice by the same model — once
 grounded in the full ontology, once grounded in raw uploaded tables):
 
-|#|Pack|Question|
-|---|--------------|-------------------------------------------------------|
-|1|6 · VNB|What is the VNB in April?|
-|2|6 · VNB|How does VNB in April compare to the previous month?|
-|3|6 · VNB|Why is there such a movement in VNB during April?|
-|4|23 · Lapse Exp|What is the lapse experience in September?|
-|5|23 · Lapse Exp|How does September lapse compare to the previous month?|
-|6|23 · Lapse Exp|Why is there such a movement in lapse during September?|
+| #   | Pack       | Question                                         |
+| --- | ---------- | ------------------------------------------------ |
+| 1   | 6 · VNB    | What is the VNB in April?                        |
+| 2   | 6 · VNB    | How does April VNB compare to the prior month?   |
+| 3   | 6 · VNB    | Why is there such a movement in April VNB?       |
+| 4   | 23 · Lapse | What is the lapse experience in September?       |
+| 5   | 23 · Lapse | How does September lapse compare to prior month? |
+| 6   | 23 · Lapse | Why such a movement in September lapse?          |
 
 **Results (all 6 scenarios completed successfully):**
 
-|Dimension|With Ontology|Without Ontology|
-|-------------------------------------------------|:----------------------------------------:|:----------------------:|
-|Answer source|**Rules engine (6/6, 100% deterministic)**|LLM AI (6/6, stochastic)|
-|Structured tables in answer|5/6|6/6|
-|Impact-chain graph nodes|59 total across 6 scenarios|**0**|
-|Impact-chain graph edges|50 total|**0**|
-|Matched ontology concepts|4–6 per answer|**—**|
-|Metric definitions used|7–9 per pack|**0**|
-|Admits limitation ("cannot determine cause")|**0/3** why-questions|2/3 lapse why-questions|
+| Dimension             | With Ontology            | Without Ontology    |
+| --------------------- | ------------------------ | ------------------- |
+| Answer source         | Rules 6/6, deterministic | LLM 6/6, stochastic |
+| Structured tables     | 5/6                      | 6/6                 |
+| Impact-chain nodes    | 59 across scenarios      | **0**               |
+| Impact-chain edges    | 50 total                 | **0**               |
+| Matched concepts      | 4–6 per answer           | —                   |
+| Metrics used          | 7–9 per pack             | **0**               |
+| Cannot-determine rate | **0/3** why-questions    | 2/3 lapse whys      |
 
 **Key findings.**
 
@@ -921,13 +1002,13 @@ answered twice through `POST /api/ask/compare` by the same model.
 **Scored rubric (0–5 per axis):** business depth, logical rigour, data
 linkage, explainability.
 
-|Axis|With ontology|Plain LLM|Delta|
-|--------------|:------------:|:-----------:|:--------:|
-|Business depth|4.14 / 5|2.14 / 5|+2.00|
-|Logical rigour|5.00 / 5|0.43 / 5|+4.57|
-|Data linkage|5.00 / 5|3.14 / 5|+1.86|
-|Explainability|5.00 / 5|1.00 / 5|+4.00|
-|**Total**|**19.14 / 20**|**6.71 / 20**|**+12.43**|
+| Axis           | With ontology  |   Plain LLM   |   Delta    |
+| -------------- | :------------: | :-----------: | :--------: |
+| Business depth |    4.14 / 5    |   2.14 / 5    |   +2.00    |
+| Logical rigour |    5.00 / 5    |   0.43 / 5    |   +4.57    |
+| Data linkage   |    5.00 / 5    |   3.14 / 5    |   +1.86    |
+| Explainability |    5.00 / 5    |   1.00 / 5    |   +4.00    |
+| **Total**      | **19.14 / 20** | **6.71 / 20** | **+12.43** |
 
 Every scenario scored 19–20 for the ontology side; the baseline ranged
 1–10. The numbers are reproduced per question in

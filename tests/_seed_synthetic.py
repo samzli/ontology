@@ -56,7 +56,7 @@ def ensure_synthetic_pack(base: str = BASE) -> tuple[int, bool]:
             .raise_for_status()
             .json()["id"]
         )
-        mime = "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         resp = c.post(
             "/api/admin/data/batch-upload",
             data={"pack_id": str(pid), "commit": "true"},

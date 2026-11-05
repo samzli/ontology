@@ -54,7 +54,16 @@ self-registered users only ever see `/app` .
    additions** (entities, graph nodes/edges, metric formulas). A
    proposal never edits or deletes existing content and never touches
    application code: approving one only adds the described element to
-   the pack, and nothing is applied until you approve it.
+   the pack, and nothing is applied until you approve it. Two sources
+   feed the same queue: the upload-time induction pass, and the
+   **self-iterating agent** — when users opt in with the ⟳ Self-iterate
+   switch, its outer loop harvests recurring answer gaps into `node`
+   proposals (keys prefixed `si_`, rationale links the finding) so the
+   ontology grows toward what people actually ask. Approving an `si_`
+   proposal runs the same validated write path and version snapshot as
+   any other change. Rejected proposals are simply not applied — the
+   underlying finding stays recorded and is not re-proposed
+   automatically.
 9. **All reports** — every user's reports with HTML / PDF / Markdown
    downloads.
 
@@ -247,26 +256,26 @@ fields verbatim. Other OpenAI-compatible gateways (Azure, Ollama, vLLM,
 Together, …) only need their own base URL + model id + API key; the
 form fields are the same for every provider.
 
-|Field|SiliconFlow|
-|---|---|
-|**Base URL**|`https://api.siliconflow.cn/v1`|
-|**Model id**|`deepseek-ai/DeepSeek-V4-Flash`|
-|**API key**|`sk-...`|
-|**Verify SSL**|✅ keep on|
+| Field          | SiliconFlow                     |
+| -------------- | ------------------------------- |
+| **Base URL**   | `https://api.siliconflow.cn/v1` |
+| **Model id**   | `deepseek-ai/DeepSeek-V4-Flash` |
+| **API key**    | `sk-...`                        |
+| **Verify SSL** | ✅ keep on                      |
 
-|Field|Deloitte Nova (D. Nova)|
-|---|---|
-|**Base URL**|`https://nova.deloitte.com.cn/v1`|
-|**Model id**|`DeepSeek-V4-Flash`|
-|**API key**|`ak-...`|
-|**Verify SSL**|❌**uncheck** (self-signed cert)|
+| Field          | Deloitte Nova (D. Nova)           |
+| -------------- | --------------------------------- |
+| **Base URL**   | `https://nova.deloitte.com.cn/v1` |
+| **Model id**   | `DeepSeek-V4-Flash`               |
+| **API key**    | `ak-...`                          |
+| **Verify SSL** | ❌**uncheck** (self-signed cert)  |
 
-|Field|Azure OpenAI|
-|---|---|
-|**Base URL**|`https://<region>.openai.azure.com/openai/deployments/<name>`|
-|**Model id**|`gpt-4o-mini` (your deployment name)|
-|**API key**|`...`|
-|**Verify SSL**|✅ keep on|
+| Field          | Azure OpenAI                                              |
+| -------------- | --------------------------------------------------------- |
+| **Base URL**   | `https://<reg>.openai.azure.com/openai/deployments/<dep>` |
+| **Model id**   | `gpt-4o-mini` (your deployment name)                      |
+| **API key**    | `...`                                                     |
+| **Verify SSL** | ✅ keep on                                                |
 
 > **Important — model ids differ across gateways.** DeepSeek V4 Flash
 > is `deepseek-ai/DeepSeek-V4-Flash` on SiliconFlow but
@@ -502,13 +511,13 @@ of a good key now succeeds.
 
 ## 7. Recommended routines
 
-|When|Do|
-|---------------------------|----------------------------------------------------------|
-|New ontology made by a user|Health check → review graph → decide on activation|
-|New model added|Test connection; watch failures on the dashboard for a day|
-|Weekly|Skim the audit feed and token-by-user table for anomalies|
-|Before big edits|Save a pack snapshot (History)|
-|Monthly|Review canonical questions; prune ones that never match|
+| When              | Do                                              |
+| ----------------- | ----------------------------------------------- |
+| New user ontology | Health check → review graph → decide activation |
+| New model added   | Test connection; watch failures for a day       |
+| Weekly            | Skim audit feed and token-by-user for anomalies |
+| Before big edits  | Save a pack snapshot (History)                  |
+| Monthly           | Review canonical questions; prune unused ones   |
 
 ## 8. FAQ
 

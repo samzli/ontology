@@ -860,6 +860,37 @@ CREATE TABLE IF NOT EXISTS studio_history (
 
 CREATE INDEX IF NOT EXISTS idx_studio_history_user
     ON studio_history(user_id, id DESC);
+
+-- Self-iterating agent (dual-loop): inner-loop sessions and the ontology
+-- gaps they exposed for the outer, human-gated evolution loop.
+CREATE TABLE IF NOT EXISTS self_iter_sessions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts            TEXT NOT NULL,
+    user_id       INTEGER NOT NULL,
+    pack_id       INTEGER,
+    question      TEXT NOT NULL,
+    iterations    INTEGER NOT NULL DEFAULT 0,
+    initial_score REAL NOT NULL DEFAULT 0,
+    final_score   REAL NOT NULL DEFAULT 0,
+    improved      INTEGER NOT NULL DEFAULT 0,
+    payload       TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_self_iter_sessions
+    ON self_iter_sessions(pack_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS self_iter_findings (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    pack_id     INTEGER NOT NULL,
+    session_id  INTEGER,
+    kind        TEXT NOT NULL,    -- missing_rule | coverage_gap | metric_gap
+    detail      TEXT NOT NULL DEFAULT '',
+    question    TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'open',   -- open | proposed
+    proposal_id INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_self_iter_findings
+    ON self_iter_findings(pack_id, status);
 """
 
 
