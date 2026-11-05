@@ -185,6 +185,57 @@ def main() -> int:
         body,
     )
 
+    # [16] status exposes the account-storage contract used by the sign-in
+    # page to warn demo users that registration is instance-local.
+    s = httpx.get(f"{BASE}/api/auth/status", timeout=15).json()
+    ok("accounts_persist" in s, "[16] status exposes accounts_persist", s)
+    ok(
+        s["accounts_persist"] == (not s["ephemeral"]),
+        "[16] accounts_persist mirrors ephemeral",
+        s,
+    )
+
+    # [17] cross-instance session rebuild: the token itself carries the
+    # identity, so a stateless instance that never saw the login can still
+    # resolve the user instead of bouncing them back to sign-in.
+    from modules import auth as auth_mod
+    from modules.db import get_conn
+
+    token = auth_mod.issue_session_token(
+        999999,
+        "2099-01-01T00:00:00+00:00",
+        username="ghost",
+        display_name="Ghost",
+        role="user",
+    )
+    claims = auth_mod.verify_session_claims(token) or {}
+    ok(claims.get("un") == "ghost", "[17] token carries identity claims", claims)
+    with get_conn() as conn:
+        ok(
+            auth_mod.user_by_token(conn, token) is None,
+            "[17] persistent host rejects an unknown user",
+        )
+        saved = auth_mod.EPHEMERAL_STORAGE
+        auth_mod.EPHEMERAL_STORAGE = True
+        rebuilt = auth_mod.user_by_token(conn, token)
+        auth_mod.EPHEMERAL_STORAGE = saved
+    ok(
+        rebuilt is not None and rebuilt["username"] == "ghost",
+        "[17] ephemeral host rebuilds the session from claims",
+        rebuilt,
+    )
+
+    # ------------------------------------------------------------- clean-up ---
+    # Test hygiene: [9] may have registered edgebot and [11]/[13] registered
+    # freshbot_*, so remove both plus their sessions. Without this the
+    # bundled database slowly fills with synthetic accounts that would then
+    # be visible in the deployed admin console.
+    with sqlite3.connect("data/onti.db") as conn:
+        conn.execute(
+            "DELETE FROM users WHERE username IN (?, ?)", (new_user, "edgebot")
+        )
+        conn.execute("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)")
+
     print()
     print(f"Backend: {PASS} ok / {FAIL} failed")
     return 0 if FAIL == 0 else 1

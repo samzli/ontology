@@ -23,7 +23,7 @@
     try {
       resp = await fetch(path, opts);
     } catch (e) {
-      throw new ApiError('Network error — the server may be unXreachable.', 0);
+      throw new ApiError('Network error — the server may be unreachable.', 0);
     }
     if (resp.status === 401) {
       // The login/register/logout endpoints themselves use 401 for

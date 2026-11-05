@@ -1038,11 +1038,13 @@ model secrets stay identical across hosts.
 > there — use a pre-provisioned account, or the Docker deployment above,
 > for real multi-user work.
 
-The repository is linked to Vercel, so every push to the connected
-branch triggers a deployment. `vercel.json`builds`main.py` with
-`@vercel/python` and routes **every** path to it — FastAPI serves the
-Jinja pages and the `/static` assets itself, so no separate static build
-is involved.
+The Vercel project deploys either from Git or from the Vercel CLI. When
+the project is Git-connected, a push to the production branch triggers a
+deployment; this checkout is **not** linked (there is no `.vercel/`
+folder), so publish with `vercel deploy --prod` unless the project
+auto-builds it. `vercel.json`builds`main.py` with`@vercel/python` and
+routes **every** path to it — FastAPI serves the Jinja pages and the
+`/static` assets itself, so no separate static build is involved.
 
 **Dependencies and the production branch.** Vercel's Python runtime
 chooses its installer from the repository: when a `pyproject.toml` is
@@ -1072,9 +1074,13 @@ to the public domain; feature branches produce preview URLs.
   per-instance — and so are accounts an admin adds there. For durable
   multi-user writes, use the Docker deployment above or point
   `ONTI_DATA_DIR` at a persistent volume.
-* Session cookies are signed with the bundled key and also validated
-  statelessly, so a login survives cold starts and requests served by
-  another instance.
+* Session cookies are signed with the bundled key and are also validated
+  statelessly. The token carries the caller's username, display name and
+  role, so an instance that never saw the login can rebuild the session
+  from the signed claims instead of bouncing the visitor back to
+  sign-in — a login therefore survives cold starts and instance
+  switches. The persistent-host path stays strict (the user row is
+  re-checked and a disabled account is rejected).
 
 **Let any account in.** Production deployments are public, but if
 **Deployment Protection → Vercel Authentication** is enabled, visitors are
@@ -1089,16 +1095,37 @@ too, but such an account lives on a single instance only. Admins add
 accounts in **Admin → Users & audit**.
 
 > **Use the deployment URL, not a dashboard path.** The app URL is the
-> deployment domain itself, e.g. `https://ontology-dais-7a03.vercel.app/` .
-> Pasting that URL after `vercel.com/<team>/<project>/` opens a Vercel
-> dashboard page and answers **404 – Page Not Found**: that is the
-> dashboard rejecting the malformed path, not the application. Share
+> deployment domain itself — for example
+> `https://ontology-psi.vercel.app/` or
+> `https://ontology-dais-7a03.vercel.app/` . Pasting that URL after
+> `vercel.com/<team>/<project>/` opens a Vercel dashboard page and
+> answers **404 – Page Not Found**: that is the dashboard rejecting the
+> malformed path, not the application. Share
 > `<domain>/app`(user portal) or`<domain>/admin` (governance console).
 > **Accounts must be provisioned before deploying.** Serverless instances
 > start from the committed `data/onti.db` , so create the accounts you want
 > to hand out (e.g. a shared demo account for another team) on a local or
 > Docker instance first, then commit the updated database and push. Accounts
 > created at runtime are per-instance and disappear on the next cold start.
+>
+> **Troubleshooting "I cannot sign in".** Work through these in order —
+> each one has a distinct symptom:
+>
+> 1. *Page never loads* (browser error, no HTML): the URL is wrong or the
+>    deployment is gone. `GET <domain>/health` returns JSON when the app
+>    is alive. `localhost` and `onti.local` only resolve on the machine
+>    running the server — never share them with a colleague; share the
+>    `*.vercel.app` domain instead. On a LAN, the Windows Firewall must
+>    allow inbound traffic on the port (`Get-NetTCPConnection -LocalPort
+>    8010` proves the server is listening, not that the firewall is open).
+> 2. *Vercel's own sign-in page appears* (Vercel logo): **Deployment
+>    Protection → Vercel Authentication** is on; disable it for the
+>    production domain (see above).
+> 3. *The sign-in form rejects the credentials*: the account does not exist
+>    on that instance. Use a pre-provisioned account, or register again —
+>    the sign-in page shows a **Demo deployment** banner and the error
+>    message explains the per-instance behaviour when the host is
+>    ephemeral (`accounts_persist: false` in `/api/auth/status`).
 
 **Environment variables.** Set `LLM_API_KEY`,`LLM_BASE_URL`,`LLM_MODEL_NAME`
 

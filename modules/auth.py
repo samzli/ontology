@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import re
 import secrets
 import sqlite3
@@ -22,6 +23,7 @@ from fastapi import Depends, HTTPException, Request
 
 from modules import config
 from modules.db import (
+    EPHEMERAL_STORAGE,
     audit,
     get_conn,
     get_setting,
@@ -74,16 +76,29 @@ def _unb64(raw: str) -> bytes:
     return base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
 
 
-def issue_session_token(user_id: int, expires_at: str) -> str:
+def issue_session_token(
+    user_id: int,
+    expires_at: str,
+    *,
+    username: str = "",
+    display_name: str = "",
+    role: str = "",
+) -> str:
     """Build a signed ``payload.signature`` session token.
 
-    The token is also stored in the ``sessions`` table (so logout revokes it
-    on that instance), but it is self-contained: a serverless instance that
-    never saw the login can still verify it with the shared machine key.
+    The payload is a small JSON record holding the user id and expiry plus,
+    when available, the identity claims (username, display name, role). The
+    claims let a stateless serverless instance that never saw this login
+    rebuild the session instead of bouncing the user back to sign-in (see
+    :func:`user_by_token`). The token is also stored in the ``sessions``
+    table so logout revokes it on the instance that issued it.
 
     Args:
         user_id (int): Id of the authenticated user.
         expires_at (str): ISO-8601 expiry timestamp.
+        username (str): Login name, embedded as the ``un`` claim.
+        display_name (str): Human label, embedded as the ``dn`` claim.
+        role (str): ``admin`` or ``user``, embedded as the ``r`` claim.
 
     Returns:
         str: ``<urlsafe-base64 payload>.<hex HMAC-SHA256 signature>``. The
@@ -95,13 +110,68 @@ def issue_session_token(user_id: int, expires_at: str) -> str:
         >>> verify_session_token(token)[0]
         1
     """
+    record: Dict[str, Any] = {
+        "u": int(user_id),
+        "e": expires_at,
+        "n": secrets.token_hex(8),
+    }
+    if username:
+        record["un"] = username
+        record["dn"] = display_name or username
+        record["r"] = role
     payload = _b64(
-        f"{int(user_id)}|{expires_at}|{secrets.token_hex(8)}".encode("utf-8")
+        json.dumps(record, separators=(",", ":"), sort_keys=True).encode("utf-8")
     )
     sig = hmac.new(
         session_signing_key(), payload.encode("ascii"), hashlib.sha256
     ).hexdigest()
     return f"{payload}.{sig}"
+
+
+def verify_session_claims(token: str) -> Optional[Dict[str, Any]]:
+    """Verify the signature and return the full token record.
+
+    Args:
+        token (str): Token produced by :func:`issue_session_token`.
+
+    Returns:
+        Optional[Dict[str, Any]]: ``{"u": user_id, "e": expires_at, ...}``
+            plus any identity claims, or ``None`` when the signature or the
+            payload is invalid. Tokens issued before the JSON payload change
+            (``user_id|expires_at|nonce``) are still accepted and yield a
+            record without claims.
+
+    Example:
+        >>> verify_session_claims("garbage") is None
+        True
+    """
+    payload, _, sig = (token or "").partition(".")
+    if not payload or not sig:
+        return None
+    expected = hmac.new(
+        session_signing_key(), payload.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
+    try:
+        raw = _unb64(payload).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    try:
+        record = json.loads(raw)
+    except ValueError:
+        record = None
+    if isinstance(record, dict) and "u" in record and "e" in record:
+        try:
+            record["u"] = int(record["u"])
+        except (TypeError, ValueError):
+            return None
+        return record
+    parts = raw.split("|")
+    try:
+        return {"u": int(parts[0]), "e": parts[1]}
+    except (IndexError, TypeError, ValueError):
+        return None
 
 
 def verify_session_token(token: str) -> Optional[Tuple[int, str]]:
@@ -118,19 +188,10 @@ def verify_session_token(token: str) -> Optional[Tuple[int, str]]:
         >>> verify_session_token("garbage") is None
         True
     """
-    payload, _, sig = (token or "").partition(".")
-    if not payload or not sig:
+    claims = verify_session_claims(token)
+    if claims is None:
         return None
-    expected = hmac.new(
-        session_signing_key(), payload.encode("ascii"), hashlib.sha256
-    ).hexdigest()
-    if not hmac.compare_digest(sig, expected):
-        return None
-    try:
-        parts = _unb64(payload).decode("utf-8").split("|")
-        return int(parts[0]), parts[1]
-    except (IndexError, ValueError, TypeError, UnicodeDecodeError):
-        return None
+    return claims["u"], claims["e"]
 
 
 # ---------------------------------------------------------------------------
@@ -608,7 +669,7 @@ def authenticate(
     if row is None:
         verify_password(password, "pbkdf2_sha256$240000$" + "x" * 24 + "$" + "y" * 44)
         audit(conn, username or "?", "auth.login_failed", "unknown username", ip)
-        raise AuthError("Invalid username or password.", 401)
+        raise AuthError(_unknown_account_message(), 401)
     if not row["enabled"]:
         audit(conn, username, "auth.login_failed", "account disabled", ip)
         raise AuthError("This account is disabled. Contact an administrator.", 403)
@@ -618,7 +679,13 @@ def authenticate(
 
     created = datetime.now(timezone.utc)
     expires = created + timedelta(days=config.SESSION_DAYS)
-    token = issue_session_token(row["id"], expires.isoformat(timespec="seconds"))
+    token = issue_session_token(
+        row["id"],
+        expires.isoformat(timespec="seconds"),
+        username=row["username"],
+        display_name=row["display_name"],
+        role=row["role"],
+    )
     conn.execute(
         "INSERT INTO sessions(token, user_id, created_at, expires_at, user_agent) "
         "VALUES(?,?,?,?,?)",
@@ -688,19 +755,38 @@ def user_by_token(conn: sqlite3.Connection, token: str) -> Optional[sqlite3.Row]
     # Serverless fallback: the login happened on another instance, so its
     # ``sessions`` row is not visible here. The token itself is signed with
     # the shared machine key, so verify it and load the user directly.
-    parsed = verify_session_token(token)
+    parsed = verify_session_claims(token)
     if parsed is None:
         return None
-    user_id, expires_at = parsed
+    claims = parsed
+    user_id = claims["u"]
+    expires_at = claims["e"]
     try:
         if _parse_dt(expires_at) < datetime.now(timezone.utc):
             return None
     except (TypeError, ValueError):
         return None
     user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-    if user is None or not user["enabled"]:
+    if user is not None and not user["enabled"]:
         return None
-    return user
+    if user is not None:
+        return user
+    # Ephemeral serverless host: the account was created on a different
+    # instance, so its row is absent from this instance's copied database.
+    # The token claims still carry the identity, so rebuild the session
+    # rather than bouncing the user back to the sign-in page. Only the
+    # ephemeral hosts do this; a persistent host keeps the strict check.
+    username = claims.get("un") or ""
+    if EPHEMERAL_STORAGE and username:
+        return {
+            "id": user_id,
+            "username": username,
+            "display_name": claims.get("dn") or username,
+            "role": claims.get("r") or "user",
+            "enabled": 1,
+            "created_at": "",
+        }
+    return None
 
 
 def logout(conn: sqlite3.Connection, token: str, ip: str = "") -> None:
@@ -802,3 +888,30 @@ def require_admin(user: Dict[str, Any] = Depends(current_user)) -> Dict[str, Any
             status_code=403, detail="Administrator privileges required."
         )
     return user
+
+
+def _unknown_account_message() -> str:
+    """Build the 401 message for an unknown username.
+
+    On a stateless serverless host, an account registered on one instance is
+    invisible to the others, so an otherwise-valid colleague is told exactly
+    what happened and what to do instead of a bare "invalid password".
+
+    Returns:
+        str: Message that keeps the stable ``Invalid username or password.``
+            prefix clients already match on, with an actionable hint appended
+            only when the host does not persist state.
+
+    Example:
+        >>> _unknown_account_message().startswith("Invalid username")
+        True
+    """
+    base = "Invalid username or password."
+    if not EPHEMERAL_STORAGE:
+        return base
+    return (
+        base
+        + " This demo deployment does not share accounts between instances."
+        + " If you registered recently, register again in this browser or ask"
+        + " an administrator for a pre-provisioned account."
+    )

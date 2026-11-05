@@ -444,6 +444,12 @@ def main() -> int:
 
     # ------------------------------------------------------ restore state ---
     with get_conn() as conn:
+        # Test hygiene: this run self-registered a throw-away account; delete
+        # it (plus its sessions) so the bundled database never accumulates
+        # synthetic logins.
+        conn.execute("DELETE FROM users WHERE username=?", (user_name,))
+        conn.execute("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)")
+    with get_conn() as conn:
         if prev_user_pack is None:
             conn.execute("DELETE FROM app_settings WHERE key='user_pack:1'")
         else:

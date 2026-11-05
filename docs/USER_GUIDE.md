@@ -29,6 +29,29 @@ ontology. There is no link from the user portal into the admin console —
 change the URL if you land in the wrong one (admins have a **← User
 portal** button in the console header for the way back).
 
+### 1.1 If you cannot sign in
+
+Three different problems look the same from the outside; check them in
+order:
+
+* **The page never loads.** The address is wrong or the service is
+  stopped. `localhost` and `onti.local` only work on the machine running
+  the server, so never share them with a colleague — use the
+  `*.vercel.app` address your administrator sends.
+* **A Vercel sign-in screen appears** instead of the Onti login form.
+  Deployment protection is switched on; only the administrator can turn
+  it off for the public address.
+* **The login form rejects your details.** Your account does not exist on
+  that server. Ask an administrator for an account, or press **Create
+  account**. On the demo deployment a **Demo deployment** banner explains
+  that accounts are kept per server instance, so an account you register
+  there may have to be created again later; for day-to-day work ask for a
+  pre-provisioned account.
+
+If the browser shows a network error when you press **Sign in**, the app
+now says so explicitly: check your connection, VPN or firewall, reload
+the page and try again.
+
 ---
 
 ## 2. Regular user: 5-minute start

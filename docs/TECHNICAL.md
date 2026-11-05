@@ -777,19 +777,35 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 
 ## 8. Security notes
 
-* Sessions are HttpOnly cookies whose value is an HMAC-signed
-`user_id|expires|nonce`payload (`auth.issue_session_token` ; the random
-  nonce keeps two logins in the same second from colliding on the
-`sessions`primary key). The token is also written to the`sessions`
-
-  table and, on logout, to `revoked_sessions` , so logout revokes it
-  immediately; other serverless instances verify the signature and check
-  the revocation table before loading the user directly, so a cookie
-  survives cold starts and per-instance `/tmp` databases. That fallback
-  still needs the user row, which another instance may not have — so on
-  ephemeral storage ( `db.EPHEMERAL_STORAGE` ) a freshly registered
-  account only lives on the instance that created it.
-`/api/admin/*` requires the admin role; the admin UI is a separate page
+* Sessions are HttpOnly cookies whose value is an HMAC-signed JSON
+  payload (`auth.issue_session_token`). The payload holds the user id,
+  the expiry and a random nonce (so two logins in the same second never
+  collide on the `sessions` primary key), plus the identity claims
+  `un`/`dn`/`r` (username, display name, role). Legacy
+  `user_id|expires|nonce` payloads are still accepted by
+  `auth.verify_session_claims`, which returns the claims and backs the
+  older `auth.verify_session_token` tuple API. The token is also written
+  to `sessions` and, on logout, to `revoked_sessions`, so logout revokes
+  it immediately; other serverless instances verify the signature and
+  check the revocation table before loading the user row.
+* **Cross-instance session rebuild.** On ephemeral storage
+  (`db.EPHEMERAL_STORAGE`, i.e. the Vercel runtime) each instance copies
+  the bundled database into its own `/tmp`, so a row written by
+  self-registration exists on one instance only. `auth.user_by_token`
+  therefore falls back to the token claims when the row is absent: it
+  returns a synthetic user record (`{id, username, display_name, role}`)
+  so the visitor stays signed in instead of looping back to `/login`. The
+  fallback is **scoped to ephemeral hosts**; a persistent host keeps the
+  strict row check, and a row that exists but is disabled is always
+  rejected. Runtime accounts are still per-instance — this only prevents
+  the session loop, it does not make the account durable.
+* `/api/auth/status` publishes `ephemeral` and `accounts_persist` so the
+  sign-in page can show the **Demo deployment** banner before the user
+  registers. `POST /api/auth/register` returns a non-empty `notice` in
+  the same situation, and an unknown-username 401 keeps the stable
+  `Invalid username or password.` prefix but appends the per-instance
+  explanation.
+* `/api/admin/*` requires the admin role; the admin UI is a separate page
   with no cross-links from the user portal.
 * API keys (system and user) are encrypted with a machine-local key
   ( `.onti.key` ) and never returned unmasked by any API.
@@ -833,7 +849,7 @@ python tests\verify_t9.py                   :: lapse pack end to end
 python tests\verify_giteam.py               :: regular team account vs admin routes
 python tests\verify_permissions.py          :: registration everywhere + ontology
                                             :: creation rights & admin visibility
-python tests\verify_login.py                :: 24 checks — auth flows
+python tests\verify_login.py                :: 30 checks — auth flows
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report
 ```
