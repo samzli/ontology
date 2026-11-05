@@ -10,6 +10,9 @@ __pycache__/
 # Test-run audit log (append-only output of tests/run_all.py)
 data/run_log.jsonl
 
+# Generated reports and charts (rebuilt on demand, never part of the source)
+data/reports/
+
 # SQLite write-ahead files (the database itself is committed on purpose)
 data/*.db-wal
 data/*.db-shm

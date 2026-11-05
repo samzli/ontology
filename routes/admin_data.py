@@ -267,7 +267,7 @@ def _run_induction_bg(pack_id: int, table_id: int, dataset_id, actor: str) -> No
             induction.induce_from_table(
                 conn, pack_id, table_id, dataset_id=dataset_id, actor=actor
             )
-    except Exception:  # noqa: BLE001 — background task must never raise
+    except Exception:
         logger.exception("Background ontology induction failed")
 
 
