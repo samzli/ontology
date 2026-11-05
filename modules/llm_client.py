@@ -1617,16 +1617,20 @@ class ConfiguredLLM:
                     if resp.status_code != 200:
                         body = (await resp.aread()).decode("utf-8", "ignore")[:300]
                         detail = describe_provider_error(resp.status_code, body)
-                        yield "data: " + json.dumps(
-                            {
-                                "type": "error",
-                                "error": detail["error"],
-                                "hint": detail["hint"],
-                                "provider_error": detail["provider_error"],
-                                "http_status": resp.status_code,
-                            },
-                            ensure_ascii=False,
-                        ) + "\n\n"
+                        yield (
+                            "data: "
+                            + json.dumps(
+                                {
+                                    "type": "error",
+                                    "error": detail["error"],
+                                    "hint": detail["hint"],
+                                    "provider_error": detail["provider_error"],
+                                    "http_status": resp.status_code,
+                                },
+                                ensure_ascii=False,
+                            )
+                            + "\n\n"
+                        )
                         return
                     async for line in resp.aiter_lines():
                         if not line or not line.startswith("data: "):
@@ -1666,15 +1670,19 @@ class ConfiguredLLM:
             # one has its own fix, and lumping them together as "not reached"
             # sent operators to the wrong place.
             detail = describe_transport_error(e)
-            yield "data: " + json.dumps(
-                {
-                    "type": "error",
-                    "error": detail["error"],
-                    "hint": detail["hint"],
-                    "provider_error": detail["provider_error"],
-                },
-                ensure_ascii=False,
-            ) + "\n\n"
+            yield (
+                "data: "
+                + json.dumps(
+                    {
+                        "type": "error",
+                        "error": detail["error"],
+                        "hint": detail["hint"],
+                        "provider_error": detail["provider_error"],
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n\n"
+            )
             return
         if not tokens and full:
             # Provider did not return usage — fall back to a word-count

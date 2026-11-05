@@ -69,10 +69,24 @@
 
   loaders.dash = async () => {
     content.innerHTML = '<div class="empty">Loading dashboard…</div>';
-    const [s, auditEvents] = await Promise.all([
-      api.get('/api/admin/stats'),
-      api.get('/api/admin/audit?limit=12'),
-    ]);
+    let s = null, auditEvents = null;
+    try {
+      [s, auditEvents] = await Promise.all([
+        api.get('/api/admin/stats'),
+        api.get('/api/admin/audit?limit=12'),
+      ]);
+    } catch (e) {
+      content.innerHTML =
+        '<div class="empty" style="max-width:480px;text-align:center">' +
+        '<h3 style="margin-bottom:8px">⚠️ Dashboard unavailable</h3>' +
+        '<p style="margin:0;color:var(--muted,#6b7280);font-size:13px">' +
+        escHtml(e.message || 'The admin stats endpoint returned an error.') +
+        '</p><button class="btn btn-primary btn-sm" id="dashRetry" style="margin-top:14px">🔄 Retry</button>' +
+        '</div>';
+      const retry = content.querySelector('#dashRetry');
+      if (retry) retry.onclick = () => loaders.dash();
+      return;
+    }
     const card = (k, v, sub, accent) =>
       '<div class="stat' + (accent ? ' accent' : '') + '"><div class="k">' + k +
       '</div><div class="v">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';

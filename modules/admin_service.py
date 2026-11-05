@@ -194,9 +194,9 @@ def create_pack(
             [{"type": "duplicate_slug", "slug": slug}],
         )
     cur = conn.execute(
-        "INSERT INTO ontology_packs(slug, name, description, is_active, created_at) "
-        "VALUES(?,?,?,0,?)",
-        (slug, name, description, now()),
+        "INSERT INTO ontology_packs(slug, name, description, created_by, is_active, created_at) "
+        "VALUES(?,?,?,?,0,?)",
+        (slug, name, description, actor, now()),
     )
     pid = int(cur.lastrowid)
     audit(conn, actor, "pack.create", f"id={pid} slug={slug}")
@@ -1007,9 +1007,16 @@ def import_pack(
             [{"type": "duplicate_slug", "slug": slug}],
         )
     cur = conn.execute(
-        "INSERT INTO ontology_packs(slug,name,description,narrative,is_active,created_at) "
-        "VALUES(?,?,?,?,0,?)",
-        (slug, name, data.get("description", ""), data.get("narrative", ""), now()),
+        "INSERT INTO ontology_packs(slug,name,description,narrative,created_by,is_active,created_at) "
+        "VALUES(?,?,?,?,?,0,?)",
+        (
+            slug,
+            name,
+            data.get("description", ""),
+            data.get("narrative", ""),
+            actor,
+            now(),
+        ),
     )
     pid = int(cur.lastrowid)
     try:
