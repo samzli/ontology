@@ -8,12 +8,12 @@
 
 ## 1. Secrets this application holds
 
-| Secret | Where it lives | Why it matters |
-| --- | --- | --- |
-| Master key | `.onti.key` / `ONTI_SECRET_KEY` | Signs cookies, encrypts keys |
-| Model API keys | `model_configs` | Billable provider credentials |
-| Session cookies | Browser only | Full access, including admin |
-| User passwords | `users` (PBKDF2 hash) | Account access |
+| Secret          | Where it lives                  | Why it matters                |
+| --------------- | ------------------------------- | ----------------------------- |
+| Master key      | `.onti.key` / `ONTI_SECRET_KEY` | Signs cookies, encrypts keys  |
+| Model API keys  | `model_configs`                 | Billable provider credentials |
+| Session cookies | Browser only                    | Full access, including admin  |
+| User passwords  | `users` (PBKDF2 hash)           | Account access                |
 
 Only the **master key** protects the others at rest, so a leaked master
 key is equivalent to leaking every stored model key, plus the ability
