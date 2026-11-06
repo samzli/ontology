@@ -674,8 +674,8 @@ same content in long form lives in:
   optional fields, minimal examples and validator error messages;
 * [docs/TECHNICAL.md](docs/TECHNICAL.md) — architecture, data model
   and HTTP API reference;
-* [SECURITY.md](SECURITY.md) — secret handling, master-key rotation and
-  the leaked-credential runbook;
+* [docs/SECURITY.md](docs/SECURITY.md) — secret handling, master-key
+  rotation and the leaked-credential runbook;
 * [docs/ONTOLOGY_VALUE_REPORT.md](docs/ONTOLOGY_VALUE_REPORT.md) —
   measured with-vs-without-ontology comparison (14 scenarios, scored).
 
@@ -1071,7 +1071,7 @@ session cookies and encrypts stored model API keys. Without it every
 instance invents its own key, so a login made on one instance is rejected
 by the next and no model key can be decrypted. Never commit
 `data/.onti.key`; the deployment reads the variable first. See
-[SECURITY.md](SECURITY.md) for the rotation procedure.
+[docs/SECURITY.md](docs/SECURITY.md) for the rotation procedure.
 
 **Do not add `rewrites` to `vercel.json` .** Vercel detects the FastAPI
 `app` instance in `main.py` and routes every path to that function

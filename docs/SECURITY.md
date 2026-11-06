@@ -1,8 +1,8 @@
 # Security — secret handling and incident response
 
 > Audience: whoever operates or deploys Onti.
-> See `README.md` for setup and
-> `docs/TECHNICAL.md` for architecture.
+> See [../README.md](../README.md) for setup and
+> [TECHNICAL.md](TECHNICAL.md) for architecture.
 
 ---
 
