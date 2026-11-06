@@ -1204,9 +1204,10 @@ whole-database snapshot (`onti/<derived-id>/onti.db` ) still covers packs,
 uploads and reports and runs from the daily cron (`0 3 * * *` ). The
 snapshot path id is derived from `ONTI_SECRET_KEY` (or the bundled
 `.onti.key` ), so keep that key stable or the old snapshots become
-unreachable. Blob URLs are public, which is why the path is derived from
-the key rather than guessable; account records hold only a PBKDF2 hash,
-never the password.
+unreachable. Account record paths deliberately do **not** depend on the
+master key (rotating it must not orphan accounts); they contain only a
+PBKDF2 hash, never the password, and the store's subdomain is
+unguessable while listing requires the token.
 
 To verify persistence, call `GET /api/auth/status` : `snapshot_sync`
 must be `true` and `accounts_persist` must stay `true` even though
