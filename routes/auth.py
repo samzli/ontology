@@ -107,32 +107,23 @@ async def register(data: LoginIn):
         data (LoginIn): Username, password and optional display name.
 
     Returns:
-        JSONResponse: Body ``{"user": {...}, "notice": str}`` plus the
-        session cookie. ``notice`` is a non-empty, user-facing explanation
-        only on hosts that cannot persist accounts between instances.
+        JSONResponse: Body ``{"user": {...}}`` plus the session cookie. A 503
+        JSON error is raised by the service layer when the host cannot keep
+        new accounts.
+
+    Raises:
+        auth.AuthError: With 503 on a stateless host without durable account
+            storage (mapped to a JSON error by the application handler).
     """
     with get_conn() as conn:
         user = auth.register_account(
             conn, data.username.strip(), data.password, data.display_name.strip(), ""
         )
         result = auth.authenticate(conn, data.username.strip(), data.password)
-    # The account row is committed now — push a snapshot before this instance
-    # can be replaced (no-op when no snapshot backend is configured).
+    # Push a whole-database snapshot too, so packs/settings written alongside
+    # the account reach the durable store (no-op without a snapshot backend).
     snapshot.request_sync()
-    persists = (not EPHEMERAL_STORAGE) or snapshot.enabled()
-    resp = JSONResponse(
-        {
-            "user": user,
-            "notice": (
-                ""
-                if persists
-                else "This demo deployment keeps accounts per instance."
-                " Stay signed in on this browser; if you are asked to"
-                " sign in again, register again or use a"
-                " pre-provisioned account."
-            ),
-        }
-    )
+    resp = JSONResponse({"user": user})
     resp.set_cookie(
         auth.COOKIE_NAME,
         result["token"],

@@ -117,6 +117,9 @@ async def admin_user_create(
         uid = auth.create_user(
             conn, data.username, data.password, data.display_name, data.role
         )
+        # Mirror the row before the transaction commits so the account exists
+        # on every instance, not just the one that served this request.
+        snapshot.persist_account(conn, data.username)
     snapshot.request_sync()
     return {"id": uid}
 

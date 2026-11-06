@@ -75,7 +75,7 @@ def _last_line(text: str) -> str:
 # survive a test run: the bundled database ships in the deployment, so a
 # leftover ``perm_…`` or ``freshbot_…`` login would show up in the live admin
 # console and confuse real users.
-_SYNTHETIC_PREFIXES = ("user_", "freshbot", "perm_", "repro", "t6_", "smoke")
+_SYNTHETIC_PREFIXES = ("acct_", "user_", "freshbot", "perm_", "repro", "t6_", "smoke")
 _SYNTHETIC_NAMES = {"testuser99", "edgebot", "alice", "bob", "rootadmin"}
 
 # Packs the scripts create as scratch spaces (permission matrix, import labs,

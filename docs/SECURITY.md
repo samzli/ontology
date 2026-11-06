@@ -8,12 +8,12 @@
 
 ## 1. Secrets this application holds
 
-| Secret          | Where it lives                  | Why it matters                |
-| --------------- | ------------------------------- | ----------------------------- |
-| Master key      | `.onti.key` / `ONTI_SECRET_KEY` | Signs cookies, encrypts keys  |
-| Model API keys  | `model_configs`                 | Billable provider credentials |
-| Session cookies | Browser only                    | Full access, including admin  |
-| User passwords  | `users` (PBKDF2 hash)           | Account access                |
+| Secret          | Where it lives    | Why it matters               |
+| --------------- | ----------------- | ---------------------------- |
+| Master key      | `.onti.key` / env | Signs cookies, encrypts keys |
+| Model API keys  | `model_configs`   | Billable credentials         |
+| Session cookies | Browser only      | Full access, incl. admin     |
+| User passwords  | `users` (PBKDF2)  | Account access               |
 
 Only the **master key** protects the others at rest, so a leaked master
 key is equivalent to leaking every stored model key, plus the ability
@@ -49,6 +49,14 @@ python -c "import base64, secrets; print(base64.b64encode(secrets.token_bytes(32
 
 `ONTI_SECRET_KEY` takes precedence over the file, so a platform-hosted
 instance never needs the key on disk.
+
+On an ephemeral host (Vercel) with neither variable nor file available,
+`_machine_key` derives the key from the storage credential the deployment
+already shares (`BLOB_READ_WRITE_TOKEN` or `ONTI_SNAPSHOT_TOKEN`) so every
+instance validates the same session cookies. That fallback inherits the
+credential's lifecycle: rotating the storage token also rotates the master
+key and invalidates sessions and encrypted model keys. Set
+`ONTI_SECRET_KEY` explicitly to decouple the two.
 
 ## 3. Incident response — leaked credential
 

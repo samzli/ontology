@@ -197,9 +197,9 @@ def main() -> int:
         s,
     )
 
-    # [17] cross-instance session rebuild: the token itself carries the
-    # identity, so a stateless instance that never saw the login can still
-    # resolve the user instead of bouncing them back to sign-in.
+    # [17] cross-instance sessions: a token whose account exists only in the
+    # durable account store is adopted; a token for an account nobody knows is
+    # rejected rather than forged from its claims.
     from modules import auth as auth_mod
     from modules.db import get_conn
 
@@ -222,8 +222,8 @@ def main() -> int:
         rebuilt = auth_mod.user_by_token(conn, token)
         auth_mod.EPHEMERAL_STORAGE = saved
     ok(
-        rebuilt is not None and rebuilt["username"] == "ghost",
-        "[17] ephemeral host rebuilds the session from claims",
+        rebuilt is None,
+        "[17] unknown user is not forged from token claims",
         rebuilt,
     )
 

@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import Depends, HTTPException, Request
 
-from modules import config
+from modules import config, snapshot
 from modules.db import (
     EPHEMERAL_STORAGE,
     audit,
@@ -456,6 +456,25 @@ def list_users(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     return [public_user(r) for r in rows]
 
 
+def _persist_user(conn: sqlite3.Connection, user_id: int) -> None:
+    """Mirror one account row to the durable store, best effort.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        user_id (int): Account whose row changed.
+
+    Returns:
+        None: Upload failures are logged by :mod:`modules.snapshot` and do
+            not abort the administrative change.
+
+    Example:
+        >>> _persist_user(conn, 2)  # doctest: +SKIP
+    """
+    row = conn.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()
+    if row is not None:
+        snapshot.persist_account(conn, row["username"])
+
+
 def set_user_role(
     conn: sqlite3.Connection, actor: Dict[str, Any], user_id: int, role: str
 ) -> None:
@@ -486,6 +505,7 @@ def set_user_role(
     if cur.rowcount == 0:
         raise AuthError("User not found.", 404)
     audit(conn, actor["username"], "user.role_change", f"user_id={user_id} role={role}")
+    _persist_user(conn, user_id)
 
 
 def set_user_enabled(
@@ -523,6 +543,7 @@ def set_user_enabled(
         "user.enable" if enabled else "user.disable",
         f"user_id={user_id}",
     )
+    _persist_user(conn, user_id)
 
 
 def reset_password(
@@ -555,11 +576,111 @@ def reset_password(
     if cur.rowcount == 0:
         raise AuthError("User not found.", 404)
     audit(conn, actor["username"], "user.password_reset", f"user_id={user_id}")
+    _persist_user(conn, user_id)
 
 
 # ---------------------------------------------------------------------------
 # Registration / login / sessions
 # ---------------------------------------------------------------------------
+
+
+def _require_durable_accounts() -> None:
+    """Refuse self-registration when the host cannot keep the account.
+
+    A stateless host without a configured snapshot backend copies a fresh
+    database on every cold start, so a new account would exist only on the
+    single instance that handled the request: the next page load lands
+    elsewhere and bounces the user straight back to sign-in. Rejecting the
+    registration up front is far cheaper to explain than a phantom account.
+
+    Returns:
+        None: Returns when the host can keep accounts.
+
+    Raises:
+        AuthError: With status 503 on an ephemeral host that has no durable
+            account store configured.
+
+    Example:
+        >>> _require_durable_accounts()
+    """
+    if not EPHEMERAL_STORAGE:
+        return
+    if snapshot.account_store():
+        return
+    raise AuthError(
+        "New accounts cannot be kept on this deployment: connect a durable "
+        "store (Vercel Blob or ONTI_SNAPSHOT_URL) or ask an administrator for "
+        "a pre-provisioned account.",
+        503,
+    )
+
+
+def _register_login_row(
+    conn: sqlite3.Connection, username: str
+) -> Optional[sqlite3.Row]:
+    """Return the local user row, adopting the account record when missing.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        username (str): Username supplied at sign-in.
+
+    Returns:
+        Optional[sqlite3.Row]: The local row, or ``None`` when neither the
+            database nor the durable account store knows the username.
+
+    Example:
+        >>> _register_login_row(conn, "alice") is None  # doctest: +SKIP
+        False
+    """
+    row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    if row is not None:
+        return row
+    record = snapshot.load_account(username)
+    if record is None:
+        return None
+    if not snapshot.adopt_account(conn, record):
+        return None
+    return conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+
+
+def _refresh_login_row(
+    conn: sqlite3.Connection, row: sqlite3.Row, password: str
+) -> Optional[sqlite3.Row]:
+    """Adopt a newer password/role/enabled state from the durable store.
+
+    An administrator may reset a password or disable an account on a
+    different instance, so this instance's copy can be stale. When the local
+    hash rejects the supplied password but the stored record accepts it, the
+    record wins and the local row is updated.
+
+    Args:
+        conn (sqlite3.Connection): Open database connection.
+        row (sqlite3.Row): Current local user row.
+        password (str): Plaintext password supplied at sign-in.
+
+    Returns:
+        Optional[sqlite3.Row]: The refreshed row, or ``None`` when the stored
+            record does not accept the password either.
+
+    Example:
+        >>> _refresh_login_row(conn, row, "wrong-password") is None  # doctest: +SKIP
+        True
+    """
+    record = snapshot.load_account(row["username"])
+    stored = str((record or {}).get("password_hash") or "")
+    if not stored or not verify_password(password, stored):
+        return None
+    role = record.get("role")
+    conn.execute(
+        "UPDATE users SET password_hash=?, role=?, enabled=? WHERE id=?",
+        (
+            stored,
+            role if role in ("admin", "user") else row["role"],
+            int(record.get("enabled", 1)),
+            row["id"],
+        ),
+    )
+    return conn.execute("SELECT * FROM users WHERE id=?", (row["id"],)).fetchone()
 
 
 def register_account(
@@ -586,14 +707,16 @@ def register_account(
         Dict[str, Any]: Public projection of the created account.
 
     Raises:
-        AuthError: With 422 for invalid credentials, and 403 when
-            self-registration is disabled by an administrator.
+        AuthError: With 422 for invalid credentials, 403 when
+            self-registration is disabled by an administrator, and 503 when
+            the host cannot persist new accounts.
 
     Example:
         >>> register_account(conn, "alice", "long-enough-password")["role"]
         'user'
     """
     validate_credentials(username, password)
+    _require_durable_accounts()
     first = user_count(conn) == 0
     if not first and get_setting(conn, "allow_registration", "1") != "1":
         raise AuthError("Self-registration is disabled. Contact an administrator.", 403)
@@ -606,6 +729,13 @@ def register_account(
         f"user_id={uid} role={role}",
         ip,
     )
+    # Mirror the new row to the durable store before this request commits:
+    # raising rolls the transaction back, so a failed upload never leaves a
+    # phantom account that the next instance cannot resolve.
+    if not snapshot.persist_account(conn, username):
+        raise AuthError(
+            "The account could not be saved to durable storage. Please retry.", 503
+        )
     row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     return public_user(row)
 
@@ -664,7 +794,7 @@ def authenticate(
     # what constitutes a legitimate login attempt — Pydantic validators on
     # the LoginIn model mirror this, but internal callers can skip those.
     validate_credentials(username, password)
-    row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    row = _register_login_row(conn, username)
     # Constant-ish path: still evaluate a hash when user is missing.
     if row is None:
         verify_password(password, "pbkdf2_sha256$240000$" + "x" * 24 + "$" + "y" * 44)
@@ -674,8 +804,13 @@ def authenticate(
         audit(conn, username, "auth.login_failed", "account disabled", ip)
         raise AuthError("This account is disabled. Contact an administrator.", 403)
     if not verify_password(password, row["password_hash"]):
-        audit(conn, username, "auth.login_failed", "bad password", ip)
-        raise AuthError("Invalid username or password.", 401)
+        row = _refresh_login_row(conn, row, password)
+        if row is None:
+            audit(conn, username, "auth.login_failed", "bad password", ip)
+            raise AuthError("Invalid username or password.", 401)
+        if not row["enabled"]:
+            audit(conn, username, "auth.login_failed", "account disabled", ip)
+            raise AuthError("This account is disabled. Contact an administrator.", 403)
 
     created = datetime.now(timezone.utc)
     expires = created + timedelta(days=config.SESSION_DAYS)
@@ -761,32 +896,24 @@ def user_by_token(conn: sqlite3.Connection, token: str) -> Optional[sqlite3.Row]
     claims = parsed
     user_id = claims["u"]
     expires_at = claims["e"]
+    username = claims.get("un") or ""
     try:
         if _parse_dt(expires_at) < datetime.now(timezone.utc):
             return None
     except (TypeError, ValueError):
         return None
+    # Ephemeral host: ids collide across instances, so the username claim is
+    # the reliable identity. Prefer the local row for that name, adopting the
+    # durable account record when this instance has never seen it.
+    if EPHEMERAL_STORAGE and username:
+        row = _register_login_row(conn, username)
+        if row is None:
+            return None
+        return row if row["enabled"] else None
     user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
     if user is not None and not user["enabled"]:
         return None
-    if user is not None:
-        return user
-    # Ephemeral serverless host: the account was created on a different
-    # instance, so its row is absent from this instance's copied database.
-    # The token claims still carry the identity, so rebuild the session
-    # rather than bouncing the user back to the sign-in page. Only the
-    # ephemeral hosts do this; a persistent host keeps the strict check.
-    username = claims.get("un") or ""
-    if EPHEMERAL_STORAGE and username:
-        return {
-            "id": user_id,
-            "username": username,
-            "display_name": claims.get("dn") or username,
-            "role": claims.get("r") or "user",
-            "enabled": 1,
-            "created_at": "",
-        }
-    return None
+    return user
 
 
 def logout(conn: sqlite3.Connection, token: str, ip: str = "") -> None:

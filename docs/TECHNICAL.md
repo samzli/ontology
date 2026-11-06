@@ -63,11 +63,14 @@ folder. On first connection the bundled `data/onti.db` is copied into
 that writable directory, so a fresh serverless instance starts with the
 same seeded packs, accounts and report metadata. Files under
 `data/reports/` that are not present in the writable directory are read
-from the bundled copy ( `report_builder._abs` ). The machine key
-( `data/.onti.key` ) always stays next to the bundled data, so encrypted
-model API keys and signed session cookies are identical across
-instances; `ONTI_SECRET_KEY` overrides it on hosts that cannot ship a key
-file (multi-replica or stateless deployments).
+from the bundled copy ( `report_builder._abs` ). The master key
+(`db._machine_key`) resolves in this order: `ONTI_SECRET_KEY`, then a
+`data/.onti.key` file (writable directory first, bundled copy second),
+then — on an ephemeral host only — a key derived from the shared storage
+credential (`BLOB_READ_WRITE_TOKEN` or `ONTI_SNAPSHOT_TOKEN`), so every
+instance signs and validates the same session cookies. A randomly
+generated per-instance key is the last resort and is logged as a warning,
+because it makes cookies and encrypted model keys instance-local.
 
 `db.EPHEMERAL_STORAGE` marks hosts whose filesystem is *wiped between
 instances* — it is true only when the `VERCEL` environment variable is
@@ -76,23 +79,49 @@ derived from the data-directory path: a Docker container points
 `ONTI_DATA_DIR` at its mounted volume and is therefore fully persistent.
 On an ephemeral host writes live only for that instance, so
 `/api/auth/status`reports`ephemeral: true` ; `modules/snapshot.py`
-closes the durability gap by mirroring the database to an external store
-(see below). Without a snapshot backend, accounts stay per-instance: use
-the Docker image with the `onti-data` volume (README → Deploying with
-Docker) for guaranteed durable multi-user state.
+mirrors accounts and the database to an external store (see below).
+Without a snapshot backend, accounts stay per-instance **and
+self-registration is refused** (`503`, see the auth contract): it is
+better to say so than to create an account the next instance cannot see.
 
 **Snapshot sync ( `modules/snapshot.py` ).** Two backends, selected by
 environment: `BLOB_READ_WRITE_TOKEN` → Vercel Blob (REST, snapshot stored
 under an unguessable prefix derived from the signing key because Blob
 URLs are public), or `ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` → any
 HTTP endpoint ( `PUT` to upload, `GET` to download). On cold start
-`db._prepare_data_dir` restores the latest snapshot before falling back
-to the bundled database; uploads happen after every account mutation
-(`snapshot.request_sync`, burst-collapsed to one upload per 5 s) and on
-a schedule via `GET /api/internal/snapshot-sync` (wired as a daily Vercel
-Cron, authenticated by `CRON_SECRET` when set). All failures are logged
-and swallowed, so a store outage never breaks a request; with no backend
-configured every call is a no-op.
+`db._prepare_data_dir` restores the latest whole-database snapshot before
+falling back to the bundled database; uploads happen after every account
+mutation (`snapshot.request_sync`, burst-collapsed to one upload per 5 s)
+and on a schedule via `GET /api/internal/snapshot-sync` (wired as a daily
+Vercel Cron, authenticated by `CRON_SECRET` when set). All failures are
+logged and swallowed, so a store outage never breaks a request; with no
+backend configured every call is a no-op.
+
+**Account records (the durability fix).** A whole-database snapshot is
+last-writer-wins: an old instance uploading late could erase an account a
+newer instance had just created. Accounts therefore have their own
+record, `shared/accounts/<sha256(username.lower().strip())>.json` (no
+dependence on the master key, so rotating it never orphans accounts),
+written *before* the transaction that changed the account commits:
+
+* **Self-registration** — `auth.register_account`; a failed upload raises
+  `503` and rolls the transaction back, so no phantom account survives.
+* **Admin create** — `routes/admin_users`, inside the same transaction.
+* **Role / enable / password** — `auth.set_user_role`,
+  `set_user_enabled` and `reset_password` (best effort; failures are
+  logged and do not abort the administrative change).
+* **Sign-in on a foreign instance** — `auth._register_login_row` inserts
+  the stored record and the normal password check follows.
+* **Password reset on another instance** — `auth._refresh_login_row`
+  adopts the newer hash when the local one rejects the password.
+* **Delete** — not exposed by the API; `snapshot.delete_account` exists
+  for operators.
+
+`snapshot.restore_accounts` runs at startup on ephemeral hosts and lists
+the blob prefix (HTTP backends adopt lazily at sign-in). Each record
+carries the PBKDF2 hash, role, enabled flag and timestamps — never a
+plaintext password — and a record for one account can never remove
+another.
 
 ## 2. Data model (SQLite)
 
@@ -801,25 +830,35 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   to `sessions` and, on logout, to `revoked_sessions`, so logout revokes
   it immediately; other serverless instances verify the signature and
   check the revocation table before loading the user row.
-* **Cross-instance session rebuild.** On ephemeral storage
+* **Cross-instance accounts and sessions.** On ephemeral storage
   (`db.EPHEMERAL_STORAGE`, i.e. the Vercel runtime) each instance copies
   the bundled database into its own `/tmp`, so a row written by
-  self-registration exists on one instance only. `auth.user_by_token`
-  therefore falls back to the token claims when the row is absent: it
-  returns a synthetic user record (`{id, username, display_name, role}`)
-  so the visitor stays signed in instead of looping back to `/login`. The
-  fallback is **scoped to ephemeral hosts**; a persistent host keeps the
-  strict row check, and a row that exists but is disabled is always
-  rejected. Without a snapshot backend runtime accounts are still
-  per-instance — this prevents the session loop; snapshot sync is what
-  makes the account itself durable.
+  self-registration exists on one instance only. Two mechanisms keep the
+  visitor signed in:
+  1. `auth.register_account` writes the per-account record before the
+     transaction commits and fails with `503` if it cannot, so a
+     successful registration is always durable.
+  2. `auth.user_by_token` resolves an ephemeral-host session **by the
+     username claim** (`_register_login_row`), adopting the durable
+     record when this instance has not seen the account. If neither the
+     database nor the store knows the username the session is refused —
+     the token is never turned into a synthetic user, so a removed
+     account cannot be impersonated. A persistent host keeps the strict
+     row check and always rejects a disabled account.
+* **Credentials across instances.** `authenticate` adopts a missing row
+  from the account store, and when the local PBKDF2 hash rejects the
+  password it re-reads the stored record (`_refresh_login_row`): an
+  administrator who reset a password or disabled an account on another
+  instance is therefore honoured at the next sign-in.
 * `/api/auth/status` publishes `ephemeral`, `snapshot_sync` and
-  `accounts_persist` (true when the host is persistent *or* a snapshot
-  backend is configured). `POST /api/auth/register` returns a non-empty
-  `notice` only when accounts genuinely cannot persist, and an
-  unknown-username 401 keeps the stable
-  `Invalid username or password.` prefix but appends the per-instance
-  explanation.
+  `accounts_persist` (true when the host is persistent *or* a durable
+  account store is configured). `POST /api/auth/register` returns
+  `{"user": {...}}`; on an ephemeral host without a store it answers
+  `503` with an actionable message instead of creating a phantom
+  account, and the sign-in page hides the registration switch.
+  Unknown usernames return the stable
+  `Invalid username or password.` message; the per-instance demo hint was
+  removed now that accounts are durable.
 * `/api/admin/*` requires the admin role; the admin UI is a separate page
   with no cross-links from the user portal.
 * API keys (system and user) are encrypted with a machine-local key

@@ -558,24 +558,27 @@ hosts mapping in the README, otherwise `http://localhost:8010/app` .
 Never share a `localhost` or `onti.local` address with a colleague: those
 names only resolve on the machine running the server. For remote access
 use the deployment domain ( `https://…/app` ).
-Self-registration works on every host, but accounts created at runtime
-need persistence to survive: on Vercel the function filesystem is
-per-instance ( `/api/auth/status`→`ephemeral: true` ), so configure a
-snapshot store — `BLOB_READ_WRITE_TOKEN` (Vercel Blob) or
-`ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` (your own endpoint). Accounts
-then upload on every change and once a day via cron, and every cold
-start restores the latest snapshot. A session stays signed in across
-instances regardless (the signed cookie carries the identity claims).
-The Docker deployment keeps the volume, so accounts persist there
-( `ephemeral: false` ) — use it (README → Deploying with Docker)
-for a real multi-user workspace.
-**Pre-provision accounts before deploying** when no snapshot store is
-configured. Serverless instances then start from the committed
-`data/onti.db` : create the accounts you want to hand out on a local or
-Docker instance, then commit the database and redeploy. The bundled
-database ships only the real accounts — the test suite deletes the
-throw-away logins it creates, so `data/onti.db` never accumulates
-synthetic users.
+Self-registration works on every host. On Vercel the function filesystem
+is per-instance ( `/api/auth/status`→`ephemeral: true` ), so configure a
+durable store — `BLOB_READ_WRITE_TOKEN` (Vercel Blob) or
+`ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` (your own endpoint). Every
+account is then saved as its own record
+( `shared/accounts/<sha256-of-username>.json` ) before the registration
+returns; a cold start re-hydrates missing accounts, and a sign-in on an
+instance that has never seen the account adopts the record on demand. A
+session also survives instance switches because all instances share the
+master key ( `ONTI_SECRET_KEY` ; when it is absent the key is derived
+from the storage credential). Without a store, self-registration is
+refused with `503` and the sign-in page hides the switch, so nobody is
+promised an account that cannot survive. The Docker deployment keeps the
+volume, so everything persists there ( `ephemeral: false` ) — use it
+(README → Deploying with Docker) for a real multi-user workspace.
+**Pre-provision accounts before deploying** when no store is configured.
+Serverless instances then start from the committed `data/onti.db` :
+create the accounts you want to hand out on a local or Docker instance,
+then commit the database and redeploy. The bundled database ships only
+the real accounts — the test suite deletes the throw-away logins it
+creates, so `data/onti.db` never accumulates synthetic users.
 On Vercel make sure **Deployment Protection → Vercel Authentication** is
 disabled, otherwise only members of your Vercel team can open the app.
 Mind the URL: `vercel.com/<team>/<project>/<url>` is a dashboard path that
@@ -596,9 +599,10 @@ Recommended setup:
 2. Create **one regular account per person** (or one shared demo account
    for a short demo) in **Users & audit**.
 3. Share `<domain>/app`— not`/admin`.
-4. On Vercel, accounts created at runtime live in that instance's
-`/tmp` unless a snapshot store is configured ( `BLOB_READ_WRITE_TOKEN`
-   or `ONTI_SNAPSHOT_URL` ). Without one, create accounts on a local or
+4. On Vercel, accounts created at runtime need a durable store
+   ( `BLOB_READ_WRITE_TOKEN` or `ONTI_SNAPSHOT_URL` ). With one, they are
+   written per account and reachable from every instance. Without one,
+   registration is refused ( `503` ); create accounts on a local or
    Docker instance, commit the updated `data/onti.db` , and push — the
    deployment then starts every instance with those accounts.
 

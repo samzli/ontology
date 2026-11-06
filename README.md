@@ -1050,15 +1050,19 @@ model secrets stay identical across hosts.
 
 > **Accounts survive cold starts when a snapshot store is configured.**
 > Each function instance gets its own `/tmp` , but
-> `modules/snapshot.py` mirrors the database to an external store and
-> restores it on boot: set `BLOB_READ_WRITE_TOKEN` (connect a Vercel Blob
-> store to the project) or point `ONTI_SNAPSHOT_URL` +
-> `ONTI_SNAPSHOT_TOKEN` at any HTTP endpoint you own. Snapshots upload
-> after every account change and once a day via Vercel Cron, so
-> self-registration works for real users. Without a backend the host
-> falls back to per-instance accounts: `/api/auth/status`reports
-> `ephemeral: true, accounts_persist: false` — use pre-provisioned
-> accounts or the Docker deployment above for guaranteed durability.
+> `modules/snapshot.py` mirrors accounts to an external store and
+> restores them on boot: set `BLOB_READ_WRITE_TOKEN` (connect a Vercel
+> Blob store to the project) or point `ONTI_SNAPSHOT_URL` +
+> `ONTI_SNAPSHOT_TOKEN` at any HTTP endpoint you own. Every account is
+> stored as its own record ( `onti/shared/accounts/<sha256-of-username>.json` ),
+> so writing one account can never overwrite another. Registration,
+> role changes, password resets and enable/disable all write the record
+> before the request returns. Without a backend the host refuses new
+> registrations with HTTP 503 and `/api/auth/status` reports
+> `ephemeral: true, accounts_persist: false`; the sign-in page then
+> invites colleagues to ask an administrator instead of promising an
+> account that cannot survive. Use pre-provisioned accounts or the
+> Docker deployment above for guaranteed durability.
 
 The Vercel project deploys either from Git or from the Vercel CLI. When
 the project is Git-connected, a push to the production branch triggers a
@@ -1067,9 +1071,11 @@ folder), so publish with `vercel deploy --prod` unless the project
 auto-builds it.
 
 **Set `ONTI_SECRET_KEY` in the Vercel project environment.** It signs the
-session cookies and encrypts stored model API keys. Without it every
-instance invents its own key, so a login made on one instance is rejected
-by the next and no model key can be decrypted. Never commit
+session cookies and encrypts stored model API keys. When it is absent on
+an ephemeral host the master key is derived from the configured storage
+credential ( `BLOB_READ_WRITE_TOKEN` or `ONTI_SNAPSHOT_TOKEN` ), so every
+instance still validates the same cookies — but an explicit
+`ONTI_SECRET_KEY` is the supported, rotation-safe choice. Never commit
 `data/.onti.key`; the deployment reads the variable first. See
 [docs/SECURITY.md](docs/SECURITY.md) for the rotation procedure.
 
@@ -1107,20 +1113,22 @@ to the public domain; feature branches produce preview URLs.
   directory.
 * Writes made **inside the app** (new registrations, uploaded data,
   generated reports, model configs) live as long as the function
-  instance; account changes additionally trigger a snapshot upload, and
-  the daily cron keeps the store fresh, so accounts registered on
-  serverless survive cold starts and appear on every instance. Other
-  writes (uploads, reports) ride along in the same snapshot but are only
-  guaranteed after the next sync. For fully durable multi-user writes,
-  use the Docker deployment above or point `ONTI_DATA_DIR` at a
+  instance. Accounts are the exception: each one is mirrored to its own
+  record in the durable store before the request returns, and a login on
+  an instance that never saw the account adopts the record on demand, so
+  self-registration works across cold starts and instance switches. Other
+  writes (uploads, reports) ride along in the whole-database snapshot and
+  are only guaranteed after the next sync. For fully durable multi-user
+  writes, use the Docker deployment above or point `ONTI_DATA_DIR` at a
   persistent volume.
-* Session cookies are signed with the bundled key and are also validated
-  statelessly. The token carries the caller's username, display name and
-  role, so an instance that never saw the login can rebuild the session
-  from the signed claims instead of bouncing the visitor back to
-  sign-in — a login therefore survives cold starts and instance
-  switches. The persistent-host path stays strict (the user row is
-  re-checked and a disabled account is rejected).
+* Session cookies are signed with the shared master key. The token also
+  carries the caller's username, display name and role; a stateless
+  instance that receives it resolves the account by username, adopting
+  the durable record when necessary. If neither the database nor the
+  store knows the account, the session is refused instead of being
+  forged from the token, so a deleted account cannot be impersonated.
+  The persistent-host path stays strict (the user row is re-checked and a
+  disabled account is rejected).
 
 **Let any account in.** Production deployments are public, but if
 **Deployment Protection → Vercel Authentication** is enabled, visitors are
@@ -1130,9 +1138,10 @@ Protection* → disable **Vercel Authentication** for the production domain
 (or hand out a Protection Bypass link). Inside the app, users can then open
 `/app`and sign in with a pre-provisioned account (`admin`/`Onti@2026`
 
-by default) or register a new one — registration works on serverless hosts
-too, but such an account lives on a single instance only. Admins add
-accounts in **Admin → Users & audit**.
+by default) or register a new one — registration on a serverless host
+requires the durable account store described above (otherwise the form
+is hidden and the API answers 503). Admins add accounts in
+**Admin → Users & audit**.
 
 > **Use the deployment URL, not a dashboard path.** The app URL is the
 > deployment domain itself — for example
@@ -1142,12 +1151,13 @@ accounts in **Admin → Users & audit**.
 > answers **404 – Page Not Found**: that is the dashboard rejecting the
 > malformed path, not the application. Share
 > `<domain>/app`(user portal) or`<domain>/admin` (governance console).
-> **Accounts must be provisioned before deploying** unless a snapshot
-> store is configured. Serverless instances start from the committed
-> `data/onti.db` (or the latest snapshot), so without a store create the
-> accounts you want to hand out (e.g. a shared demo account for another
-> team) on a local or Docker instance first, then commit the updated
-> database and push.
+> **Provision shared accounts before deploying, or connect the store.**
+> With a durable account store connected, accounts created in the app
+> reach every instance. Without one, self-registration is refused and
+> serverless instances start from the committed `data/onti.db` (or the
+> latest snapshot) — create the accounts you want to hand out (e.g. a
+> shared demo account for another team) on a local or Docker instance
+> first, then commit the updated database and push.
 >
 > **Troubleshooting "I cannot sign in".** Work through these in order —
 > each one has a distinct symptom:
@@ -1163,11 +1173,12 @@ accounts in **Admin → Users & audit**.
 >    Protection → Vercel Authentication** is on; disable it for the
 >    production domain (see above).
 > 3. *The sign-in form rejects the credentials*: the account does not exist
->    on that instance. Use a pre-provisioned account, or register again —
->    when the host is ephemeral and no snapshot store is configured,
->    `/api/auth/status` reports `accounts_persist: false` and the
->    registration response carries a `notice` explaining the per-instance
->    behaviour.
+>    on this deployment. With a durable account store every account is
+>    reachable from any instance; without one,
+>    `/api/auth/status` reports `accounts_persist: false` and new
+>    registrations are refused with a `503` telling the visitor to ask an
+>    administrator. Use a pre-provisioned account, or configure the store
+>    described below and register again.
 
 **Environment variables.** Set `LLM_API_KEY`,`LLM_BASE_URL`,`LLM_MODEL_NAME`
 
@@ -1185,19 +1196,24 @@ it as a Bearer token once set).
 
 **Connecting a Vercel Blob store (recommended).** *Storage → Create →
 Blob* adds `BLOB_READ_WRITE_TOKEN` to the project environment
-automatically; redeploy afterwards. On the next cold start the instance
-restores the newest snapshot, and every registration, role change,
-password reset or account enable/disable uploads a fresh copy before the
-request returns. The daily cron (`0 3 * * *` ) covers everything else.
-Snapshots live under `onti/<derived-id>/onti.db` ; the id is derived from
-`ONTI_SECRET_KEY` (or the bundled `.onti.key` ), so keep that key stable
-or the old snapshots become unreachable. Blob URLs are public, which is
-why the path is derived from the key rather than guessable.
+automatically; redeploy afterwards. Each account is then written as
+`onti/shared/accounts/<sha256-of-username>.json` before the registration
+(or role change, password reset, enable/disable) returns, and a cold
+start re-hydrates any account missing from the restored database. The
+whole-database snapshot (`onti/<derived-id>/onti.db` ) still covers packs,
+uploads and reports and runs from the daily cron (`0 3 * * *` ). The
+snapshot path id is derived from `ONTI_SECRET_KEY` (or the bundled
+`.onti.key` ), so keep that key stable or the old snapshots become
+unreachable. Blob URLs are public, which is why the path is derived from
+the key rather than guessable; account records hold only a PBKDF2 hash,
+never the password.
 
 To verify persistence, call `GET /api/auth/status` : `snapshot_sync`
 must be `true` and `accounts_persist` must stay `true` even though
-`ephemeral` is `true`. Register a user, wait for a cold start, then sign
-in again — the account must still exist.
+`ephemeral` is `true`. Register a user, force a new deployment (or wait
+for a cold start), then sign in again — the account must still exist.
+`python tests/verify_accounts.py` covers the same flow locally against a
+throwaway store.
 
 **Health check.** `GET /health` returns JSON without authentication and
 is the quickest way to confirm a deployment is alive.

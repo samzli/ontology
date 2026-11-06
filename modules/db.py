@@ -363,15 +363,43 @@ def _read_master_key(path: Path) -> Optional[bytes]:
     return key if len(key) == 32 else None
 
 
+def _ephemeral_seed() -> str:
+    """Deployment-stable secret used as a master-key fallback on stateless hosts.
+
+    Serverless instances share no disk, so a randomly generated key would make
+    every instance reject the others' session cookies: a user who just
+    registered is bounced straight back to the sign-in page. When
+    ``ONTI_SECRET_KEY`` is absent, derive the key from the storage credential
+    the deployment already shares — it is identical on every instance and never
+    leaves the host.
+
+    Returns:
+        str: The storage credential, or ``""`` when no backend is configured.
+    """
+    from modules import config as cfg
+
+    snapshot_cfg = cfg.SNAPSHOT
+    for key in ("blob_token_env", "http_token_env"):
+        name = str(snapshot_cfg.get(key, "")).strip()
+        if not name:
+            continue
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
 def _machine_key() -> bytes:
     """Load, or create, the 32-byte machine-local master key.
 
     ``ONTI_SECRET_KEY`` wins when set, so a multi-host or serverless
     deployment can pin one key (and therefore one set of session cookies and
-    encrypted model secrets) without shipping a key file. Otherwise the key is
-    looked up in ``KEY_PATH`` and then in the writable data directory; when
-    neither exists a fresh key is generated and written with owner-only
-    permissions (best effort).
+    encrypted model secrets) without shipping a key file. On an ephemeral host
+    without that variable the key is derived from the shared storage
+    credential (see :func:`_ephemeral_seed`), which keeps instances in sync.
+    Otherwise the key is looked up in ``KEY_PATH`` and then in the writable
+    data directory; when neither exists a fresh key is generated and written
+    with owner-only permissions (best effort).
 
     Returns:
         bytes: The 32-byte master key.
@@ -386,6 +414,10 @@ def _machine_key() -> bytes:
     secret = os.environ.get("ONTI_SECRET_KEY", "").strip()
     if secret:
         return hashlib.sha256(b"onti-secret:" + secret.encode("utf-8")).digest()
+    if EPHEMERAL_STORAGE:
+        seed = _ephemeral_seed()
+        if seed:
+            return hashlib.sha256(b"onti-ephemeral:" + seed.encode("utf-8")).digest()
     for candidate in (KEY_PATH, DATA_DIR / ".onti.key"):
         key = _read_master_key(candidate)
         if key is not None:
@@ -941,13 +973,21 @@ def init_db(seed: bool = True) -> None:
                 "ONTI_DATA_DIR at a persistent volume." % DATA_DIR
             )
     if EPHEMERAL_STORAGE and not os.environ.get("ONTI_SECRET_KEY", "").strip():
-        _BOOT_LOG.warn(
-            "ONTI_SECRET_KEY is not set on this ephemeral host: every instance "
-            "generates its own master key, so session cookies will not validate "
-            "across instances and no model API key can be decrypted. Set "
-            "ONTI_SECRET_KEY in the deployment environment instead of shipping "
-            "a data/.onti.key file."
-        )
+        if _ephemeral_seed():
+            _BOOT_LOG.info(
+                "ONTI_SECRET_KEY is not set; deriving the master key from the "
+                "shared storage credential so every instance validates the "
+                "same session cookies. Set ONTI_SECRET_KEY for full control."
+            )
+        else:
+            _BOOT_LOG.warn(
+                "ONTI_SECRET_KEY is not set on this ephemeral host and no "
+                "snapshot backend is configured: every instance generates its "
+                "own master key, so session cookies will not validate across "
+                "instances and no model API key can be decrypted. Set "
+                "ONTI_SECRET_KEY in the deployment environment instead of "
+                "shipping a data/.onti.key file."
+            )
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
         for key, value in DEFAULT_SETTINGS.items():
@@ -1029,6 +1069,14 @@ def init_db(seed: bool = True) -> None:
             ensure_seed(conn)
             seed_default_admin(conn)
         migrate_legacy_model()
+    if EPHEMERAL_STORAGE:
+        from modules import snapshot
+
+        if snapshot.enabled():
+            # The whole-database snapshot can lag behind the per-account
+            # records, so re-hydrate any account it has not seen yet.
+            with get_conn() as conn:
+                snapshot.restore_accounts(conn)
 
 
 if __name__ == "__main__":

@@ -87,7 +87,10 @@
       }
 
       api.get('/api/auth/status').then((s) => {
-        if (s.first_run && s.allow_registration) {
+        // Account creation needs a store that outlives this instance; the
+        // backend refuses with 503 otherwise, so do not invite the attempt.
+        const canRegister = s.allow_registration && s.accounts_persist !== false;
+        if (s.first_run && canRegister) {
           mode = 'register';
           document.getElementById('firstRun').style.display = 'block';
           document.getElementById('fNameWrap').style.display = 'block';
@@ -96,10 +99,11 @@
           document.getElementById('authBtn').textContent = 'Create admin & continue';
           document.getElementById('switchText').textContent = 'You are setting up a new workspace.';
           document.getElementById('switchBtn').style.display = 'none';
-        } else if (!s.allow_registration) {
+        } else if (!canRegister) {
           document.getElementById('switchBtn').style.display = 'none';
-          document.getElementById('switchText').textContent =
-            'Self-registration is closed — please contact an administrator.';
+          document.getElementById('switchText').textContent = s.allow_registration
+            ? 'Account creation is unavailable on this deployment — ask an administrator for an account.'
+            : 'Self-registration is closed — please contact an administrator.';
         }
       }).catch(() => { });
 
