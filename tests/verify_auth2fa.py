@@ -524,6 +524,38 @@ def test_registration_toggle() -> None:
     admin.put("/api/admin/settings", json={"allow_registration": True})
 
 
+def test_pages(client: TestClient) -> None:
+    print("[11] Pages: sign-up, sign-in, password, reminder banner")
+    anon = _client()
+    login = anon.get("/login")
+    ok(login.status_code == 200, "[11] /login renders", login.status_code)
+    ok("/signup" in login.text, "[11] /login links to sign-up")
+    ok("verification code" in login.text.lower(), "[11] /login mentions the code")
+
+    signup = anon.get("/signup")
+    ok(signup.status_code == 200, "[11] /signup renders", signup.status_code)
+    ok('id="fEmail"' in signup.text, "[11] /signup asks for an address")
+    ok("10" in signup.text, "[11] /signup shows the length rule")
+
+    gate = anon.get("/account/password", follow_redirects=False)
+    ok(
+        gate.status_code in (302, 307) and "/login" in gate.headers.get("location", ""),
+        "[11] password page redirects anonymous visitors",
+        f"{gate.status_code} {gate.headers.get('location')}",
+    )
+
+    pw = client.get("/account/password")
+    ok(pw.status_code == 200, "[11] /account/password renders", pw.status_code)
+    ok("Change password" in pw.text, "[11] password page has its heading")
+    app = client.get("/app")
+    ok(app.status_code == 200, "[11] portal renders", app.status_code)
+    ok('id="pwNotice"' in app.text, "[11] portal has the reminder slot")
+    ok(
+        "/account/password" in app.text,
+        "[11] portal sidebar links to the password page",
+    )
+
+
 def main() -> int:
     init_db()
     client = _client()
@@ -537,6 +569,7 @@ def main() -> int:
     test_legacy_bind()
     test_username_collision()
     test_registration_toggle()
+    test_pages(client)
     print()
     print(f"Auth 2FA: {PASS} ok / {FAIL} failed")
     return 0 if FAIL == 0 else 1
