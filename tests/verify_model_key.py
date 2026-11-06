@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules import llm_client as llm  # noqa: E402
 from modules.db import decrypt_secret, encrypt_secret, get_conn, now  # noqa: E402
 
-KEY = "sk-abcdefghijklmnopqrstuvwxyz0123456789"
+KEY = "sk-test-model-key-not-a-real-credential"
 STAMP = now().replace(":", "").replace("-", "").replace(" ", "")[:14]
 PREFIX = "keytest" + STAMP
 PASS = 0

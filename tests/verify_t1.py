@@ -7,7 +7,7 @@ gained extra packs / users / models. The invariants it protects are:
 * re-running the seed is idempotent (row counts do not move);
 * exactly one pack is active and ``app_settings['active_pack_id']`` agrees;
 * the active pack computes every declared formula without error;
-* the stored model key is encrypted at rest.
+* a stored model key, when present, is encrypted at rest;
 """
 
 import sys
@@ -89,9 +89,16 @@ if not str(active):
     print("  BAD active_pack_id missing from app_settings")
 else:
     print("  OK  app_settings carries active_pack_id")
-if model is None or model["klen"] <= 40:
+if model is None:
     ok = False
-    print("  BAD api key should be encrypted at rest")
+    print("  BAD model configuration row is missing")
+elif model["klen"] == 0:
+    # The shipped database must not carry provider credentials at all; the
+    # operator enters the key in Model centre (see SECURITY.md §1).
+    print("  OK  no api key bundled (operator supplies one)")
+elif model["klen"] <= 40:
+    ok = False
+    print("  BAD api key must not be stored in plaintext")
 else:
     print("  OK  api key encrypted at rest")
 

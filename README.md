@@ -674,6 +674,8 @@ same content in long form lives in:
   optional fields, minimal examples and validator error messages;
 * [docs/TECHNICAL.md](docs/TECHNICAL.md) — architecture, data model
   and HTTP API reference;
+* [SECURITY.md](SECURITY.md) — secret handling, master-key rotation and
+  the leaked-credential runbook;
 * [docs/ONTOLOGY_VALUE_REPORT.md](docs/ONTOLOGY_VALUE_REPORT.md) —
   measured with-vs-without-ontology comparison (14 scenarios, scored).
 
@@ -1063,6 +1065,13 @@ the project is Git-connected, a push to the production branch triggers a
 deployment; this checkout is **not** linked (there is no `.vercel/`
 folder), so publish with `vercel deploy --prod` unless the project
 auto-builds it.
+
+**Set `ONTI_SECRET_KEY` in the Vercel project environment.** It signs the
+session cookies and encrypts stored model API keys. Without it every
+instance invents its own key, so a login made on one instance is rejected
+by the next and no model key can be decrypted. Never commit
+`data/.onti.key`; the deployment reads the variable first. See
+[SECURITY.md](SECURITY.md) for the rotation procedure.
 
 **Do not add `rewrites` to `vercel.json` .** Vercel detects the FastAPI
 `app` instance in `main.py` and routes every path to that function

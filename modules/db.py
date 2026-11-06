@@ -940,6 +940,14 @@ def init_db(seed: bool = True) -> None:
                 "ONTI_SNAPSHOT_URL to persist them across instances, or point "
                 "ONTI_DATA_DIR at a persistent volume." % DATA_DIR
             )
+    if EPHEMERAL_STORAGE and not os.environ.get("ONTI_SECRET_KEY", "").strip():
+        _BOOT_LOG.warn(
+            "ONTI_SECRET_KEY is not set on this ephemeral host: every instance "
+            "generates its own master key, so session cookies will not validate "
+            "across instances and no model API key can be decrypted. Set "
+            "ONTI_SECRET_KEY in the deployment environment instead of shipping "
+            "a data/.onti.key file."
+        )
     with get_conn() as conn:
         conn.executescript(_SCHEMA)
         for key, value in DEFAULT_SETTINGS.items():

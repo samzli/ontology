@@ -389,6 +389,12 @@ def compare_answers(
         >>> compare_answers("why did VNB drop?", "auto", pack, computed, None)["value"]["tables_used"]
         3
     """
+    # A configuration without a usable key cannot answer anything. Treat it as
+    # "no model configured" so the panel reports the honest placeholder instead
+    # of surfacing a provider rejection for a key the operator has not entered.
+    if model_cfg is not None and not model_cfg.get("api_key"):
+        model_cfg = None
+
     analysis = deep.analyze(pack, computed, question, history=history)
 
     with_onto: Dict[str, Any] = {
