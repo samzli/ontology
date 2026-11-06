@@ -153,6 +153,10 @@ def _blob_headers() -> dict:
     return {
         "authorization": f"Bearer {_env(_BLOB_TOKEN_ENV)}",
         "x-api-version": _BLOB_API_VERSION,
+        # The REST API defaults to private on some store generations; every
+        # object here is already protected by an unguessable namespace, and a
+        # plain GET of the returned URL has to work from any instance.
+        "x-vercel-blob-access": "public",
     }
 
 

@@ -963,7 +963,7 @@ def reset_password(
 # ---------------------------------------------------------------------------
 
 
-def _require_durable_accounts() -> None:
+def require_durable_accounts() -> None:
     """Refuse self-registration when the host cannot keep the account.
 
     A stateless host without a configured snapshot backend copies a fresh
@@ -980,7 +980,7 @@ def _require_durable_accounts() -> None:
             account store configured.
 
     Example:
-        >>> _require_durable_accounts()
+        >>> require_durable_accounts()
     """
     if not EPHEMERAL_STORAGE:
         return
@@ -1111,7 +1111,7 @@ def register_account(
         username = (identifier or "").strip()
     validate_credentials(username, password)
     validate_password_policy(password)
-    _require_durable_accounts()
+    require_durable_accounts()
     first = user_count(conn) == 0
     if not first and get_setting(conn, "allow_registration", "1") != "1":
         raise AuthError("Self-registration is disabled. Contact an administrator.", 403)
@@ -1169,7 +1169,7 @@ def register_hashed(
         AuthError: 409 when the address was taken meanwhile, 403 when
             self-registration is closed, 503 when storage is not durable.
     """
-    _require_durable_accounts()
+    require_durable_accounts()
     first = user_count(conn) == 0
     if not first and get_setting(conn, "allow_registration", "1") != "1":
         raise AuthError("Self-registration is disabled. Contact an administrator.", 403)

@@ -182,6 +182,10 @@ async def signup_start(data: SignupIn, request: Request):
     """
     email = auth.normalize_email(data.email)
     auth.validate_password_policy(data.password)
+    # Fail before a code is mailed: on a host that cannot keep accounts the
+    # only honest answer is 503, and the user should not wait for an e-mail
+    # that leads to a dead end.
+    auth.require_durable_accounts()
     with get_conn() as conn:
         if conn.execute("SELECT 1 FROM users WHERE email=?", (email,)).fetchone():
             raise auth.AuthError("An account already uses this e-mail address.", 409)
