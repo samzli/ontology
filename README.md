@@ -108,10 +108,12 @@ e-mail OTP on the next sign-in.
 ### Shared team accounts
 
 Four **shared workspace accounts** are seeded into the database so the team
-can hand out credentials immediately. No personal e-mail is bound at seed
-time — the team decides on first sign-in whether to bind an Authenticator
-app (no network, recommended) or a shared mailbox. Run the idempotent
-seeder to (re)create them on any database:
+can hand out credentials immediately. They carry **no e-mail address by
+design** — the password alone signs them straight in, no verification code
+and no mailbox required. Teams that want a second factor can bind an
+Authenticator app any time from the account page (once bound, sign-in
+switches to password + TOTP). Run the idempotent seeder to (re)create them
+on any database:
 
 ```bash
 python scripts/seed_preset_accounts.py
@@ -126,8 +128,8 @@ python scripts/seed_preset_accounts.py
 
 **Initial password for all four:** `OntiDeloitte@2026`. Password policy
 (10+ chars, ≥3/4 classes, no reuse within 24 months, rotation every 90
-days) and either an Authenticator app or an e-mail OTP second factor both
-apply from day one. Duplicate self-registrations against any of these
+days) applies from day one, and binding an Authenticator is encouraged for
+any shared credential. Duplicate self-registrations against any of these
 usernames (or any existing account) are rejected with a friendly HTTP 409
 telling the user the account already exists.
 

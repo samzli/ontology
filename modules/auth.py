@@ -1224,6 +1224,42 @@ def find_account(conn: sqlite3.Connection, identifier: str) -> Optional[sqlite3.
     return _register_login_row(conn, value)
 
 
+SHARED_USERNAMES = (
+    "dais_hk_life",
+    "dais_hk_gi",
+    "dais_ml_life",
+    "dais_ml_gi",
+)
+
+
+def is_shared_account(username: str) -> bool:
+    """Whether the account is one of the provisioned shared workspace logins.
+
+    Shared accounts never carry an e-mail address: they sign in with the
+    password alone (or with a TOTP once the team binds an Authenticator).
+    """
+    return (username or "").strip().lower() in SHARED_USERNAMES
+
+
+def enforce_shared_no_email(conn: sqlite3.Connection) -> List[str]:
+    """Clear stale e-mail values from shared accounts.
+
+    Older seed runs stored a placeholder address on the shared rows, which
+    pushed sign-in onto the e-mail OTP path. Idempotent; returns the
+    usernames whose rows were changed so callers can re-persist them.
+    """
+    cleaned: List[str] = []
+    for name in SHARED_USERNAMES:
+        cur = conn.execute(
+            "UPDATE users SET email='', email_verified=0 "
+            "WHERE username=? AND (email<>'' OR email_verified<>0)",
+            (name,),
+        )
+        if cur.rowcount:
+            cleaned.append(name)
+    return cleaned
+
+
 def verify_signin(
     conn: sqlite3.Connection, identifier: str, password: str, *, ip: str = ""
 ) -> sqlite3.Row:

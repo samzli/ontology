@@ -1147,6 +1147,20 @@ def init_db(seed: bool = True) -> None:
             # records, so re-hydrate any account it has not seen yet.
             with get_conn() as conn:
                 snapshot.restore_accounts(conn)
+    # Shared workspace accounts never carry an e-mail address; clear stale
+    # rows left by older seed runs (their placeholder addresses pushed the
+    # sign-in onto the e-mail OTP path) and overwrite the persisted account
+    # records so future restores stay clean.
+    from modules.auth import enforce_shared_no_email
+
+    with get_conn() as conn:
+        cleaned = enforce_shared_no_email(conn)
+        if cleaned and EPHEMERAL_STORAGE:
+            from modules import snapshot
+
+            if snapshot.enabled():
+                for name in cleaned:
+                    snapshot.persist_account(conn, name)
 
 
 if __name__ == "__main__":

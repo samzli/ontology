@@ -104,10 +104,10 @@ to the same rules.
 
 Four shared workspace accounts are pre-provisioned for every team. Pick
 the one that matches your team — the username is your team's handle and
-the initial password is the same for all four. On first sign-in the
-platform asks you to either bind an **Authenticator app** (recommended —
-no e-mail, no network wait, every major authenticator works) or a shared
-mailbox the team already uses.
+the initial password is the same for all four. **No e-mail is involved**:
+the password alone signs you straight in. If your team wants a second
+factor, bind an **Authenticator app** from the account page afterwards
+(optional — once bound, sign-in becomes password + six-digit code).
 
 | Username       | Purpose                                            |
 | -------------- | ---------------------------------------------------|
@@ -117,7 +117,8 @@ mailbox the team already uses.
 | `dais_ml_gi`   | Deloitte AIS — Mainland General Insurance Team     |
 
 **Initial password for all four:** `OntiDeloitte@2026`. After first
-sign-in each team chooses its own second factor and rotates the password.
+sign-in each team should rotate the password (and can optionally bind an
+Authenticator).
 
 ---
 

@@ -585,14 +585,16 @@ a short-lived `mfa_token`) → user scans the QR with Google / Microsoft /
 code and the `mfa_token`. After that, sign-in on the account takes
 `/api/auth/signin/mfa/verify` instead of the e-mail OTP endpoint. The
 account page (`/account/password`) exposes a switch to enable or disable
-MFA; disabling falls back to the e-mail OTP on the next sign-in.
+MFA; disabling falls back to the e-mail OTP on the next sign-in (or to
+password-only sign-in for the shared workspace accounts below).
 
 ### Shared team accounts
 
-Four **shared workspace accounts** are seeded out of the box — no personal
-e-mail bound at seed time, so the team picks its own second factor on
-first sign-in. The seeder at `scripts/seed_preset_accounts.py` is
-idempotent and safe to re-run after schema upgrades:
+Four **shared workspace accounts** are seeded out of the box — **no e-mail
+address by design**, so the password alone signs them straight in (no
+verification code, no mailbox). The seeder at
+`scripts/seed_preset_accounts.py` is idempotent and safe to re-run after
+schema upgrades — it also clears any stale e-mail left by older runs:
 
 ```bash
 python scripts/seed_preset_accounts.py
@@ -607,9 +609,9 @@ python scripts/seed_preset_accounts.py
 
 **Initial password for all four:** `OntiDeloitte@2026`. Password policy
 (10+ chars, ≥3/4 classes, no reuse in 24 months, 90-day rotation) applies
-from day one. After the first sign-in each team chooses either the
-Authenticator app MFA path (no network, recommended) or binds a shared
-mailbox for the e-mail OTP.
+from day one. Sign-in is password-only; teams that want a second factor
+can bind an Authenticator app from the account page (once bound, sign-in
+becomes password + TOTP via `/api/auth/signin/mfa/verify`).
 
 Duplicate self-registrations against any of these usernames (or any
 existing account) are rejected with a friendly HTTP 409 `"already registered"`

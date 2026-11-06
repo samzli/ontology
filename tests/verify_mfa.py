@@ -7,9 +7,7 @@ as fixtures.
 
 from __future__ import annotations
 
-import json
 import sys
-import time
 
 import httpx
 
@@ -57,7 +55,7 @@ def main() -> int:
         r.text[:120],
     )
 
-    # [3] signin a preset account (echo OTP, no MFA yet)
+    # [3] signin a preset account — shared account, password alone suffices
     r = c.post(
         "/api/auth/signin/start",
         json={
@@ -68,31 +66,16 @@ def main() -> int:
     ok(r.status_code == 200, "[3] preset account password ok", r.status_code)
     body = r.json()
     ok(
-        body.get("status") == "otp_required",
-        "[3] non-MFA account gets otp_required",
+        body.get("status") == "ok",
+        "[3] shared account signs in directly (no e-mail OTP)",
         body,
     )
-    challenge = body.get("challenge_id")
-    debug_code = body.get("debug_code")
-    ok(bool(challenge), "[3] challenge_id returned")
-    ok(bool(debug_code), "[3] echo debug_code returned for testing")
-
-    # [4] verify OTP and get session
-    r = c.post(
-        "/api/auth/signin/verify",
-        json={
-            "challenge_id": challenge,
-            "code": debug_code,
-        },
-    )
-    ok(r.status_code == 200, "[4] OTP verify -> 200", r.status_code)
-    token = r.json().get("token") or r.cookies.get("onti_session")
     cookies = (
         {"onti_session": r.cookies.get("onti_session")}
         if r.cookies.get("onti_session")
         else {}
     )
-    ok(bool(cookies), "[4] session cookie set", dict(r.cookies))
+    ok(bool(cookies), "[3] session cookie set on direct sign-in", dict(r.cookies))
 
     # [5] /api/auth/me shows mfa disabled by default
     r = c.get("/api/auth/me", cookies=cookies)
@@ -221,7 +204,7 @@ def main() -> int:
     )
     ok(r.status_code == 401, "[13] wrong password on unbind -> 401", r.status_code)
 
-    # [14] after unbind, signin falls back to email OTP
+    # [14] after unbind, signin is back to password-only direct sign-in
     c.post("/api/auth/logout", cookies=cookies)
     r = c.post(
         "/api/auth/signin/start",
@@ -232,12 +215,12 @@ def main() -> int:
     )
     body = r.json()
     ok(
-        body.get("status") == "otp_required",
-        "[14] after unbind, signin falls back to email OTP",
+        body.get("status") == "ok",
+        "[14] after unbind, shared account signs in directly again",
         body,
     )
 
-    # [15] other preset accounts exist + are MFA-disabled by default
+    # [15] other preset accounts exist + sign in directly (no MFA by default)
     for username in ("dais_hk_gi", "dais_ml_life", "dais_ml_gi"):
         r = c.post(
             "/api/auth/signin/start",
@@ -248,9 +231,14 @@ def main() -> int:
         )
         ok(r.status_code == 200, f"[15] {username} password ok", r.status_code)
         ok(
-            r.json().get("status") == "otp_required",
-            f"[15] {username} defaults to email OTP (no MFA)",
+            r.json().get("status") == "ok",
+            f"[15] {username} direct sign-in (no e-mail, no MFA)",
             r.json(),
+        )
+        ok(
+            bool(r.cookies.get("onti_session")),
+            f"[15] {username} session cookie set",
+            dict(r.cookies),
         )
 
     print(f"\n=== {PASS} ok / {FAIL} failed ===")

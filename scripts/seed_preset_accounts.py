@@ -42,8 +42,15 @@ def main() -> int:
                 (username,),
             ).fetchone()
             if existing is not None:
+                # Older seed runs left a placeholder address on the row;
+                # shared accounts never carry one, so clear it.
+                conn.execute(
+                    "UPDATE users SET email='', email_verified=0 "
+                    "WHERE username=? AND (email<>'' OR email_verified<>0)",
+                    (username,),
+                )
                 skipped += 1
-                print(f"  skip {username} — already exists")
+                print(f"  skip {username} — already exists (e-mail cleared)")
                 continue
             auth.register_account(
                 conn,

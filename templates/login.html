@@ -180,6 +180,11 @@
             identifier: document.getElementById('fUser').value.trim(),
             password: document.getElementById('fPass').value,
           });
+          if (r.status === 'ok') {
+            // Shared workspace account — password alone completed sign-in.
+            location.replace('/app');
+            return;
+          }
           if (r.status === 'bind_required') {
             state.bindToken = r.bind_token;
             document.getElementById('authTitle').textContent = 'Confirm your e-mail';

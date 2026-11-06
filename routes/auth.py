@@ -228,6 +228,12 @@ async def signup_start(data: SignupIn, request: Request):
     with get_conn() as conn:
         if conn.execute("SELECT 1 FROM users WHERE email=?", (email,)).fetchone():
             raise auth.AuthError("An account already uses this e-mail address.", 409)
+        if auth.is_shared_account(auth.derive_username(email)):
+            raise auth.AuthError(
+                "This username is reserved for a shared workspace account. "
+                "Use your existing account instead.",
+                409,
+            )
         first = auth.user_count(conn) == 0
         if not first and get_setting(conn, "allow_registration", "1") != "1":
             raise auth.AuthError(
@@ -298,6 +304,10 @@ async def signin_start(data: SigninIn, request: Request):
 
     * **MFA enabled** → returns ``{"status": "mfa_required", "mfa_token": …}``
       and the caller must submit a TOTP code via ``signin/mfa/verify``.
+    * **Shared workspace account (no e-mail)** → signs in immediately on
+      the password alone; the response carries the session cookie.
+    * **Legacy account without a verified address** → ``bind_required``
+      and the one-time e-mail binding flow.
     * **Otherwise** → issues an e-mail OTP as before
       (``signin/verify``).
 
@@ -314,18 +324,6 @@ async def signin_start(data: SigninIn, request: Request):
             conn, data.identifier.strip(), data.password, ip=_ip(request)
         )
         email = str(row["email"] or "")
-        if not email or int(row["email_verified"] or 0) != 1:
-            return {
-                "status": "bind_required",
-                "username": row["username"],
-                "bind_token": auth.issue_pending_token(
-                    {"uid": int(row["id"]), "purpose": "bind", "un": row["username"]}
-                ),
-                "message": (
-                    "This account was created before e-mail sign-in. "
-                    "Confirm an address to continue."
-                ),
-            }
         # MFA replaces the e-mail OTP when enabled — one factor, not two.
         if int(row["mfa_enabled"] or 0) == 1 and mfa.available():
             return {
@@ -339,6 +337,33 @@ async def signin_start(data: SigninIn, request: Request):
                     }
                 ),
                 "next": "/api/auth/signin/mfa/verify",
+            }
+        if not email or int(row["email_verified"] or 0) != 1:
+            if auth.is_shared_account(row["username"]):
+                # Shared workspace account: no e-mail exists by design, so
+                # the password alone completes the sign-in.
+                session = auth.start_session(
+                    conn, row, user_agent=_agent(request), ip=_ip(request)
+                )
+                snapshot.request_sync()
+                return _with_cookie(
+                    {
+                        "status": "ok",
+                        "user": session["user"],
+                        "password": session["password"],
+                    },
+                    session["token"],
+                )
+            return {
+                "status": "bind_required",
+                "username": row["username"],
+                "bind_token": auth.issue_pending_token(
+                    {"uid": int(row["id"]), "purpose": "bind", "un": row["username"]}
+                ),
+                "message": (
+                    "This account was created before e-mail sign-in. "
+                    "Confirm an address to continue."
+                ),
             }
         result = otp.issue(
             conn,
