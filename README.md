@@ -105,27 +105,31 @@ An account cannot be enrolled in both factors at the same time — MFA
 replaces the e-mail OTP while enabled. Disabling MFA falls back to the
 e-mail OTP on the next sign-in.
 
-### Preset workspace accounts
+### Shared team accounts
 
-Four team accounts are seeded into the database on first run. Run the
-idempotent seeder to add them to an existing database:
+Four **shared workspace accounts** are seeded into the database so the team
+can hand out credentials immediately. No personal e-mail is bound at seed
+time — the team decides on first sign-in whether to bind an Authenticator
+app (no network, recommended) or a shared mailbox. Run the idempotent
+seeder to (re)create them on any database:
 
 ```bash
 python scripts/seed_preset_accounts.py
 ```
 
-| Username       | E-mail                         | Purpose                                      |
-| -------------- | ------------------------------ | -------------------------------------------- |
-| `dais_hk_life` | `dais_hk_life@deloitte.com.hk` | Deloitte AI Solutions — HK Life              |
-| `dais_hk_gi`   | `dais_hk_gi@deloitte.com.hk`   | Deloitte AI Solutions — HK General Insurance |
-| `dais_ml_life` | `dais_ml_life@deloitte.com.hk` | Deloitte AI Solutions — ML Life              |
-| `dais_ml_gi`   | `dais_ml_gi@deloitte.com.hk`   | Deloitte AI Solutions — ML General Insurance |
+| Username       | Purpose                                         |
+| -------------- | ----------------------------------------------- |
+| `dais_hk_life` | Deloitte AIS — Hong Kong Life Insurance Team    |
+| `dais_hk_gi`   | Deloitte AIS — Hong Kong General Insurance Team |
+| `dais_ml_life` | Deloitte AIS — Mainland Life Insurance Team     |
+| `dais_ml_gi`   | Deloitte AIS — Mainland General Insurance Team  |
 
 **Initial password for all four:** `OntiDeloitte@2026`. Password policy
 (10+ chars, ≥3/4 classes, no reuse within 24 months, rotation every 90
-days) and the Authenticator app second factor both apply from day one.
-Duplicate self-registrations against any of these addresses are rejected
-with a friendly 409 response telling the user the account already exists.
+days) and either an Authenticator app or an e-mail OTP second factor both
+apply from day one. Duplicate self-registrations against any of these
+usernames (or any existing account) are rejected with a friendly HTTP 409
+telling the user the account already exists.
 
 Open one of the two portals (the root URL `/` forwards to the user
 portal):
@@ -1293,26 +1297,39 @@ another, challenges are mirrored to the same durable store as accounts
 (`onti/shared/otp/<sha256-of-challenge>.json`); with Blob connected this
 works across cold starts without extra configuration.
 
-Account persistence uses separate variables: `BLOB_READ_WRITE_TOKEN`
-(set automatically when a Vercel Blob store is connected) or
-`ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` for your own endpoint, and
-`CRON_SECRET` to authenticate the daily snapshot-sync cron (Vercel sends
-it as a Bearer token once set).
+Account persistence is configured through Vercel Database Blob (new,
+recommended), the legacy Blob REST API, or any HTTP endpoint you own.
+A daily snapshot-sync cron authenticates with `CRON_SECRET` (Vercel
+sends it as a Bearer token once set).
 
-**Connecting a Vercel Blob store (recommended).** *Storage → Create →
-Blob* adds `BLOB_READ_WRITE_TOKEN` to the project environment
-automatically; redeploy afterwards. Each account is then written as
+**1. Vercel Database Blob — recommended, no token to manage.**
+*Storage → Create → Blob* and connect the store to this project. Vercel
+injects a `BLOB_STORE_ID` automatically and the `vercel-blob` SDK
+(already in `requirements.txt`) authenticates via the runtime's built-in
+OIDC — no `BLOB_READ_WRITE_TOKEN` is ever needed. `modules/snapshot.py`
+picks up this path first on every boot.
+
+**2. Legacy Vercel Blob REST API — still supported.** If your store
+was created before Database Blob landed, set `BLOB_READ_WRITE_TOKEN`;
+snapshot.py falls back to direct REST calls against
+`https://blob.vercel-storage.com`.
+
+**3. Bring your own endpoint.** Set `ONTI_SNAPSHOT_URL` and
+`ONTI_SNAPSHOT_TOKEN` for any HTTP PUT/GET pair you control (VPS, S3
+pre-signed URLs, NAS WebDAV...).
+
+With any backend, each account is written as
 `onti/shared/accounts/<sha256-of-username>.json` before the registration
 (or role change, password reset, enable/disable) returns, and a cold
 start re-hydrates any account missing from the restored database. The
-whole-database snapshot (`onti/<derived-id>/onti.db` ) still covers packs,
-uploads and reports and runs from the daily cron (`0 3 * * *` ). The
+whole-database snapshot (`onti/<derived-id>/onti.db`) still covers packs,
+uploads and reports and runs from the daily cron (`0 3 * * *`). The
 snapshot path id is derived from `ONTI_SECRET_KEY` (or the bundled
-`.onti.key` ), so keep that key stable or the old snapshots become
+`.onti.key`), so keep that key stable or the old snapshots become
 unreachable. Account record paths deliberately do **not** depend on the
 master key (rotating it must not orphan accounts); they contain only a
 PBKDF2 hash, never the password, and the store's subdomain is
-unguessable while listing requires the token.
+unguessable while listing requires credentials.
 
 To verify persistence, call `GET /api/auth/status` : `snapshot_sync`
 must be `true` and `accounts_persist` must stay `true` even though

@@ -1,10 +1,13 @@
-"""Seed the four Deloitte Onti workspace accounts.
+"""Seed the four Deloitte shared workspace accounts.
 
 Run from the repo root (``python scripts/seed_preset_accounts.py``).
 Idempotent: existing rows are skipped, so re-running after a schema
-upgrade is safe. All preset accounts are created with e-mail addresses
-following the ``<username>@deloitte.com.hk`` convention, MFA disabled by
-default and ready to bind an Authenticator app from the account page.
+upgrade is safe.
+
+These are **shared team accounts** — no personal e-mail is bound at seed
+time. The team takes the initial password and either binds an
+Authenticator app (recommended, no network) or a shared mailbox the
+first time anyone signs in.
 """
 
 from __future__ import annotations
@@ -21,10 +24,10 @@ from modules.db import get_conn, init_db  # noqa: E402
 PRESET_PASSWORD = "OntiDeloitte@2026"
 
 ACCOUNTS = [
-    ("dais_hk_life", "dais_hk_life@deloitte.com.hk", "DAIS HK Life Team"),
-    ("dais_hk_gi", "dais_hk_gi@deloitte.com.hk", "DAIS HK General Insurance Team"),
-    ("dais_ml_life", "dais_ml_life@deloitte.com.hk", "DAIS ML Life Team"),
-    ("dais_ml_gi", "dais_ml_gi@deloitte.com.hk", "DAIS ML General Insurance Team"),
+    ("dais_hk_life", "Deloitte AI Solutions — HK Life Team"),
+    ("dais_hk_gi", "Deloitte AI Solutions — HK General Insurance Team"),
+    ("dais_ml_life", "Deloitte AI Solutions — Mainland Life Team"),
+    ("dais_ml_gi", "Deloitte AI Solutions — Mainland General Insurance Team"),
 ]
 
 
@@ -33,32 +36,40 @@ def main() -> int:
     created = 0
     skipped = 0
     with get_conn() as conn:
-        for username, email, display_name in ACCOUNTS:
+        for username, display_name in ACCOUNTS:
             existing = conn.execute(
-                "SELECT id FROM users WHERE username=? OR email=?",
-                (username, email),
+                "SELECT id FROM users WHERE username=?",
+                (username,),
             ).fetchone()
             if existing is not None:
                 skipped += 1
-                print(f"  skip {username} ({email}) — already exists")
+                print(f"  skip {username} — already exists")
                 continue
             auth.register_account(
                 conn,
-                email,
+                username,
                 PRESET_PASSWORD,
                 display_name=display_name,
                 ip="seed",
             )
-            # The flow above registers the e-mail and marks it verified —
-            # register_account sets ``email_verified=1`` as a side effect
-            # because it is the "admin-trusted" path. Confirm that and also
-            # flip role to user (register_account makes the first row admin,
-            # so this guard is moot here but keeps things honest if the seed
-            # is run after the admin already exists).
-            conn.execute("UPDATE users SET role='user' WHERE username=?", (username,))
+            # register_account expects the first argument to be an e-mail
+            # address; for shared accounts we want no e-mail at all, so
+            # clear the field and the verified flag right after insert.
+            conn.execute(
+                "UPDATE users SET email='', email_verified=0, role='user' "
+                "WHERE username=?",
+                (username,),
+            )
             created += 1
-            print(f"  + created {username} ({email})")
-    print(f"\nDone: {created} new, {skipped} skipped. Password: {PRESET_PASSWORD}")
+            print(f"  + created {username} (shared — no bound e-mail)")
+    print(
+        f"\nDone: {created} new, {skipped} skipped. "
+        f"Initial password for all four: {PRESET_PASSWORD}"
+    )
+    print(
+        "Each account is shared. The team's first sign-in is asked to either "
+        "bind an Authenticator app (no network, recommended) or a shared mailbox."
+    )
     return 0
 
 

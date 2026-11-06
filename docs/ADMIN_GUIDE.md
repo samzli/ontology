@@ -587,46 +587,55 @@ code and the `mfa_token`. After that, sign-in on the account takes
 account page (`/account/password`) exposes a switch to enable or disable
 MFA; disabling falls back to the e-mail OTP on the next sign-in.
 
-### Preset team accounts
+### Shared team accounts
 
-Four team accounts are seeded out of the box so you can hand out
-credentials immediately:
+Four **shared workspace accounts** are seeded out of the box — no personal
+e-mail bound at seed time, so the team picks its own second factor on
+first sign-in. The seeder at `scripts/seed_preset_accounts.py` is
+idempotent and safe to re-run after schema upgrades:
 
-| Username       | E-mail                         | Purpose                        |
-| -------------- | ------------------------------ | ------------------------------ |
-| `dais_hk_life` | `dais_hk_life@deloitte.com.hk` | DAIS HK Life Team              |
-| `dais_hk_gi`   | `dais_hk_gi@deloitte.com.hk`   | DAIS HK General Insurance Team |
-| `dais_ml_life` | `dais_ml_life@deloitte.com.hk` | DAIS ML Life Team              |
-| `dais_ml_gi`   | `dais_ml_gi@deloitte.com.hk`   | DAIS ML General Insurance Team |
+```bash
+python scripts/seed_preset_accounts.py
+```
 
-**Initial password for all four:** `OntiDeloitte@2026`. Enforce password
-rotation and MFA binding with the team on first use. The seeder lives at
-`scripts/seed_preset_accounts.py` and is idempotent — safe to re-run
-after schema upgrades.
+| Username       | Purpose                                            |
+| -------------- | ---------------------------------------------------|
+| `dais_hk_life` | Deloitte AIS — Hong Kong Life Insurance Team       |
+| `dais_hk_gi`   | Deloitte AIS — Hong Kong General Insurance Team    |
+| `dais_ml_life` | Deloitte AIS — Mainland Life Insurance Team        |
+| `dais_ml_gi`   | Deloitte AIS — Mainland General Insurance Team     |
 
-Duplicate self-registrations against any of these addresses (or any
-existing account) are rejected with a friendly HTTP 409 telling the user
-the account already exists — the response body carries `"already registered"`
-so the front-end can surface a "Use your existing account instead"
-message instead of a generic error.
+**Initial password for all four:** `OntiDeloitte@2026`. Password policy
+(10+ chars, ≥3/4 classes, no reuse in 24 months, 90-day rotation) applies
+from day one. After the first sign-in each team chooses either the
+Authenticator app MFA path (no network, recommended) or binds a shared
+mailbox for the e-mail OTP.
+
+Duplicate self-registrations against any of these usernames (or any
+existing account) are rejected with a friendly HTTP 409 `"already registered"`
+— the front-end surfaces "Use your existing account instead" instead of
+a generic error.
 
 Self-registration works on every host. On Vercel the function filesystem
-is per-instance ( `/api/auth/status`→`ephemeral: true` ), so configure a
-durable store — `BLOB_READ_WRITE_TOKEN` (Vercel Blob) or
-`ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` (your own endpoint). Every
-account is then saved as its own record
-( `shared/accounts/<sha256-of-username>.json` ) before the registration
+is per-instance (`/api/auth/status`→`ephemeral: true`), so configure a
+durable store — **Vercel Database Blob (new, recommended)** via
+`BLOB_STORE_ID` (the `vercel-blob` SDK authenticates with Vercel's OIDC
+automatically once the Blob store is linked to the project; no manual
+token needed), or the legacy REST API via `BLOB_READ_WRITE_TOKEN`, or
+your own HTTP endpoint via `ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN`.
+Every account is then saved as its own record
+(`shared/accounts/<sha256-of-username>.json`) before the registration
 returns; a cold start re-hydrates missing accounts, and a sign-in on an
 instance that has never seen the account adopts the record on demand. A
 session also survives instance switches because all instances share the
-master key ( `ONTI_SECRET_KEY` ; when it is absent the key is derived
+master key (`ONTI_SECRET_KEY`; when it is absent the key is derived
 from the storage credential). Without a store, self-registration is
 refused with `503` and the sign-in page hides the switch, so nobody is
 promised an account that cannot survive. The Docker deployment keeps the
-volume, so everything persists there ( `ephemeral: false` ) — use it
+volume, so everything persists there (`ephemeral: false`) — use it
 (README → Deploying with Docker) for a real multi-user workspace.
 **Pre-provision accounts before deploying** when no store is configured.
-Serverless instances then start from the committed `data/onti.db` :
+Serverless instances then start from the committed `data/onti.db`:
 create the accounts you want to hand out on a local or Docker instance,
 then commit the database and redeploy. The bundled database ships only
 the real accounts — the test suite deletes the throw-away logins it

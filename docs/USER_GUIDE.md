@@ -100,6 +100,27 @@ to the same rules.
 
 ---
 
+## Shared team accounts (get yours in 30 seconds)
+
+Four shared workspace accounts are pre-provisioned for every team. Pick
+the one that matches your team — the username is your team's handle and
+the initial password is the same for all four. On first sign-in the
+platform asks you to either bind an **Authenticator app** (recommended —
+no e-mail, no network wait, every major authenticator works) or a shared
+mailbox the team already uses.
+
+| Username       | Purpose                                            |
+| -------------- | ---------------------------------------------------|
+| `dais_hk_life` | Deloitte AIS — Hong Kong Life Insurance Team       |
+| `dais_hk_gi`   | Deloitte AIS — Hong Kong General Insurance Team    |
+| `dais_ml_life` | Deloitte AIS — Mainland Life Insurance Team        |
+| `dais_ml_gi`   | Deloitte AIS — Mainland General Insurance Team     |
+
+**Initial password for all four:** `OntiDeloitte@2026`. After first
+sign-in each team chooses its own second factor and rotates the password.
+
+---
+
 ## 2. Regular user: 5-minute start
 
 ### 2.1 Read the dashboard

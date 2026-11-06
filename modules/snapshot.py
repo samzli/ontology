@@ -4,8 +4,13 @@ Serverless filesystems are wiped on every cold start, so accounts registered
 on one instance would vanish for the next. This module mirrors the SQLite
 database to an external store and restores it on boot:
 
-  * **Vercel Blob** — set ``BLOB_READ_WRITE_TOKEN`` (Vercel does this
-    automatically when a Blob store is connected to the project).
+  * **Vercel Database Blob (new) — recommended** — no token needed on a
+    connected project. The Vercel runtime injects ``BLOB_STORE_ID`` and the
+    SDK authenticates via Vercel's built-in OIDC. Requires ``vercel-blob``
+    in ``requirements.txt``.
+  * **Vercel Blob REST API (legacy)** — set ``BLOB_READ_WRITE_TOKEN``; the
+    module talks to ``https://blob.vercel-storage.com`` directly over httpx.
+    Useful when the SDK is missing or an older Blob generation is used.
   * **Any HTTP endpoint you own** — set ``ONTI_SNAPSHOT_URL`` and
     ``ONTI_SNAPSHOT_TOKEN``; the snapshot is ``PUT`` there and fetched back
     with a ``GET`` (a small VPS, an S3 pre-signed pair, a NAS webdav share...).
@@ -34,18 +39,14 @@ from modules import config as cfg
 
 _LOG = AppLogger("snapshot")
 
-# Every tunable comes from config/config.json (``snapshot`` section) so hosts
-# can adjust timeouts and the Blob prefix without touching code; secrets stay
-# in environment variables named there.
 _SNAP = cfg.SNAPSHOT
 _TIMEOUT = float(_SNAP.get("timeout_s", 20))
-# Collapse bursts of account changes (e.g. an admin creating several users)
-# into a single upload.
 _MIN_INTERVAL_S = float(_SNAP.get("min_interval_s", 5))
 _BLOB_API = str(_SNAP.get("blob_api_base", "https://blob.vercel-storage.com"))
 _BLOB_API_VERSION = str(_SNAP.get("blob_api_version", "7"))
 _PREFIX = str(_SNAP.get("prefix", "onti")).strip("/")
 _BLOB_TOKEN_ENV = str(_SNAP.get("blob_token_env", "BLOB_READ_WRITE_TOKEN"))
+_BLOB_STORE_ID_ENV = str(_SNAP.get("blob_store_id_env", "BLOB_STORE_ID"))
 _HTTP_URL_ENV = str(_SNAP.get("http_url_env", "ONTI_SNAPSHOT_URL"))
 _HTTP_TOKEN_ENV = str(_SNAP.get("http_token_env", "ONTI_SNAPSHOT_TOKEN"))
 
@@ -53,20 +54,41 @@ _last_sync = 0.0
 
 
 def _env(name: str) -> str:
-    """Return a trimmed environment variable, or ``""`` when unset."""
     return os.environ.get(name, "").strip()
+
+
+def _try_sdk():
+    """Return ``(svc, sync_module)`` for the Vercel SDK, or ``None, None``.
+
+    The SDK is only tried when ``BLOB_STORE_ID`` is set AND the ``vercel-blob``
+    package is importable. Import errors degrade silently so the legacy REST
+    path still works on hosts that intentionally skip the SDK.
+    """
+    store_id = _env(_BLOB_STORE_ID_ENV)
+    if not store_id:
+        return None, None
+    try:
+        from vercel.blob import sync as _vsync
+
+        session = _vsync.get_active_sync_session()
+        svc = _vsync.get_sync_blob_service(session)
+        return svc, _vsync
+    except Exception as exc:  # noqa: BLE001
+        _LOG.warn(f"vercel-blob SDK unavailable, falling back: {exc}")
+        return None, None
 
 
 def backend() -> str:
     """Name the configured snapshot backend.
 
     Returns:
-        str: ``"blob"``, ``"http"`` or ``""`` (sync disabled).
-
-    Example:
-        >>> backend() in ("blob", "http", "")
-        True
+        str: ``"blob_sdk"`` (Vercel Database Blob + SDK), ``"blob"`` (legacy
+        REST API), ``"http"`` or ``""`` (sync disabled).
     """
+    if _env(_BLOB_STORE_ID_ENV):
+        svc, _ = _try_sdk()
+        if svc is not None:
+            return "blob_sdk"
     if _env(_BLOB_TOKEN_ENV):
         return "blob"
     if _env(_HTTP_URL_ENV):
@@ -75,28 +97,11 @@ def backend() -> str:
 
 
 def enabled() -> bool:
-    """Whether a snapshot backend is configured.
-
-    Returns:
-        bool: ``True`` when snapshots can be uploaded and restored.
-
-    Example:
-        >>> enabled()
-        False
-    """
     return backend() != ""
 
 
 def _namespace() -> str:
-    """Secret, stable pathname segment derived from the deployment key.
-
-    Vercel Blob URLs are public, so the snapshot lives under an unguessable
-    prefix derived from the machine key instead of a well-known path.
-
-    Returns:
-        str: 24 hex characters identifying this deployment's snapshot folder.
-    """
-    from modules import db  # local import: db imports us lazily
+    from modules import db
 
     return hmac.new(db.session_signing_key(), b"snapshot-path", "sha256").hexdigest()[
         :24
@@ -104,18 +109,6 @@ def _namespace() -> str:
 
 
 def _db_bytes() -> bytes:
-    """Read a consistent copy of the live database.
-
-    Uses SQLite's online backup API instead of copying the file or forcing a
-    WAL checkpoint: the backup sees a committed snapshot even while the app
-    is writing, so no ``-wal``/``-shm`` sidecar ever has to be shipped.
-
-    Returns:
-        bytes: Raw SQLite file contents.
-
-    Raises:
-        sqlite3.Error: When the database cannot be opened or backed up.
-    """
     from modules import db
 
     fd, name = tempfile.mkstemp(suffix=".db")
@@ -137,38 +130,23 @@ def _db_bytes() -> bytes:
 
 
 def _looks_like_sqlite(data: bytes) -> bool:
-    """Check the SQLite magic header before trusting downloaded bytes.
-
-    Args:
-        data (bytes): Candidate database contents.
-
-    Returns:
-        bool: ``True`` when the bytes start with the SQLite file magic.
-    """
     return data[:16] == b"SQLite format 3\x00"
 
 
+# ---------------------------------------------------------------------------
+# Legacy REST API helpers (bearer token + blob.vercel-storage.com)
+# ---------------------------------------------------------------------------
+
+
 def _blob_headers() -> dict:
-    """Authorization headers shared by every Vercel Blob call."""
     return {
         "authorization": f"Bearer {_env(_BLOB_TOKEN_ENV)}",
         "x-api-version": _BLOB_API_VERSION,
-        # The REST API defaults to private on some store generations; every
-        # object here is already protected by an unguessable namespace, and a
-        # plain GET of the returned URL has to work from any instance.
         "x-vercel-blob-access": "public",
     }
 
 
 def _upload_blob(data: bytes) -> bool:
-    """PUT the snapshot to Vercel Blob under the secret prefix.
-
-    Args:
-        data (bytes): Database contents.
-
-    Returns:
-        bool: ``True`` on HTTP 2xx.
-    """
     path = f"{_PREFIX}/{_namespace()}/onti.db"
     resp = httpx.put(
         f"{_BLOB_API}/{path}",
@@ -188,12 +166,6 @@ def _upload_blob(data: bytes) -> bool:
 
 
 def _download_blob() -> Optional[bytes]:
-    """Fetch the newest snapshot from Vercel Blob.
-
-    Returns:
-        Optional[bytes]: Database contents, or ``None`` when no snapshot
-            exists yet or the request failed.
-    """
     prefix = f"{_PREFIX}/{_namespace()}/"
     resp = httpx.get(
         f"{_BLOB_API}?prefix={prefix}&limit=10",
@@ -214,15 +186,48 @@ def _download_blob() -> Optional[bytes]:
     return resp.content
 
 
+# ---------------------------------------------------------------------------
+# Vercel SDK helpers (Database Blob + OIDC — no token to manage)
+# ---------------------------------------------------------------------------
+
+
+def _sdk_upload(data: bytes) -> bool:
+    svc, _ = _try_sdk()
+    if svc is None:
+        return False
+    path = f"{_PREFIX}/{_namespace()}/onti.db"
+    try:
+        svc.put(path, data, access="public")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _LOG.warn(f"sdk blob upload failed: {exc}")
+        return False
+
+
+def _sdk_download() -> Optional[bytes]:
+    svc, _ = _try_sdk()
+    if svc is None:
+        return None
+    prefix = f"{_PREFIX}/{_namespace()}/"
+    try:
+        page = svc.query_blobs_page(prefix=prefix, limit=10)
+        items = list(page.items) if hasattr(page, "items") else list(page)
+        if not items:
+            return None
+        latest = max(items, key=lambda b: getattr(b, "uploaded_at", None) or "")
+        got = svc.open_download(latest.pathname)
+        return got.read() if got else None
+    except Exception as exc:  # noqa: BLE001
+        _LOG.warn(f"sdk blob download failed: {exc}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# HTTP operator endpoint helpers (unchanged)
+# ---------------------------------------------------------------------------
+
+
 def _upload_http(data: bytes) -> bool:
-    """PUT the snapshot to the operator's own endpoint.
-
-    Args:
-        data (bytes): Database contents.
-
-    Returns:
-        bool: ``True`` on HTTP 2xx.
-    """
     resp = httpx.put(
         _env(_HTTP_URL_ENV),
         content=data,
@@ -236,11 +241,6 @@ def _upload_http(data: bytes) -> bool:
 
 
 def _download_http() -> Optional[bytes]:
-    """GET the snapshot back from the operator's own endpoint.
-
-    Returns:
-        Optional[bytes]: Database contents, or ``None`` on failure.
-    """
     resp = httpx.get(
         _env(_HTTP_URL_ENV),
         headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
@@ -251,47 +251,34 @@ def _download_http() -> Optional[bytes]:
     return resp.content
 
 
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
 def sync_now() -> bool:
-    """Upload a fresh snapshot of the database, best effort.
-
-    Returns:
-        bool: ``True`` when a snapshot was uploaded; ``False`` when sync is
-            disabled or the upload failed (failures are logged, never raised).
-
-    Example:
-        >>> sync_now()
-        False
-    """
     kind = backend()
     if not kind:
         return False
     try:
         data = _db_bytes()
-        ok = _upload_blob(data) if kind == "blob" else _upload_http(data)
+        if kind == "blob_sdk":
+            ok = _sdk_upload(data)
+        elif kind == "blob":
+            ok = _upload_blob(data)
+        else:
+            ok = _upload_http(data)
         if ok:
             global _last_sync
             _last_sync = time.time()
             _LOG.info(f"snapshot uploaded via {kind} ({len(data)} bytes)")
         return ok
-    except Exception as exc:  # noqa: BLE001 - persistence must never break requests
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"snapshot upload skipped: {exc}")
         return False
 
 
 def request_sync() -> bool:
-    """Upload a snapshot unless one just happened (burst collapse).
-
-    Called after account mutations (register / role / password / enable), so
-    a registration made on a serverless instance reaches the durable store
-    before that instance can be replaced.
-
-    Returns:
-        bool: ``True`` when a snapshot was uploaded.
-
-    Example:
-        >>> request_sync()
-        False
-    """
     if not enabled():
         return False
     if time.time() - _last_sync < _MIN_INTERVAL_S:
@@ -300,26 +287,16 @@ def request_sync() -> bool:
 
 
 def restore_latest(target: Path) -> bool:
-    """Download the latest snapshot into ``target`` for a cold start.
-
-    Args:
-        target (Path): Where the runtime database should live (``DB_PATH`` on
-            an ephemeral host).
-
-    Returns:
-        bool: ``True`` when a snapshot was restored; ``False`` when sync is
-            disabled, no snapshot exists, or the download was invalid — the
-            caller then falls back to the bundled database.
-
-    Example:
-        >>> restore_latest(Path("/tmp/onti-data/onti.db"))
-        False
-    """
     kind = backend()
     if not kind:
         return False
     try:
-        data = _download_blob() if kind == "blob" else _download_http()
+        if kind == "blob_sdk":
+            data = _sdk_download()
+        elif kind == "blob":
+            data = _download_blob()
+        else:
+            data = _download_http()
         if not data or not _looks_like_sqlite(data):
             return False
         tmp = target.with_suffix(".restore")
@@ -331,7 +308,7 @@ def restore_latest(target: Path) -> bool:
                 side.unlink()
         _LOG.info(f"snapshot restored via {kind} ({len(data)} bytes)")
         return True
-    except Exception as exc:  # noqa: BLE001 - fall back to the bundled database
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"snapshot restore skipped: {exc}")
         return False
 
@@ -339,65 +316,44 @@ def restore_latest(target: Path) -> bool:
 # ---------------------------------------------------------------------------
 # Account records
 # ---------------------------------------------------------------------------
-# The whole-database snapshot above is last-writer-wins: two instances that
-# booted at different times hold different copies, and whichever uploads last
-# replaces the other's registrations. That is exactly how an account could be
-# created and then be gone on the next request.
-#
-# Accounts are therefore mirrored one JSON object per account, keyed by a hash
-# of the username. Writing one account can never delete a different one, and
-# any instance can fetch a single record when a login arrives for a username
-# its own copy does not know.
-#
-# The path segment is deliberately independent of the master key: rotating the
-# key must not orphan accounts created before the rotation. Records hold the
-# PBKDF2 hash, never the password, and the store is reached with the operator
-# token (Blob listing requires it).
 
 _ACCOUNT_DIR = "shared/accounts"
 
 
 def account_store() -> bool:
-    """Whether account records can be mirrored to a durable store.
-
-    Returns:
-        bool: ``True`` when a snapshot backend is configured.
-
-    Example:
-        >>> account_store()
-        False
-    """
     return enabled()
 
 
 def _account_key(username: str) -> str:
-    """Hash a username into a stable, filename-safe key.
-
-    Args:
-        username (str): Account name as entered at sign-in.
-
-    Returns:
-        str: 64 hex characters, case- and whitespace-insensitive.
-    """
     return hashlib.sha256(username.strip().lower().encode("utf-8")).hexdigest()
 
 
 def _blob_account_path(username: str) -> str:
-    """Pathname of one account record inside the Blob store."""
     return f"{_PREFIX}/{_ACCOUNT_DIR}/{_account_key(username)}.json"
 
 
 def _http_account_url(username: str) -> str:
-    """URL of one account record on the operator's own endpoint."""
     base = _env(_HTTP_URL_ENV)
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}account={_account_key(username)}"
 
 
+def _put_account_sdk(username: str, payload: bytes) -> bool:
+    svc, _ = _try_sdk()
+    if svc is None:
+        return False
+    try:
+        svc.put(_blob_account_path(username), payload, access="public")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _LOG.warn(f"sdk account upload failed: {exc}")
+        return False
+
+
 def _put_account_blob(username: str, payload: bytes) -> bool:
-    """Upload one account record to Vercel Blob (overwrite in place)."""
+    path = _blob_account_path(username)
     resp = httpx.put(
-        f"{_BLOB_API}/{_blob_account_path(username)}",
+        f"{_BLOB_API}/{path}",
         content=payload,
         headers={
             **_blob_headers(),
@@ -413,8 +369,20 @@ def _put_account_blob(username: str, payload: bytes) -> bool:
     return True
 
 
+def _get_account_sdk(username: str) -> Optional[bytes]:
+    svc, _ = _try_sdk()
+    if svc is None:
+        return None
+    path = _blob_account_path(username)
+    try:
+        got = svc.open_download(path)
+        return bytes(got) if got else None
+    except Exception as exc:  # noqa: BLE001
+        _LOG.warn(f"sdk account download failed: {exc}")
+        return None
+
+
 def _get_account_blob(username: str) -> Optional[bytes]:
-    """Download one account record from Vercel Blob, or ``None``."""
     path = _blob_account_path(username)
     resp = httpx.get(
         f"{_BLOB_API}?prefix={path}&limit=1",
@@ -422,33 +390,18 @@ def _get_account_blob(username: str) -> Optional[bytes]:
         timeout=_TIMEOUT,
     )
     if resp.status_code >= 300:
-        _LOG.warn(f"account list failed: {resp.status_code} {resp.text[:200]}")
         return None
     for blob in resp.json().get("blobs", []):
         if blob.get("pathname") != path:
             continue
         got = httpx.get(blob["url"], timeout=_TIMEOUT)
         if got.status_code >= 300:
-            _LOG.warn(f"account download failed: {got.status_code}")
             return None
         return got.content
     return None
 
 
 def save_account(record: Dict[str, Any]) -> bool:
-    """Persist one account record so every instance can see it.
-
-    Args:
-        record (Dict[str, Any]): Row with ``username``, ``display_name``,
-            ``password_hash``, ``role``, ``enabled`` and ``created_at``.
-
-    Returns:
-        bool: ``True`` when the record was stored (or storage is disabled).
-
-    Example:
-        >>> save_account({"username": "alice"})
-        False
-    """
     kind = backend()
     if not kind:
         return False
@@ -457,6 +410,8 @@ def save_account(record: Dict[str, Any]) -> bool:
         return False
     payload = json.dumps(record, ensure_ascii=False).encode("utf-8")
     try:
+        if kind == "blob_sdk":
+            return _put_account_sdk(username, payload)
         if kind == "blob":
             return _put_account_blob(username, payload)
         resp = httpx.put(
@@ -468,34 +423,20 @@ def save_account(record: Dict[str, Any]) -> bool:
             },
             timeout=_TIMEOUT,
         )
-        if resp.status_code >= 300:
-            _LOG.warn(f"account upload failed: {resp.status_code} {resp.text[:200]}")
-            return False
-        return True
-    except Exception as exc:  # noqa: BLE001 - persistence must not break requests
+        return resp.status_code < 300
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"account upload skipped: {exc}")
         return False
 
 
 def load_account(username: str) -> Optional[Dict[str, Any]]:
-    """Fetch one account record from the durable store.
-
-    Args:
-        username (str): Username supplied at sign-in.
-
-    Returns:
-        Optional[Dict[str, Any]]: The stored record, or ``None`` when storage
-            is disabled, the record is absent or the download failed.
-
-    Example:
-        >>> load_account("alice")  # doctest: +SKIP
-        {'username': 'alice', 'role': 'user', ...}
-    """
     kind = backend()
     if not kind:
         return None
     try:
-        if kind == "blob":
+        if kind == "blob_sdk":
+            raw = _get_account_sdk(username)
+        elif kind == "blob":
             raw = _get_account_blob(username)
         else:
             resp = httpx.get(
@@ -510,65 +451,45 @@ def load_account(username: str) -> Optional[Dict[str, Any]]:
         if not isinstance(record, dict) or not record.get("username"):
             return None
         return record
-    except Exception as exc:  # noqa: BLE001 - a lookup failure is a miss
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"account lookup skipped: {exc}")
         return None
 
 
 def delete_account(username: str) -> bool:
-    """Remove one account record from the durable store.
-
-    Args:
-        username (str): Account being deleted.
-
-    Returns:
-        bool: ``True`` when the delete was accepted.
-
-    Example:
-        >>> delete_account("alice")
-        False
-    """
     kind = backend()
     if not kind:
         return False
     try:
-        if kind == "blob":
+        if kind in ("blob_sdk", "blob"):
             path = _blob_account_path(username)
-            resp = httpx.post(
-                f"{_BLOB_API}/delete",
-                json={"urls": [f"{_BLOB_API}/{path}"]},
-                headers=_blob_headers(),
-                timeout=_TIMEOUT,
-            )
-        else:
-            resp = httpx.delete(
-                _http_account_url(username),
-                headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
-                timeout=_TIMEOUT,
-            )
-        if resp.status_code >= 300:
-            _LOG.warn(f"account delete failed: {resp.status_code}")
-            return False
-        return True
-    except Exception as exc:  # noqa: BLE001 - deletion is best effort
+            if kind == "blob_sdk":
+                svc, _ = _try_sdk()
+                if svc is None:
+                    return False
+                svc.delete(path)
+            else:
+                resp = httpx.post(
+                    f"{_BLOB_API}/delete",
+                    json={"urls": [f"{_BLOB_API}/{path}"]},
+                    headers=_blob_headers(),
+                    timeout=_TIMEOUT,
+                )
+                if resp.status_code >= 300:
+                    return False
+            return True
+        resp = httpx.delete(
+            _http_account_url(username),
+            headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
+            timeout=_TIMEOUT,
+        )
+        return resp.status_code < 300
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"account delete skipped: {exc}")
         return False
 
 
 def persist_account(conn: sqlite3.Connection, username: str) -> bool:
-    """Mirror the current database row for ``username`` to the store.
-
-    Args:
-        conn (sqlite3.Connection): Open database connection.
-        username (str): Account to mirror.
-
-    Returns:
-        bool: ``True`` when the record was stored or storage is disabled.
-
-    Example:
-        >>> persist_account(conn, "alice")  # doctest: +SKIP
-        True
-    """
     if not account_store():
         return True
     row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
@@ -608,19 +529,6 @@ def persist_account(conn: sqlite3.Connection, username: str) -> bool:
 
 
 def adopt_account(conn: sqlite3.Connection, record: Dict[str, Any]) -> bool:
-    """Insert a remotely stored account into the local database.
-
-    Args:
-        conn (sqlite3.Connection): Open database connection.
-        record (Dict[str, Any]): Record returned by :func:`load_account`.
-
-    Returns:
-        bool: ``True`` when the account is now present locally.
-
-    Example:
-        >>> adopt_account(conn, {"username": "alice"})  # doctest: +SKIP
-        True
-    """
     username = str(record.get("username", "")).strip()
     role = record.get("role") if record.get("role") in ("admin", "user") else "user"
     if not username:
@@ -649,8 +557,6 @@ def adopt_account(conn: sqlite3.Connection, record: Dict[str, Any]) -> bool:
     )
     row = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
     if row is not None and "password_changed_at" in cols:
-        # The stored record is authoritative: refresh the fields that the
-        # legacy INSERT above cannot overwrite on an already-adopted row.
         conn.execute(
             "UPDATE users SET email=?, email_verified=?, password_changed_at=? "
             "WHERE id=? AND email=''",
@@ -681,47 +587,49 @@ def adopt_account(conn: sqlite3.Connection, record: Dict[str, Any]) -> bool:
 
 
 def restore_accounts(conn: sqlite3.Connection) -> int:
-    """Pull every stored account record into a cold-started instance.
-
-    Only the Blob backend can be listed; the generic HTTP endpoint exposes one
-    record at a time, so it is fetched on demand at sign-in instead.
-
-    Args:
-        conn (sqlite3.Connection): Open database connection.
-
-    Returns:
-        int: Number of accounts added locally.
-
-    Example:
-        >>> restore_accounts(conn)  # doctest: +SKIP
-        2
-    """
-    if backend() != "blob":
+    kind = backend()
+    if kind not in ("blob_sdk", "blob"):
         return 0
     prefix = f"{_PREFIX}/{_ACCOUNT_DIR}/"
     added = 0
     try:
-        resp = httpx.get(
-            f"{_BLOB_API}?prefix={prefix}&limit=1000",
-            headers=_blob_headers(),
-            timeout=_TIMEOUT,
-        )
-        if resp.status_code >= 300:
-            _LOG.warn(f"account list failed: {resp.status_code}")
-            return 0
-        for blob in resp.json().get("blobs", []):
-            got = httpx.get(blob["url"], timeout=_TIMEOUT)
-            if got.status_code >= 300:
-                continue
-            try:
-                record = json.loads(got.content.decode("utf-8"))
-            except ValueError:
-                continue
-            if isinstance(record, dict) and adopt_account(conn, record):
-                added += 1
+        if kind == "blob_sdk":
+            svc, _ = _try_sdk()
+            if svc is None:
+                return 0
+            blobs = list(svc.query_blobs(prefix=prefix, limit=1000))
+            for blob in blobs:
+                got = svc.open_download(blob.pathname)
+                if not got:
+                    continue
+                try:
+                    record = json.loads(bytes(got).decode("utf-8"))
+                except ValueError:
+                    continue
+                if isinstance(record, dict) and adopt_account(conn, record):
+                    added += 1
+        else:
+            resp = httpx.get(
+                f"{_BLOB_API}?prefix={prefix}&limit=1000",
+                headers=_blob_headers(),
+                timeout=_TIMEOUT,
+            )
+            if resp.status_code >= 300:
+                _LOG.warn(f"account list failed: {resp.status_code}")
+                return 0
+            for blob in resp.json().get("blobs", []):
+                got = httpx.get(blob["url"], timeout=_TIMEOUT)
+                if got.status_code >= 300:
+                    continue
+                try:
+                    record = json.loads(got.content.decode("utf-8"))
+                except ValueError:
+                    continue
+                if isinstance(record, dict) and adopt_account(conn, record):
+                    added += 1
         if added:
             _LOG.info(f"restored {added} account record(s) from blob")
-    except Exception as exc:  # noqa: BLE001 - startup must not fail
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"account restore skipped: {exc}")
     return added
 
@@ -729,66 +637,40 @@ def restore_accounts(conn: sqlite3.Connection) -> int:
 # ---------------------------------------------------------------------------
 # E-mail verification challenges
 # ---------------------------------------------------------------------------
-#
-# A sign-up code is sent by one instance and verified by whichever instance
-# handles the next request, so the challenge cannot live in the local database
-# alone on a serverless host. It is mirrored here the same way accounts are:
-# one small JSON object per challenge, addressed by its opaque id (never by the
-# address, which is personal data and would leak into a listing).
 
 _OTP_DIR = "shared/otp"
 
 
 def otp_store() -> bool:
-    """Whether verification challenges can be mirrored to a durable store.
-
-    Returns:
-        bool: ``True`` when a snapshot backend is configured.
-
-    Example:
-        >>> otp_store()
-        False
-    """
     return enabled()
 
 
 def _otp_key(challenge_id: str) -> str:
-    """Map a challenge id to a filename-safe key."""
     return hashlib.sha256(challenge_id.strip().encode("utf-8")).hexdigest()
 
 
 def _blob_otp_path(challenge_id: str) -> str:
-    """Pathname of one challenge inside the Blob store."""
     return f"{_PREFIX}/{_OTP_DIR}/{_otp_key(challenge_id)}.json"
 
 
 def _http_otp_url(challenge_id: str) -> str:
-    """URL of one challenge on the operator's own endpoint."""
     base = _env(_HTTP_URL_ENV)
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}otp={_otp_key(challenge_id)}"
 
 
 def save_otp(challenge_id: str, record: Dict[str, Any]) -> bool:
-    """Mirror an e-mail challenge so any instance can verify it.
-
-    Args:
-        challenge_id (str): Opaque handle returned to the browser.
-        record (Dict[str, Any]): Challenge row (code hash, expiry, attempts…).
-
-    Returns:
-        bool: ``True`` when the record was stored or storage is disabled.
-
-    Example:
-        >>> save_otp("abc", {"purpose": "signup"})  # doctest: +SKIP
-        True
-    """
     kind = backend()
     if not kind:
         return True
     payload = json.dumps(record, ensure_ascii=False).encode("utf-8")
     try:
-        if kind == "blob":
+        if kind == "blob_sdk":
+            svc, _ = _try_sdk()
+            if svc is None:
+                return False
+            svc.put(_blob_otp_path(challenge_id), payload, access="public")
+        elif kind == "blob":
             resp = httpx.put(
                 f"{_BLOB_API}/{_blob_otp_path(challenge_id)}",
                 content=payload,
@@ -800,6 +682,9 @@ def save_otp(challenge_id: str, record: Dict[str, Any]) -> bool:
                 },
                 timeout=_TIMEOUT,
             )
+            if resp.status_code >= 300:
+                _LOG.warn(f"otp upload failed: {resp.status_code} {resp.text[:200]}")
+                return False
         else:
             resp = httpx.put(
                 _http_otp_url(challenge_id),
@@ -810,33 +695,27 @@ def save_otp(challenge_id: str, record: Dict[str, Any]) -> bool:
                 },
                 timeout=_TIMEOUT,
             )
-        if resp.status_code >= 300:
-            _LOG.warn(f"otp upload failed: {resp.status_code} {resp.text[:200]}")
-            return False
+            if resp.status_code >= 300:
+                _LOG.warn(f"otp upload failed: {resp.status_code} {resp.text[:200]}")
+                return False
         return True
-    except Exception as exc:  # noqa: BLE001 - persistence must not break requests
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"otp upload skipped: {exc}")
         return False
 
 
 def load_otp(challenge_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch one challenge from the durable store.
-
-    Args:
-        challenge_id (str): Opaque handle returned to the browser.
-
-    Returns:
-        Optional[Dict[str, Any]]: The stored record, or ``None``.
-
-    Example:
-        >>> load_otp("abc") is None
-        True
-    """
     kind = backend()
     if not kind:
         return None
     try:
-        if kind == "blob":
+        if kind == "blob_sdk":
+            svc, _ = _try_sdk()
+            if svc is None:
+                return None
+            got = svc.open_download(_blob_otp_path(challenge_id))
+            raw = bytes(got) if got else None
+        elif kind == "blob":
             path = _blob_otp_path(challenge_id)
             listing = httpx.get(
                 f"{_BLOB_API}?prefix={path}&limit=1",
@@ -861,42 +740,39 @@ def load_otp(challenge_id: str) -> Optional[Dict[str, Any]]:
             return None
         record = json.loads(raw.decode("utf-8"))
         return record if isinstance(record, dict) else None
-    except Exception as exc:  # noqa: BLE001 - a lookup failure is a miss
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"otp lookup skipped: {exc}")
         return None
 
 
 def delete_otp(challenge_id: str) -> bool:
-    """Remove a consumed challenge from the durable store.
-
-    Args:
-        challenge_id (str): Opaque handle returned to the browser.
-
-    Returns:
-        bool: ``True`` when the delete was accepted (best effort).
-
-    Example:
-        >>> delete_otp("abc")  # doctest: +SKIP
-        True
-    """
     kind = backend()
     if not kind:
         return True
     try:
-        if kind == "blob":
-            resp = httpx.post(
-                f"{_BLOB_API}/delete",
-                json={"urls": [f"{_BLOB_API}/{_blob_otp_path(challenge_id)}"]},
-                headers=_blob_headers(),
-                timeout=_TIMEOUT,
-            )
-        else:
-            resp = httpx.delete(
-                _http_otp_url(challenge_id),
-                headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
-                timeout=_TIMEOUT,
-            )
+        if kind in ("blob_sdk", "blob"):
+            path = _blob_otp_path(challenge_id)
+            if kind == "blob_sdk":
+                svc, _ = _try_sdk()
+                if svc is None:
+                    return False
+                svc.delete(path)
+            else:
+                resp = httpx.post(
+                    f"{_BLOB_API}/delete",
+                    json={"urls": [f"{_BLOB_API}/{path}"]},
+                    headers=_blob_headers(),
+                    timeout=_TIMEOUT,
+                )
+                if resp.status_code >= 300:
+                    return False
+            return True
+        resp = httpx.delete(
+            _http_otp_url(challenge_id),
+            headers={"authorization": f"Bearer {_env(_HTTP_TOKEN_ENV)}"},
+            timeout=_TIMEOUT,
+        )
         return resp.status_code < 300
-    except Exception as exc:  # noqa: BLE001 - deletion is best effort
+    except Exception as exc:  # noqa: BLE001
         _LOG.warn(f"otp delete skipped: {exc}")
         return False
