@@ -106,8 +106,8 @@ finding.
 ## 4. Authentication and password policy
 
 All accounts are e-mail accounts and all sessions are **two-factor**:
-the password is the first factor, a six-digit code mailed to the address on
-file is the second. A password alone never produces a cookie.
+the password is the first factor, and one of two second factors is verified
+before a cookie is issued. A password alone never produces a cookie.
 
 | Control          | Implementation                                                                                                                                            |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -116,9 +116,11 @@ file is the second. A password alone never produces a cookie.
 | Password classes | At least 3 of {lowercase, uppercase, digit, symbol}                                                                                                       |
 | Password history | The last 24 months are kept in `password_history`; a hash match rejects the change                                                                        |
 | Rotation         | 90-day window (`password_changed_at`); a banner appears in the last 14 days and after expiry, with a link to `/account/password`                          |
-| Codes            | Six random digits, `SHA-256(challenge_id:code)` stored — never the code; 10-minute TTL, 60-second resend cooldown, 5 attempts, single use                 |
+| E-mail OTP       | Six random digits, `SHA-256(challenge_id:code)` stored — never the code; 10-minute TTL, 60-second resend cooldown, 5 attempts, single use                 |
+| Authenticator MFA | Per-account flag in `users.mfa_enabled`. When set, sign-in branches to a TOTP step (`/api/auth/signin/mfa/verify`) using a base32 secret stored as `mfa_secret`; QR provisioning via `/api/auth/mfa/bind`. One factor only on any account — MFA replaces the e-mail OTP while enabled. |
 | Legacy accounts  | No address → password step returns `bind_required` with a 15-minute HMAC-signed bind token; the address is confirmed by code before any session is issued |
-| Sessions         | HMAC-signed HttpOnly `SameSite=Lax` cookie, also recorded in `sessions`; logout deletes the row                                                           |
+| Sessions         | HMAC-signed HttpOnly `SameSite=Lax` cookie, also recorded in `sessions`; logout deletes the row and writes a revocation entry                             |
+| Duplicate guard  | Self-registration against an address already in `users` returns HTTP 409 `"already registered"` — a front-end-friendly path to tell the user to sign in instead of retry. |
 
 Sign-up deliberately writes **nothing** to `users` until the code verifies,
 so a mistyped address or an abandoned form cannot leave a half-created

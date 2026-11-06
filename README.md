@@ -84,6 +84,49 @@ box. With neither Resend nor SMTP configured the API answers **503** and
 the sign-in page says so instead of pretending a code was sent.
 `GET /api/auth/status` reports `mail_configured`.
 
+### Authenticator app (TOTP) second factor
+
+Every account signs in with a password and a **code from an Authenticator
+app**. Choose one of two second factors per account:
+
+* **E-mail OTP** (default) — six-digit code delivered to the registered
+  address. Works out of the box once [E-mail
+  delivery](#e-mail-delivery-verification-codes) is configured.
+* **Authenticator TOTP** — bind a standard Authenticator app (Google
+  Authenticator, Microsoft Authenticator, 1Password, Authy...) from the
+  account page. The sign-in flow switches to a six-digit code generated
+  by the app, no network round-trip required. Bind, verify, unbind live
+  behind authenticated endpoints: `GET /api/auth/mfa/bind`,
+  `POST /api/auth/mfa/bind/verify`, `POST /api/auth/mfa/unbind`. `mfa_available`
+  and `mfa_qr_available` in `GET /api/auth/status` let the front-end decide
+  whether to show the bind UI.
+
+An account cannot be enrolled in both factors at the same time — MFA
+replaces the e-mail OTP while enabled. Disabling MFA falls back to the
+e-mail OTP on the next sign-in.
+
+### Preset workspace accounts
+
+Four team accounts are seeded into the database on first run. Run the
+idempotent seeder to add them to an existing database:
+
+```bash
+python scripts/seed_preset_accounts.py
+```
+
+| Username       | E-mail                         | Purpose                                      |
+| -------------- | ------------------------------ | -------------------------------------------- |
+| `dais_hk_life` | `dais_hk_life@deloitte.com.hk` | Deloitte AI Solutions — HK Life              |
+| `dais_hk_gi`   | `dais_hk_gi@deloitte.com.hk`   | Deloitte AI Solutions — HK General Insurance |
+| `dais_ml_life` | `dais_ml_life@deloitte.com.hk` | Deloitte AI Solutions — ML Life              |
+| `dais_ml_gi`   | `dais_ml_gi@deloitte.com.hk`   | Deloitte AI Solutions — ML General Insurance |
+
+**Initial password for all four:** `OntiDeloitte@2026`. Password policy
+(10+ chars, ≥3/4 classes, no reuse within 24 months, rotation every 90
+days) and the Authenticator app second factor both apply from day one.
+Duplicate self-registrations against any of these addresses are rejected
+with a friendly 409 response telling the user the account already exists.
+
 Open one of the two portals (the root URL `/` forwards to the user
 portal):
 

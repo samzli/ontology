@@ -128,7 +128,8 @@ another.
 Core tables (selection):
 
 * `users` — accounts, PBKDF2 hashes, roles, e-mail address + verified flag,
-  `password_changed_at` (rotation clock)
+  `password_changed_at` (rotation clock), `mfa_secret` (base32 TOTP key),
+  `mfa_enabled` (flag, sign-in branches on this)
 * `password_history` — one row per password ever set, kept 24 months;
   reuse is rejected by hash comparison
 * `email_otp` — mail challenges: purpose, address, `SHA-256(id:code)`,

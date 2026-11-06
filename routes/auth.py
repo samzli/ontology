@@ -187,6 +187,7 @@ async def auth_status():
             "accounts_persist": (not EPHEMERAL_STORAGE) or synced,
             "mail_configured": mailer.configured() or mailer.echo_enabled(),
             "mfa_available": mfa.available(),
+            "mfa_qr_available": mfa.qr_available(),
             "password_policy": {
                 "min_length": auth.PASSWORD_MIN_LENGTH,
                 "min_categories": auth.PASSWORD_MIN_CATEGORIES,
@@ -372,9 +373,7 @@ async def signin_mfa_verify(data: MfaSigninIn, request: Request):
             "This sign-in attempt expired. Enter your password again.", 401
         )
     if not mfa.available():
-        raise auth.AuthError(
-            "Authenticator codes are not supported on this host.", 501
-        )
+        raise auth.AuthError("Authenticator codes are not supported on this host.", 501)
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM users WHERE id=?", (int(claims["uid"]),)
@@ -602,16 +601,19 @@ async def mfa_bind_start(
         auth.AuthError: 501 when the runtime dependencies are missing.
     """
     if not mfa.available():
-        raise auth.AuthError(
-            "Authenticator MFA is not supported on this host.", 501
-        )
+        raise auth.AuthError("Authenticator MFA is not supported on this host.", 501)
     username = str(user.get("username") or "")
     email = str(user.get("email") or "")
     secret = mfa.generate_secret()
     uri = mfa.provisioning_uri(secret, username, label=email or username)
-    qr_svg = mfa.generate_qr_svg(uri)
-    # Keep the pending secret signed by the mfa_token so we don't have to
-    # touch the user row until the first code is confirmed.
+    # qrcode may be missing on some hosts — bind still returns the secret
+    # and URI so the operator can type them into the Authenticator app.
+    qr_svg = ""
+    if mfa.qr_available():
+        try:
+            qr_svg = mfa.generate_qr_svg(uri)
+        except Exception:  # noqa: BLE001 - degrade gracefully
+            qr_svg = ""
     mfa_token = auth.issue_pending_token(
         {
             "uid": int(user["id"]),
@@ -624,6 +626,7 @@ async def mfa_bind_start(
         "secret": secret,
         "uri": uri,
         "qr_svg": qr_svg,
+        "qr_available": mfa.qr_available() and bool(qr_svg),
         "mfa_token": mfa_token,
     }
 

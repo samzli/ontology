@@ -56,12 +56,26 @@ class MfaUnavailable(MfaError):
 
 
 def available() -> bool:
-    """Whether the runtime libraries are present.
+    """Whether TOTP verification can run on this host.
 
     Returns:
-        bool: ``True`` when both :mod:`pyotp` and :mod:`qrcode` imported ok.
+        bool: ``True`` when :mod:`pyotp` imported ok (which is everything
+        the sign-in TOTP step needs). QR-code rendering for the bind flow
+        is gated separately — see :func:`qr_available`.
     """
-    return pyotp is not None and qrcode is not None
+    return pyotp is not None
+
+
+def qr_available() -> bool:
+    """Whether we can render the provisioning QR image.
+
+    Returns:
+        bool: ``True`` when both :mod:`pyotp` and :mod:`qrcode` are
+        present. Missing qrcode is tolerated on hosts where MFA sign-in
+        is still useful (operators can type the secret manually instead
+        of scanning the QR code).
+    """
+    return available() and qrcode is not None
 
 
 def generate_secret() -> str:

@@ -569,6 +569,47 @@ reuse in 24 months), and the account is prompted to rotate every 90 days.
 Legacy accounts without an address are asked to bind one on first
 sign-in — the session is not issued until the code comes back.
 
+### Two second factors
+
+Every account picks **one** of two second factors after the password is
+verified:
+
+| Factor        | When to use                      | Config required                                  |
+| ------------- | -------------------------------- | ------------------------------------------------ |
+| E-mail OTP    | Default — works with any mailbox | `RESEND_API_KEY` or `SMTP_HOST`                  |
+| Authenticator | No network, no e-mail, no delay  | `pyotp` + `qrcode` (already in requirements.txt) |
+
+The Authenticator flow is `GET /api/auth/mfa/bind` (returns the QR SVG +
+a short-lived `mfa_token`) → user scans the QR with Google / Microsoft /
+1Password Authenticator → `POST /api/auth/mfa/bind/verify` with one fresh
+code and the `mfa_token`. After that, sign-in on the account takes
+`/api/auth/signin/mfa/verify` instead of the e-mail OTP endpoint. The
+account page (`/account/password`) exposes a switch to enable or disable
+MFA; disabling falls back to the e-mail OTP on the next sign-in.
+
+### Preset team accounts
+
+Four team accounts are seeded out of the box so you can hand out
+credentials immediately:
+
+| Username       | E-mail                         | Purpose                        |
+| -------------- | ------------------------------ | ------------------------------ |
+| `dais_hk_life` | `dais_hk_life@deloitte.com.hk` | DAIS HK Life Team              |
+| `dais_hk_gi`   | `dais_hk_gi@deloitte.com.hk`   | DAIS HK General Insurance Team |
+| `dais_ml_life` | `dais_ml_life@deloitte.com.hk` | DAIS ML Life Team              |
+| `dais_ml_gi`   | `dais_ml_gi@deloitte.com.hk`   | DAIS ML General Insurance Team |
+
+**Initial password for all four:** `OntiDeloitte@2026`. Enforce password
+rotation and MFA binding with the team on first use. The seeder lives at
+`scripts/seed_preset_accounts.py` and is idempotent — safe to re-run
+after schema upgrades.
+
+Duplicate self-registrations against any of these addresses (or any
+existing account) are rejected with a friendly HTTP 409 telling the user
+the account already exists — the response body carries `"already registered"`
+so the front-end can surface a "Use your existing account instead"
+message instead of a generic error.
+
 Self-registration works on every host. On Vercel the function filesystem
 is per-instance ( `/api/auth/status`→`ephemeral: true` ), so configure a
 durable store — `BLOB_READ_WRITE_TOKEN` (Vercel Blob) or
