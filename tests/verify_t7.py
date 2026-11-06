@@ -27,6 +27,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import _auth_client as auth_client  # noqa: E402
 from _seed_synthetic import delete_pack, ensure_synthetic_pack  # noqa: E402
 
 from modules import induction  # noqa: E402
@@ -79,10 +80,8 @@ def main():
     )
 
     with httpx.Client(base_url=BASE, timeout=60) as c:
-        r = c.post(
-            "/api/auth/login", json={"username": "admin", "password": "Onti@2026"}
-        )
-        ok(r.status_code == 200, "admin login", r.status_code)
+        auth_client.login(c, "admin", "Onti@2026")
+        ok(c.get("/api/auth/me").status_code == 200, "admin login")
 
         table = js(c.get("/api/admin/data/tables", params={"pack_id": pid}))["tables"][
             0

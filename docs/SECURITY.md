@@ -103,7 +103,45 @@ finding.
    files, make it private. A public repository with committed databases
    will keep producing findings.
 
-## 4. What the guard test enforces
+## 4. Authentication and password policy
+
+All accounts are e-mail accounts and all sessions are **two-factor**:
+the password is the first factor, a six-digit code mailed to the address on
+file is the second. A password alone never produces a cookie.
+
+| Control          | Implementation                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Username         | Derived from the address (`alice@example.com` → `alice`), suffixed `-2`, `-3`… on collision. Never entered by the user.                                   |
+| Password length  | ≥ 10 and ≤ 256 characters                                                                                                                                 |
+| Password classes | At least 3 of {lowercase, uppercase, digit, symbol}                                                                                                       |
+| Password history | The last 24 months are kept in `password_history`; a hash match rejects the change                                                                        |
+| Rotation         | 90-day window (`password_changed_at`); a banner appears in the last 14 days and after expiry, with a link to `/account/password`                          |
+| Codes            | Six random digits, `SHA-256(challenge_id:code)` stored — never the code; 10-minute TTL, 60-second resend cooldown, 5 attempts, single use                 |
+| Legacy accounts  | No address → password step returns `bind_required` with a 15-minute HMAC-signed bind token; the address is confirmed by code before any session is issued |
+| Sessions         | HMAC-signed HttpOnly `SameSite=Lax` cookie, also recorded in `sessions`; logout deletes the row                                                           |
+
+Sign-up deliberately writes **nothing** to `users` until the code verifies,
+so a mistyped address or an abandoned form cannot leave a half-created
+account that later blocks the same address.
+
+Codes are delivered through Resend (`RESEND_API_KEY`) or SMTP
+(`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
+`SMTP_SECURITY`). Neither configured → every code request answers **503**;
+the app never pretends a message was sent. `ONTI_MAIL_ECHO=1` prints the
+code and returns `debug_code`; it is a local debugging switch and must not
+be set on a public deployment.
+
+Challenges are stored in SQLite **and** mirrored to the durable store
+(`onti/shared/otp/<sha256-of-challenge>.json`) because the instance that
+sends a code may not be the instance that verifies it. They carry only a
+hash and expire in ten minutes; the mirror is deleted when the challenge is
+consumed or superseded.
+
+Administrators resetting a password through the console are subject to the
+same policy, and the reset is written to `password_history` like a
+self-service change. Roles, enable/disable and password resets are audited.
+
+## 5. What the guard test enforces
 
 `tests/verify_secrets.py` runs in the normal suite and fails when:
 
@@ -117,14 +155,23 @@ finding.
 Test fixtures must use obviously invalid values such as
 `sk-test-not-a-real-key`, never a real provider key.
 
-## 5. Known, accepted risks
+## 6. Known, accepted risks
 
 * **The seeded administrator password is public.** `admin` /
   `Onti@2026` ships in the documentation for first-run convenience.
   Change it immediately after deploying, or pre-provision accounts and
-  disable the seed login.
+  disable the seed login. The first sign-in also forces an e-mail binding,
+  so the account cannot be used without an address somebody controls.
 * **Registration is open by default.** Close it in Users & audit when
   the instance is not a demo.
-* **Serverless instances do not share storage.** Accounts registered at
-  runtime live on one instance only; see `README.md` → Deploying to
-  Vercel. Use the Docker deployment for durable multi-user state.
+* **Mail delivery is operator-supplied.** With Resend the message leaves
+  through a third party; with SMTP it leaves through your relay. Treat the
+  provider account as production infrastructure, and keep
+  `ONTI_MAIL_ECHO` off outside local development — it returns the code in
+  the HTTP response.
+* **Serverless instances do not share a filesystem.** Accounts and
+  verification challenges are mirrored to the durable store (Vercel Blob
+  or your HTTP endpoint), so they survive cold starts; uploads and reports
+  still rely on the whole-database snapshot. Without a store,
+  `/api/auth/status` reports `accounts_persist: false` and self-registration
+  is refused. Use the Docker deployment for guaranteed durability.

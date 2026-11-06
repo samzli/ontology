@@ -26,8 +26,17 @@ from __future__ import annotations
 
 import sys
 import time
+from pathlib import Path
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import _auth_client as auth_client  # noqa: E402
+
+from modules import auth  # noqa: E402
+from modules.db import get_conn  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 ADMIN = {"username": "admin", "password": "Onti@2026"}
@@ -92,8 +101,8 @@ def main() -> int:
     # and restore it at the end.
     original_active = None
     with httpx.Client(base_url=BASE, timeout=30) as pre:
-        if pre.post("/api/auth/login", json=ADMIN).status_code == 200:
-            original_active = pre.get("/api/admin/packs").json().get("active_id")
+        auth_client.login(pre, ADMIN["username"], ADMIN["password"])
+        original_active = pre.get("/api/admin/packs").json().get("active_id")
 
     # -- 1. Registration is open and works --------------------------------
     with httpx.Client(base_url=BASE, timeout=30) as anon:
@@ -113,29 +122,27 @@ def main() -> int:
             "anonymous /api/packs is rejected",
         )
         r = anon.post(
-            "/api/auth/register",
-            json={"username": USERNAME, "password": "short"},
+            "/api/auth/signup/start",
+            json={
+                "email": f"shortpw_{STAMP}@example.com",
+                "password": "short",
+            },
         )
         ok(r.status_code == 422, "short password rejected with 422", r.status_code)
 
     with httpx.Client(base_url=BASE, timeout=120) as user:
-        r = user.post(
-            "/api/auth/register",
-            json={
-                "username": USERNAME,
-                "password": PASSWORD,
-                "display_name": "Permission Check",
-            },
-        )
-        body = r.json() if r.status_code == 200 else {}
+        # Registration itself is covered by verify_auth2fa.py; here the account
+        # is provisioned directly so the permission matrix is what is tested.
+        with get_conn() as conn:
+            created = auth.register_account(
+                conn, USERNAME, PASSWORD, "Permission Check"
+            )
+        auth_client.login(user, USERNAME, PASSWORD)
         ok(
-            r.status_code == 200 and (body.get("user") or {}).get("role") == "user",
+            created["role"] == "user",
             "new account registers with role 'user'",
-            f"{r.status_code} {r.text[:200]}",
+            created,
         )
-        if r.status_code != 200:
-            print(f"\n  {PASS} passed, {FAIL} failed")
-            return 1
         me = user.get("/api/auth/me").json()
         ok(
             (me.get("user") or {}).get("username") == USERNAME,
@@ -180,21 +187,22 @@ def main() -> int:
         )
 
     # -- duplicate username rejected (fresh client, after user exists) -----
-    with httpx.Client(base_url=BASE, timeout=30) as dup:
-        r = dup.post(
-            "/api/auth/register",
-            json={"username": USERNAME, "password": PASSWORD},
-        )
-        ok(r.status_code == 409, "duplicate username rejected with 409", r.status_code)
+    duplicate = False
+    try:
+        with get_conn() as conn:
+            auth.register_account(conn, USERNAME, PASSWORD)
+    except auth.AuthError as exc:
+        duplicate = exc.status_code == 409
+    ok(duplicate, "duplicate username rejected with 409")
 
     # -- 4. Administrator sees the user's ontology and can create too -----
     with httpx.Client(base_url=BASE, timeout=120) as admin:
-        r = admin.post("/api/auth/login", json=ADMIN)
-        body = r.json() if r.status_code == 200 else {}
+        auth_client.login(admin, ADMIN["username"], ADMIN["password"])
+        body = admin.get("/api/auth/me").json()
         ok(
-            r.status_code == 200 and (body.get("user") or {}).get("role") == "admin",
+            (body.get("user") or {}).get("role") == "admin",
             "admin login",
-            f"{r.status_code} {r.text[:160]}",
+            body,
         )
         admin_packs = admin.get("/api/admin/packs").json().get("packs", [])
         seen = [p for p in admin_packs if p.get("id") == user_pid]
@@ -227,7 +235,7 @@ def main() -> int:
 
     # -- 5. Cross-visibility: the regular user sees the admin's pack ------
     with httpx.Client(base_url=BASE, timeout=30) as user:
-        user.post("/api/auth/login", json={"username": USERNAME, "password": PASSWORD})
+        auth_client.login(user, USERNAME, PASSWORD)
         packs = user.get("/api/packs").json().get("packs", [])
         ok(
             any(p.get("id") == admin_pid for p in packs),
@@ -237,7 +245,7 @@ def main() -> int:
     # -- 6. Restore the previously active pack for later test scripts -----
     if original_active is not None:
         with httpx.Client(base_url=BASE, timeout=30) as post:
-            post.post("/api/auth/login", json=ADMIN)
+            auth_client.login(post, ADMIN["username"], ADMIN["password"])
             r = post.post(f"/api/admin/packs/{original_active}/activate")
             ok(
                 r.status_code == 200,

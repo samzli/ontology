@@ -244,11 +244,53 @@ def _service_checks(store_url: str) -> None:
         auth.EPHEMERAL_STORAGE = saved_ephemeral
 
 
+def _signup(client, email: str, password: str, display: str = "A") -> tuple:
+    """Run the two-step sign-up flow and return (challenge, cookie_seen)."""
+    start = client.post(
+        "/api/auth/signup/start",
+        json={"email": email, "password": password, "display_name": display},
+    )
+    if start.status_code != 200:
+        return start, False
+    body = start.json()
+    code = body.get("debug_code")
+    if not code:
+        return start, False
+    done = client.post(
+        "/api/auth/signup/verify",
+        json={"challenge_id": body["challenge_id"], "code": code},
+    )
+    return done, "onti_session" in (done.headers.get("set-cookie") or "")
+
+
+def _signin(client, email: str, password: str):
+    """Run the two-step sign-in flow and return the final response."""
+    start = client.post(
+        "/api/auth/signin/start", json={"identifier": email, "password": password}
+    )
+    if start.status_code != 200:
+        return start
+    body = start.json()
+    if body.get("status") != "otp_required" or not body.get("debug_code"):
+        return start
+    return client.post(
+        "/api/auth/signin/verify",
+        json={"challenge_id": body["challenge_id"], "code": body["debug_code"]},
+    )
+
+
 def _http_checks() -> None:
-    """Full create / sign-in / switch flow against the running server."""
+    """Full create / sign-in / switch flow against the running server.
+
+    The flow needs a verification code, so it only runs when the server was
+    started with Resend, SMTP or ``ONTI_MAIL_ECHO=1``. ``verify_auth2fa.py``
+    covers the same journey in-process and always runs.
+    """
     client = httpx.Client(base_url=BASE, timeout=20, follow_redirects=False)
     user_a = unique("acct_a")
     user_b = unique("acct_b")
+    email_a = f"{user_a}@example.com"
+    email_b = f"{user_b}@example.com"
     CREATED.extend([user_a, user_b])
     try:
         status = client.get("/api/auth/status")
@@ -259,17 +301,14 @@ def _http_checks() -> None:
             "[9] local host reports durable accounts",
             info,
         )
+        if not info.get("mail_configured"):
+            print("  SKIP [10-13] e-mail flow :: server has no mail transport")
+            return
 
-        # [10] register -> /app renders -> /me resolves
-        reg = client.post(
-            "/api/auth/register",
-            json={"username": user_a, "password": "Alpha@2026x", "display_name": "A"},
-        )
-        ok(reg.status_code == 200, "[10] register -> 200", reg.text[:200])
-        ok(
-            "onti_session" in (reg.headers.get("set-cookie") or ""),
-            "[10] register signs the user in",
-        )
+        # [10] sign up -> /app renders -> /me resolves
+        reg, cookie = _signup(client, email_a, "Alpha@2026x")
+        ok(reg.status_code == 200, "[10] sign up -> 200", reg.text[:200])
+        ok(cookie, "[10] sign up signs the user in")
         app_page = client.get("/app")
         ok(
             app_page.status_code == 200 and b"Sign in" not in app_page.content[:400],
@@ -283,24 +322,18 @@ def _http_checks() -> None:
             me.text[:200],
         )
 
-        # [11] logout -> sign in again
+        # [11] logout -> sign in again (password + mailed code)
         ok(client.post("/api/auth/logout").status_code == 200, "[11] logout -> 200")
         ok(
             client.get("/api/auth/me").status_code == 401,
             "[11] /me after logout -> 401",
         )
-        again = client.post(
-            "/api/auth/login",
-            json={"username": user_a, "password": "Alpha@2026x"},
-        )
+        again = _signin(client, email_a, "Alpha@2026x")
         ok(again.status_code == 200, "[11] sign in again -> 200", again.text[:200])
 
         # [12] two accounts stay separate in two browsers
         other = httpx.Client(base_url=BASE, timeout=20, follow_redirects=False)
-        reg_b = other.post(
-            "/api/auth/register",
-            json={"username": user_b, "password": "Bravo@2026x", "display_name": "B"},
-        )
+        reg_b, _ = _signup(other, email_b, "Bravo@2026x", "B")
         ok(reg_b.status_code == 200, "[12] second account registers", reg_b.text[:200])
         me_b = other.get("/api/auth/me")
         me_a = client.get("/api/auth/me")
@@ -316,10 +349,10 @@ def _http_checks() -> None:
             "[12] signing out one account leaves the other signed in",
         )
 
-        # [13] wrong password and duplicate registration are clear, not vague
+        # [13] wrong password and duplicate sign-up are clear, not vague
         bad = client.post(
-            "/api/auth/login",
-            json={"username": user_a, "password": "wrong-password"},
+            "/api/auth/signin/start",
+            json={"identifier": email_a, "password": "wrong-password"},
         )
         message = str(bad.json())
         ok(
@@ -333,12 +366,12 @@ def _http_checks() -> None:
             message,
         )
         dup = client.post(
-            "/api/auth/register",
-            json={"username": user_a, "password": "Alpha@2026x"},
+            "/api/auth/signup/start",
+            json={"email": email_a, "password": "Alpha@2026x"},
         )
         ok(
             dup.status_code == 409,
-            "[13] duplicate registration -> 409",
+            "[13] duplicate sign-up -> 409",
             dup.status_code,
         )
     finally:

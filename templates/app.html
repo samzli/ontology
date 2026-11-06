@@ -38,6 +38,10 @@
             library</button>
           <button data-view="reports"><span class="ic">📄</span> My
             reports</button>
+          <a href="/account/password"
+            style="text-decoration:none;color:inherit">
+            <button><span class="ic">🔐</span> Account &amp; password</button>
+          </a>
           {% if is_admin %}
           <a href="/admin" style="text-decoration:none;color:inherit">
             <button><span class="ic">⚙️</span> Admin console</button>
@@ -73,6 +77,7 @@
         </header>
 
         <div class="content">
+          <div id="pwNotice" style="display:none"></div>
           <!-- ================ DASHBOARD ================ -->
           <section class="view active" id="view-dashboard">
             <div class="page-head">
@@ -558,6 +563,35 @@
         style="flex:1;text-decoration:none;color:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px"><span
           class="ic" style="font-size:16px">⚙️</span>Admin</a>{% endif %}
     </nav>
+
+    <script>
+    // 90-day password rotation reminder. The server owns the dates; this only
+    // renders the banner, so the rule cannot drift between clients.
+    window.addEventListener('DOMContentLoaded', function () {
+      fetch('/api/auth/me', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.password) return;
+          var p = data.password;
+          if (!p.password_warning && !p.password_expired) return;
+          var box = document.getElementById('pwNotice');
+          if (!box) return;
+          box.style.display = 'block';
+          box.innerHTML =
+            '<div class="card" style="margin-bottom:18px;border-left:4px solid ' +
+            (p.password_expired ? '#C8102E' : '#D97706') + '">' +
+            '<div class="card-b" style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center">' +
+            '<span><b>' + (p.password_expired
+              ? 'Your password has expired.'
+              : 'Your password expires in ' + p.password_days_left + ' day(s).') +
+            '</b> Passwords must be changed every 3 months.</span>' +
+            '<span class="spacer"></span>' +
+            '<a class="btn btn-primary btn-sm" href="/account/password">Change password</a>' +
+            '</div></div>';
+        })
+        .catch(function () { });
+    });
+    </script>
 
   </body>
 

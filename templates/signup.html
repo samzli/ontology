@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create account · {{ system_name }}</title>
+    <link rel="stylesheet" href="/static/css/app.css?v=19">
+    <link rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ED1B2E'/><text x='16' y='22' font-size='17' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>O</text></svg>">
+  </head>
+
+  <body>
+    <div class="auth-screen">
+      <aside class="auth-aside">
+        <div class="brand"><span class="logo">O</span> {{ system_name }}</div>
+        <div class="hero">
+          <h2>Create your workspace account.</h2>
+          <p>Registration and sign-in are separate, and both are protected by a
+            code sent to your e-mail. Your username is taken from the part of
+            your address before the @ sign.</p>
+          <ul>
+            <li>Passwords must be {{ password_min_length }}+ characters with
+              {{ password_min_categories }} character types</li>
+            <li>No reuse of a password from the last 24 months</li>
+            <li>Rotate your password every 3 months — we remind you in-app</li>
+          </ul>
+        </div>
+        <div class="ver">{{ system_name }} platform v{{ version }}</div>
+      </aside>
+      <main class="auth-main">
+        <div class="auth-card">
+          <h1 id="authTitle">Create your account</h1>
+          <div class="sub" id="authSub">Enter your work e-mail — we send a
+            verification code to activate the account.</div>
+          <div class="auth-error" id="authError"></div>
+
+          <form id="stepForm" autocomplete="off">
+            <label class="fld">
+              <span>E-mail address</span>
+              <input type="email" id="fEmail" required maxlength="254"
+                placeholder="you@company.com" autofocus autocomplete="username">
+            </label>
+            <label class="fld">
+              <span>Display name <small class="muted">(optional)</small></span>
+              <input type="text" id="fName" maxlength="120"
+                placeholder="e.g. Alex Lee" autocomplete="name">
+            </label>
+            <label class="fld">
+              <span>Password</span>
+              <input type="password" id="fPass" required maxlength="256"
+                placeholder="At least {{ password_min_length }} characters"
+                autocomplete="new-password">
+            </label>
+            <div class="pw-rules" id="pwRules">
+              <div class="pw-rule" data-rule="len"><span class="tick">○</span>
+                At least {{ password_min_length }} characters</div>
+              <div class="pw-rule" data-rule="cats"><span class="tick">○</span>
+                At least {{ password_min_categories }} of: upper, lower, digits,
+                symbols</div>
+              <div class="pw-rule" data-rule="same"><span class="tick">○</span>
+                Both passwords match</div>
+            </div>
+            <label class="fld">
+              <span>Confirm password</span>
+              <input type="password" id="fPass2" required maxlength="256"
+                placeholder="Repeat the password" autocomplete="new-password">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="createBtn">Send verification code</button>
+          </form>
+
+          <form id="stepCode" autocomplete="off" style="display:none">
+            <div class="otp-target">We sent a 6-digit code to
+              <b id="otpEmail">your inbox</b>. Enter it to create the
+              account.</div>
+            <label class="fld">
+              <span>Verification code</span>
+              <input type="text" id="fCode" inputmode="numeric" required
+                minlength="6" maxlength="6" pattern="[0-9]{6}"
+                placeholder="123456" autocomplete="one-time-code">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="verifyBtn">Verify &amp; create account</button>
+            <div class="auth-switch" style="margin-top:12px">
+              <button class="btn-link" id="resendBtn" type="button">Send a new
+                code</button>
+              <button class="btn-link" id="backBtn" type="button">Edit
+                details</button>
+            </div>
+          </form>
+
+          <div class="auth-switch">
+            <span>Already have an account?</span>
+            <a class="btn-link" href="/login">Sign in</a>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="/static/js/common.js?v=19"></script>
+    <script>
+    (function () {
+      const { api } = Onti;
+      const MIN_LEN = {{ password_min_length }};
+      const MIN_CATS = {{ password_min_categories }};
+      const errBox = document.getElementById('authError');
+      const state = { challenge: '' };
+      const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
+
+      function categories(pw) {
+        let n = 0;
+        if (/[a-z]/.test(pw)) n += 1;
+        if (/[A-Z]/.test(pw)) n += 1;
+        if (/[0-9]/.test(pw)) n += 1;
+        if (/[^A-Za-z0-9]/.test(pw)) n += 1;
+        return n;
+      }
+
+      function paintRules() {
+        const pw = document.getElementById('fPass').value;
+        const pw2 = document.getElementById('fPass2').value;
+        const results = {
+          len: pw.length >= MIN_LEN,
+          cats: categories(pw) >= MIN_CATS,
+          same: pw.length > 0 && pw === pw2,
+        };
+        document.querySelectorAll('.pw-rule').forEach((row) => {
+          const ok = results[row.dataset.rule];
+          row.classList.toggle('ok', ok);
+          row.querySelector('.tick').textContent = ok ? '✓' : '○';
+        });
+        return results.len && results.cats && results.same;
+      }
+      ['fPass', 'fPass2'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', paintRules);
+      });
+
+      api.get('/api/auth/status').then((s) => {
+        if (!s.allow_registration) {
+          showErr('Self-registration is closed. Contact an administrator.');
+          document.getElementById('createBtn').disabled = true;
+        }
+        if (!s.mail_configured) {
+          showErr('Verification e-mail is not configured on this deployment. '
+            + 'An administrator must set RESEND_API_KEY or SMTP_HOST.');
+          document.getElementById('createBtn').disabled = true;
+        }
+        if (s.first_run) {
+          document.getElementById('authSub').textContent =
+            'You are creating the administrator account for this workspace.';
+        }
+      }).catch(() => { });
+
+      document.getElementById('stepForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.classList.remove('show');
+        if (!paintRules()) {
+          showErr('Please satisfy all password rules before continuing.');
+          return;
+        }
+        const btn = document.getElementById('createBtn');
+        btn.disabled = true;
+        try {
+          const r = await api.post('/api/auth/signup/start', {
+            email: document.getElementById('fEmail').value.trim(),
+            password: document.getElementById('fPass').value,
+            display_name: document.getElementById('fName').value.trim(),
+          });
+          state.challenge = r.challenge_id;
+          document.getElementById('otpEmail').textContent = r.email_masked;
+          document.getElementById('stepForm').style.display = 'none';
+          document.getElementById('stepCode').style.display = 'block';
+          document.getElementById('authTitle').textContent = 'Check your inbox';
+          document.getElementById('authSub').textContent =
+            'One more step: confirm the code to activate your account.';
+          document.getElementById('fCode').focus();
+          startCooldown();
+          if (r.debug_code) document.getElementById('fCode').value = r.debug_code;
+        } catch (ex) {
+          showErr(ex.status === 0
+            ? 'Cannot reach the server. Check your connection and try again.'
+            : ex.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      document.getElementById('stepCode').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.classList.remove('show');
+        const btn = document.getElementById('verifyBtn');
+        btn.disabled = true;
+        try {
+          await api.post('/api/auth/signup/verify', {
+            challenge_id: state.challenge,
+            code: document.getElementById('fCode').value.trim(),
+          });
+          // Full navigation (not a partial update) so the portal boots from a
+          // clean document — this replaces the old flow where the redirect
+          // fired while the sign-up form was still re-rendering.
+          location.replace('/app');
+        } catch (ex) {
+          showErr(ex.message);
+          if (ex.extra && ex.extra.restart) {
+            state.challenge = '';
+          }
+          btn.disabled = false;
+        }
+      });
+
+      let timer = null;
+      function startCooldown() {
+        const btn = document.getElementById('resendBtn');
+        let left = 60;
+        btn.disabled = true;
+        btn.textContent = 'Send a new code (60s)';
+        clearInterval(timer);
+        timer = setInterval(() => {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = 'Send a new code';
+          } else {
+            btn.textContent = 'Send a new code (' + left + 's)';
+          }
+        }, 1000);
+      }
+
+      document.getElementById('resendBtn').addEventListener('click', async () => {
+        if (!state.challenge) return;
+        errBox.classList.remove('show');
+        try {
+          const r = await api.post('/api/auth/otp/resend', {
+            challenge_id: state.challenge,
+          });
+          if (r.challenge_id) state.challenge = r.challenge_id;
+          document.getElementById('otpEmail').textContent = r.email_masked;
+          startCooldown();
+          if (r.debug_code) document.getElementById('fCode').value = r.debug_code;
+        } catch (ex) {
+          showErr(ex.message);
+        }
+      });
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        state.challenge = '';
+        clearInterval(timer);
+        document.getElementById('stepCode').style.display = 'none';
+        document.getElementById('stepForm').style.display = 'block';
+        document.getElementById('authTitle').textContent = 'Create your account';
+        document.getElementById('authSub').textContent =
+          'Enter your work e-mail — we send a verification code to activate the account.';
+        errBox.classList.remove('show');
+      });
+    })();
+  </script>
+  </body>
+
+</html>

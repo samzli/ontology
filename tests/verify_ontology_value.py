@@ -32,7 +32,10 @@ from typing import Any, Dict, List
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import _auth_client as auth_client  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -177,9 +180,8 @@ def main() -> int:
     rows: List[Dict[str, Any]] = []
     try:
         client = httpx.Client(base_url=BASE, timeout=90)
-        r = client.post(
-            "/api/auth/login", json={"username": "admin", "password": "Onti@2026"}
-        )
+        auth_client.login(client, "admin", "Onti@2026")
+        r = client.get("/api/auth/me")
         if r.status_code != 200:
             print("login failed:", r.status_code, r.text[:200])
             client.close()

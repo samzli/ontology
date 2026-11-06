@@ -31,5 +31,21 @@
     "blob_token_env": "BLOB_READ_WRITE_TOKEN",
     "http_url_env": "ONTI_SNAPSHOT_URL",
     "http_token_env": "ONTI_SNAPSHOT_TOKEN"
+  },
+  "mail": {
+    "from_email": "Onti <onboarding@resend.dev>",
+    "resend_api_base": "https://api.resend.com",
+    "timeout_s": 20,
+    "code_ttl_minutes": 10,
+    "resend_cooldown_s": 60,
+    "max_attempts": 5
+  },
+  "password_policy": {
+    "min_length": 10,
+    "max_length": 256,
+    "min_categories": 3,
+    "history_months": 24,
+    "max_age_days": 90,
+    "warn_before_days": 14
   }
 }

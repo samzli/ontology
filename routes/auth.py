@@ -1,77 +1,131 @@
-"""HTTP routes for the auth area."""
+"""HTTP routes for the auth area.
+
+Two-factor by design: a password alone never yields a session. Sign-up and
+sign-in are separate flows, and both end with a six-digit code mailed to the
+address on file.
+
+* ``POST /api/auth/signup/start``  → e-mail + password, sends a code
+* ``POST /api/auth/signup/verify`` → code, creates the account and signs in
+* ``POST /api/auth/signin/start``  → e-mail + password, sends a code
+* ``POST /api/auth/signin/verify`` → code, issues the session
+* ``POST /api/auth/bind/start`` / ``bind/verify`` → one-time upgrade path for
+  accounts created before e-mail sign-in
+* ``POST /api/auth/password/change`` → self-service rotation every 90 days
+"""
 
 from __future__ import annotations
 
-import re
+import json
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
-from modules import auth, snapshot
+from modules import auth, mailer, otp, snapshot
 from modules import config as cfg
 from modules.db import EPHEMERAL_STORAGE, get_conn, get_setting
 
 router = APIRouter()
 
 
-class LoginIn(BaseModel):
-    """Registration / sign-in payload.
+class SignupIn(BaseModel):
+    """Sign-up payload.
 
     Attributes:
-        username (str): 3-64 characters, letters/digits/``_``/``.``/``-``.
-        password (str): 8-256 characters; stored hashed.
-        display_name (str): Optional human-readable name (defaults to empty).
+        email (str): Address that will receive the verification code and
+            become the sign-in identity.
+        password (str): Plaintext password; validated against the policy.
+        display_name (str): Optional human-readable name.
     """
 
-    username: str = Field(min_length=1, max_length=64)
+    email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=1, max_length=256)
-    display_name: str = ""
+    display_name: str = Field(default="", max_length=120)
 
-    @field_validator("username")
-    @classmethod
-    def _check_username(cls, v: str) -> str:
-        """Validate and normalise the username.
 
-        Args:
-            v (str): Raw username from the request body.
+class VerifyIn(BaseModel):
+    """Payload for completing a code challenge.
 
-        Returns:
-            str: The trimmed username.
+    Attributes:
+        challenge_id (str): Opaque handle returned by the ``start`` call.
+        code (str): Six-digit code from the e-mail.
+    """
 
-        Raises:
-            ValueError: When the username is not 3-64 allowed characters.
+    challenge_id: str = Field(min_length=8, max_length=128)
+    code: str = Field(min_length=4, max_length=12)
 
-        Example:
-            >>> LoginIn._check_username("  alice  ")
-            'alice'
-        """
-        stripped = v.strip()
-        if not re.match(r"^[A-Za-z0-9_.\-]{3,64}$", stripped):
-            raise ValueError(
-                "Username must be 3-64 characters: letters, digits, '_', '.', '-'."
-            )
-        return stripped
 
-    @field_validator("password")
-    @classmethod
-    def _check_password(cls, v: str) -> str:
-        """Validate password length.
+class SigninIn(BaseModel):
+    """Sign-in payload (first factor).
 
-        Args:
-            v (str): Raw password from the request body.
+    Attributes:
+        identifier (str): E-mail address, or the username of a legacy account.
+        password (str): Plaintext password.
+    """
 
-        Returns:
-            str: The unchanged password when valid.
+    identifier: str = Field(min_length=1, max_length=254)
+    password: str = Field(min_length=1, max_length=256)
 
-        Raises:
-            ValueError: When the password is shorter than 8 or longer than 256
-                characters.
-        """
-        if len(v) < 8 or len(v) > 256:
-            raise ValueError("Password must be 8-256 characters.")
-        return v
+
+class ResendIn(BaseModel):
+    """Payload for re-sending a code.
+
+    Attributes:
+        challenge_id (str): Challenge being extended.
+    """
+
+    challenge_id: str = Field(min_length=8, max_length=128)
+
+
+class BindStartIn(BaseModel):
+    """Payload for binding an address to a legacy account.
+
+    Attributes:
+        bind_token (str): Short-lived proof produced by the password step.
+        email (str): Address to attach.
+    """
+
+    bind_token: str = Field(min_length=8, max_length=512)
+    email: str = Field(min_length=3, max_length=254)
+
+
+class PasswordChangeIn(BaseModel):
+    """Payload for a self-service password rotation.
+
+    Attributes:
+        current_password (str): Existing password.
+        new_password (str): Replacement password.
+    """
+
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=1, max_length=256)
+
+
+def _ip(request: Request) -> str:
+    """Best-effort client IP, honouring the Vercel proxy header."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()[:64]
+    return (request.client.host if request.client else "")[:64]
+
+
+def _agent(request: Request) -> str:
+    """Client user agent, truncated for storage."""
+    return request.headers.get("user-agent", "")[:300]
+
+
+def _with_cookie(payload: Dict[str, Any], token: str) -> JSONResponse:
+    """Build a JSON response that also stores the session cookie."""
+    resp = JSONResponse(payload)
+    resp.set_cookie(
+        auth.COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite="lax",
+        max_age=cfg.SESSION_DAYS * 86400,
+    )
+    return resp
 
 
 @router.get("/api/auth/status")
@@ -79,13 +133,11 @@ async def auth_status():
     """Report first-run state, registration availability and storage mode.
 
     Returns:
-        dict: ``{"first_run": bool, "allow_registration": bool,
-        "ephemeral": bool, "accounts_persist": bool, "snapshot_sync": bool}``.
-        ``allow_registration`` is false only when an administrator closed
-        self-registration; ``ephemeral`` reports the storage mode for
-        diagnostics; ``snapshot_sync`` tells whether a snapshot backend is
-        configured, and ``accounts_persist`` is true whenever the host is
-        persistent *or* snapshots carry accounts across instances.
+        dict: ``{"first_run", "allow_registration", "ephemeral",
+        "accounts_persist", "snapshot_sync", "mail_configured",
+        "password_policy"}``. ``mail_configured`` is false when neither Resend
+        nor SMTP is set, in which case the UI explains that codes cannot be
+        delivered instead of showing a dead sign-up form.
     """
     with get_conn() as conn:
         count = conn.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
@@ -96,106 +148,335 @@ async def auth_status():
             "ephemeral": EPHEMERAL_STORAGE,
             "snapshot_sync": synced,
             "accounts_persist": (not EPHEMERAL_STORAGE) or synced,
+            "mail_configured": mailer.configured() or mailer.echo_enabled(),
+            "password_policy": {
+                "min_length": auth.PASSWORD_MIN_LENGTH,
+                "min_categories": auth.PASSWORD_MIN_CATEGORIES,
+                "history_months": auth.PASSWORD_HISTORY_MONTHS,
+                "max_age_days": auth.PASSWORD_MAX_AGE_DAYS,
+                "warn_before_days": auth.PASSWORD_WARN_BEFORE_DAYS,
+            },
         }
 
 
-@router.post("/api/auth/register")
-async def register(data: LoginIn):
-    """Create a new account and sign it in immediately.
+@router.post("/api/auth/signup/start")
+async def signup_start(data: SignupIn, request: Request):
+    """Validate a sign-up request and mail a verification code.
+
+    Nothing is written to ``users`` yet: the account only exists once the code
+    comes back, which removes the "registered but half-created" state that
+    used to break the redirect after sign-up.
 
     Args:
-        data (LoginIn): Username, password and optional display name.
+        data (SignupIn): Address, password and optional display name.
+        request (Request): Incoming request, used for the client IP.
 
     Returns:
-        JSONResponse: Body ``{"user": {...}}`` plus the session cookie. A 503
-        JSON error is raised by the service layer when the host cannot keep
-        new accounts.
+        dict: ``challenge_id``, ``email_masked``, ``expires_in``, ``provider``
+        and, in echo mode only, ``debug_code``.
 
     Raises:
-        auth.AuthError: With 503 on a stateless host without durable account
-            storage (mapped to a JSON error by the application handler).
+        auth.AuthError: 422 for a bad address or password policy violation,
+            403 when an administrator disabled self-registration, 409 when
+            the address is already registered.
+    """
+    email = auth.normalize_email(data.email)
+    auth.validate_password_policy(data.password)
+    with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM users WHERE email=?", (email,)).fetchone():
+            raise auth.AuthError("An account already uses this e-mail address.", 409)
+        first = auth.user_count(conn) == 0
+        if not first and get_setting(conn, "allow_registration", "1") != "1":
+            raise auth.AuthError(
+                "Self-registration is disabled. Contact an administrator.", 403
+            )
+        result = otp.issue(
+            conn,
+            purpose="signup",
+            email=email,
+            payload={
+                "password_hash": auth.hash_password(data.password),
+                "display_name": data.display_name.strip(),
+            },
+            ip=_ip(request),
+        )
+    result["status"] = "otp_required"
+    result["next"] = "/api/auth/signup/verify"
+    return result
+
+
+@router.post("/api/auth/signup/verify")
+async def signup_verify(data: VerifyIn, request: Request):
+    """Consume the sign-up code, create the account and sign the user in.
+
+    Args:
+        data (VerifyIn): Challenge handle plus the mailed code.
+        request (Request): Incoming request, used for the user agent and IP.
+
+    Returns:
+        JSONResponse: ``{"user", "password", "provider"}`` plus the session
+        cookie. A failed code returns 400 and leaves the pending account
+        uncreated, so the browser can simply ask for a new code.
     """
     with get_conn() as conn:
-        user = auth.register_account(
-            conn, data.username.strip(), data.password, data.display_name.strip(), ""
+        record = otp.verify(conn, data.challenge_id, data.code)
+        if record["purpose"] != "signup":
+            raise otp.OtpError("This code is not valid for sign-up.", 400)
+        payload = json.loads(record.get("payload") or "{}")
+        user = auth.register_hashed(
+            conn,
+            str(record["email"]),
+            str(payload.get("password_hash") or ""),
+            str(payload.get("display_name") or ""),
+            _ip(request),
         )
-        result = auth.authenticate(conn, data.username.strip(), data.password)
-    # Push a whole-database snapshot too, so packs/settings written alongside
-    # the account reach the durable store (no-op without a snapshot backend).
+        row = conn.execute(
+            "SELECT * FROM users WHERE username=?", (user["username"],)
+        ).fetchone()
+        session = auth.start_session(
+            conn, row, user_agent=_agent(request), ip=_ip(request)
+        )
     snapshot.request_sync()
-    resp = JSONResponse({"user": user})
-    resp.set_cookie(
-        auth.COOKIE_NAME,
-        result["token"],
-        httponly=True,
-        samesite="lax",
-        max_age=cfg.SESSION_DAYS * 86400,
+    return _with_cookie(
+        {
+            "user": session["user"],
+            "password": session["password"],
+            "provider": record["purpose"],
+        },
+        session["token"],
     )
-    return resp
 
 
-@router.post("/api/auth/login")
-async def login(request: Request, data: LoginIn):
-    """Authenticate a user and set the session cookie.
+@router.post("/api/auth/signin/start")
+async def signin_start(data: SigninIn, request: Request):
+    """Check the password and prepare the second factor.
 
     Args:
-        request (Request): Incoming request (client IP and user agent are
-            recorded for the audit trail).
-        data (LoginIn): Credentials supplied by the client.
+        data (SigninIn): Address (or legacy username) and password.
+        request (Request): Incoming request, used for the client IP.
 
     Returns:
-        JSONResponse: Body ``{"user": {...}}`` plus the session cookie.
+        dict: ``{"status": "otp_required", ...challenge}`` for a normal
+        account, or ``{"status": "bind_required", "bind_token": ...}`` when
+        the account predates e-mail sign-in and must bind an address first.
+
+    Raises:
+        auth.AuthError: 401 for unknown credentials, 403 for a disabled
+            account.
     """
-    ip = request.client.host if request.client else ""
-    ua = request.headers.get("user-agent", "")
     with get_conn() as conn:
-        result = auth.authenticate(
-            conn, data.username.strip(), data.password, ip=ip, user_agent=ua
+        row = auth.verify_signin(
+            conn, data.identifier.strip(), data.password, ip=_ip(request)
         )
-    resp = JSONResponse({"user": result["user"]})
-    resp.set_cookie(
-        auth.COOKIE_NAME,
-        result["token"],
-        httponly=True,
-        samesite="lax",
-        max_age=cfg.SESSION_DAYS * 86400,
-    )
-    return resp
+        email = str(row["email"] or "")
+        if not email or int(row["email_verified"] or 0) != 1:
+            return {
+                "status": "bind_required",
+                "username": row["username"],
+                "bind_token": auth.issue_pending_token(
+                    {"uid": int(row["id"]), "purpose": "bind", "un": row["username"]}
+                ),
+                "message": (
+                    "This account was created before e-mail sign-in. "
+                    "Confirm an address to continue."
+                ),
+            }
+        result = otp.issue(
+            conn,
+            purpose="signin",
+            email=email,
+            username=row["username"],
+            ip=_ip(request),
+        )
+    result["status"] = "otp_required"
+    result["next"] = "/api/auth/signin/verify"
+    return result
 
 
-@router.post("/api/auth/logout")
-async def logout(request: Request):
-    """Invalidate the caller's session and clear the cookie.
+@router.post("/api/auth/signin/verify")
+async def signin_verify(data: VerifyIn, request: Request):
+    """Consume the sign-in code and issue the session.
 
     Args:
-        request (Request): Incoming request carrying the session cookie.
+        data (VerifyIn): Challenge handle plus the mailed code.
+        request (Request): Incoming request, used for the user agent and IP.
 
     Returns:
-        JSONResponse: Body ``{"ok": true}`` with the cookie deleted.
+        JSONResponse: ``{"user", "password"}`` plus the session cookie.
+
+    Raises:
+        otp.OtpError: 400 for a consumed, expired or wrong code.
+        auth.AuthError: 403 when the account was disabled meanwhile.
     """
-    token = request.cookies.get(auth.COOKIE_NAME, "")
     with get_conn() as conn:
-        auth.logout(conn, token)
-    resp = JSONResponse({"ok": True})
-    resp.delete_cookie(auth.COOKIE_NAME)
-    return resp
+        record = otp.verify(conn, data.challenge_id, data.code)
+        if record["purpose"] != "signin":
+            raise otp.OtpError("This code is not valid for sign-in.", 400)
+        row = conn.execute(
+            "SELECT * FROM users WHERE username=?", (record["username"],)
+        ).fetchone()
+        if row is None:
+            raise auth.AuthError(
+                "The account is not available on this instance. Try again.", 409
+            )
+        if str(row["email"] or "") != str(record["email"]):
+            raise otp.OtpError("The e-mail address changed. Start sign-in again.", 400)
+        if not row["enabled"]:
+            raise auth.AuthError(
+                "This account is disabled. Contact an administrator.", 403
+            )
+        session = auth.start_session(
+            conn, row, user_agent=_agent(request), ip=_ip(request)
+        )
+    return _with_cookie(
+        {"user": session["user"], "password": session["password"]},
+        session["token"],
+    )
+
+
+@router.post("/api/auth/otp/resend")
+async def otp_resend(data: ResendIn):
+    """Send a fresh code for the same challenge.
+
+    Args:
+        data (ResendIn): Challenge handle.
+
+    Returns:
+        dict: Same shape as the original ``start`` response.
+    """
+    with get_conn() as conn:
+        return otp.resend(conn, data.challenge_id)
+
+
+@router.post("/api/auth/bind/start")
+async def bind_start(data: BindStartIn, request: Request):
+    """Mail a code to the address a legacy account wants to attach.
+
+    Args:
+        data (BindStartIn): Password proof token plus the requested address.
+        request (Request): Incoming request, used for the client IP.
+
+    Returns:
+        dict: Challenge payload for the verification screen.
+
+    Raises:
+        auth.AuthError: 401 when the bind token is invalid or expired, 409
+            when the address belongs to another account.
+    """
+    claims = auth.verify_pending_token(data.bind_token, "bind")
+    if claims is None:
+        raise auth.AuthError(
+            "This sign-in attempt expired. Enter your password again.", 401
+        )
+    email = auth.normalize_email(data.email)
+    with get_conn() as conn:
+        taken = conn.execute(
+            "SELECT id FROM users WHERE email=? AND id<>?",
+            (email, int(claims["uid"])),
+        ).fetchone()
+        if taken is not None:
+            raise auth.AuthError("An account already uses this e-mail address.", 409)
+        result = otp.issue(
+            conn,
+            purpose="bind",
+            email=email,
+            username=str(claims.get("un") or ""),
+            payload={"uid": int(claims["uid"])},
+            ip=_ip(request),
+        )
+    result["status"] = "otp_required"
+    return result
+
+
+@router.post("/api/auth/bind/verify")
+async def bind_verify(data: VerifyIn, request: Request):
+    """Attach the proven address and complete the sign-in.
+
+    Args:
+        data (VerifyIn): Challenge handle plus the mailed code.
+        request (Request): Incoming request, used for the user agent and IP.
+
+    Returns:
+        JSONResponse: ``{"user", "password"}`` plus the session cookie.
+    """
+    with get_conn() as conn:
+        record = otp.verify(conn, data.challenge_id, data.code)
+        if record["purpose"] != "bind":
+            raise otp.OtpError("This code is not valid for e-mail binding.", 400)
+        payload = json.loads(record.get("payload") or "{}")
+        uid = int(payload.get("uid") or 0)
+        row = auth.bind_email(conn, uid, str(record["email"]), ip=_ip(request))
+        session = auth.start_session(
+            conn, row, user_agent=_agent(request), ip=_ip(request)
+        )
+    snapshot.request_sync()
+    return _with_cookie(
+        {"user": session["user"], "password": session["password"]},
+        session["token"],
+    )
+
+
+@router.post("/api/auth/password/change")
+async def password_change(
+    data: PasswordChangeIn,
+    request: Request,
+    user: Dict[str, Any] = Depends(auth.current_user),
+):
+    """Rotate the signed-in user's password.
+
+    Args:
+        data (PasswordChangeIn): Current and replacement passwords.
+        request (Request): Incoming request, used for the client IP.
+        user (Dict[str, Any]): Injected by the ``current_user`` dependency.
+
+    Returns:
+        dict: ``{"ok": True, "user", "password"}`` where ``password`` carries
+        the refreshed 90-day window.
+    """
+    with get_conn() as conn:
+        result = auth.change_password(
+            conn,
+            int(user["id"]),
+            data.current_password,
+            data.new_password,
+            ip=_ip(request),
+        )
+    snapshot.request_sync()
+    return {"ok": True, **result}
 
 
 @router.get("/api/auth/me")
 async def me(user: Dict[str, Any] = Depends(auth.current_user)):
-    """Return the signed-in user's safe profile fields.
+    """Return the signed-in account plus its password-age banner state.
 
     Args:
         user (Dict[str, Any]): Injected by the ``current_user`` dependency.
 
     Returns:
-        dict: ``{"user": {"id", "username", "display_name", "role", "enabled",
-        "created_at"}}`` (keys missing from the record are omitted).
+        dict: ``{"user": ..., "password": ...}``.
     """
-    return {
-        "user": {
-            k: user[k]
-            for k in ("id", "username", "display_name", "role", "enabled", "created_at")
-            if k in user
-        }
-    }
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+    return {"user": auth.public_user(row), "password": auth.password_state(row)}
+
+
+@router.post("/api/auth/logout")
+async def logout(request: Request):
+    """Revoke the current session and clear the cookie.
+
+    Args:
+        request (Request): Incoming request carrying the session cookie.
+
+    Returns:
+        JSONResponse: ``{"ok": True}`` with an expired cookie.
+    """
+    token = request.cookies.get(auth.COOKIE_NAME, "")
+    if token:
+        with get_conn() as conn:
+            # Also record the token as revoked: without that entry the stateless
+            # fallback in ``user_by_token`` would happily accept it again, since
+            # the ``sessions`` row alone is not the only way a token validates.
+            auth.logout(conn, token, _ip(request))
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE_NAME)
+    return resp

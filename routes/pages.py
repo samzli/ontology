@@ -44,6 +44,64 @@ async def login_page(request: Request):
     )
 
 
+@router.get("/signup")
+async def signup_page(request: Request):
+    """Render the standalone registration page.
+
+    Sign-up lives on its own URL (rather than a mode switch on the sign-in
+    form) so the post-registration redirect has a single, predictable target.
+
+    Args:
+        request (Request): Incoming request (used to read the session cookie).
+
+    Returns:
+        RedirectResponse | TemplateResponse: Redirect to ``/app`` for
+        signed-in users, otherwise the rendered ``signup.html`` page.
+    """
+    user = auth.optional_user(request)
+    if user:
+        return RedirectResponse("/app")
+    return templates.TemplateResponse(
+        request,
+        "signup.html",
+        {
+            "system_name": cfg.SYSTEM_NAME,
+            "version": cfg.VERSION,
+            "password_min_length": auth.PASSWORD_MIN_LENGTH,
+            "password_min_categories": auth.PASSWORD_MIN_CATEGORIES,
+        },
+    )
+
+
+@router.get("/account/password")
+async def password_page(request: Request):
+    """Render the dedicated password-rotation page.
+
+    Args:
+        request (Request): Incoming request (used to read the session cookie).
+
+    Returns:
+        RedirectResponse | TemplateResponse: Redirect to ``/login`` when not
+        signed in, otherwise the rendered ``password.html`` page.
+    """
+    user = auth.optional_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(
+        request,
+        "password.html",
+        {
+            "system_name": cfg.SYSTEM_NAME,
+            "version": cfg.VERSION,
+            "user": user,
+            "password_min_length": auth.PASSWORD_MIN_LENGTH,
+            "password_min_categories": auth.PASSWORD_MIN_CATEGORIES,
+            "max_age_days": auth.PASSWORD_MAX_AGE_DAYS,
+            "history_months": auth.PASSWORD_HISTORY_MONTHS,
+        },
+    )
+
+
 @router.get("/app")
 async def app_page(request: Request):
     """Render the main portal page for an authenticated user.

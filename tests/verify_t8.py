@@ -28,8 +28,10 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import _auth_client as auth_client  # noqa: E402
 from _seed_synthetic import delete_pack, ensure_synthetic_pack  # noqa: E402
 
 from modules import admin_service as adm  # noqa: E402
@@ -146,10 +148,8 @@ def main():
     )
 
     with httpx.Client(base_url=BASE, timeout=90) as c:
-        r = c.post(
-            "/api/auth/login", json={"username": "admin", "password": "Onti@2026"}
-        )
-        ok(r.status_code == 200, "admin login", r.status_code)
+        auth_client.login(c, "admin", "Onti@2026")
+        ok(c.get("/api/auth/me").status_code == 200, "admin login")
 
         def batch(parts, plan=None, commit=False):
             data = {"pack_id": str(pid), "commit": "true" if commit else "false"}

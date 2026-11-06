@@ -87,19 +87,35 @@
           <div class="auth-error" id="errBox"></div>
           <form id="adminForm" autocomplete="off">
             <label class="fld">
-              <span>Admin username</span>
-              <input type="text" id="fUser" required minlength="3"
-                maxlength="64" placeholder="Administrator username"
-                autofocus>
+              <span>Admin e-mail (or username)</span>
+              <input type="text" id="fUser" required maxlength="254"
+                placeholder="you@company.com" autofocus
+                autocomplete="username">
             </label>
             <label class="fld">
               <span>Password</span>
-              <input type="password" id="fPass" required minlength="8"
-                maxlength="256" placeholder="Your password">
+              <input type="password" id="fPass" required maxlength="256"
+                placeholder="Your password" autocomplete="current-password">
             </label>
             <button type="submit" class="btn btn-primary" style="width:100%"
-              id="signBtn">Sign in to admin
-              console</button>
+              id="signBtn">Continue</button>
+          </form>
+          <form id="codeForm" autocomplete="off" style="display:none">
+            <p class="small muted" style="margin:0 0 12px">
+              A 6-digit code was sent to <b id="otpEmail">your inbox</b>.
+            </p>
+            <label class="fld">
+              <span>Verification code</span>
+              <input type="text" id="fCode" inputmode="numeric" required
+                minlength="6" maxlength="6" pattern="[0-9]{6}"
+                placeholder="123456" autocomplete="one-time-code">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="codeBtn">Verify &amp; sign in</button>
+            <div class="auth-switch" style="margin-top:10px">
+              <button class="btn-link" id="resendBtn" type="button">Send a new
+                code</button>
+            </div>
           </form>
         </div>
         <div class="admin-foot">
@@ -114,6 +130,7 @@
       const { api } = Onti;
       const errBox = document.getElementById('errBox');
       const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
+      const state = { challenge: '' };
       const qs = new URLSearchParams(location.search);
       if (qs.get('expired')) showErr('Your session expired — please sign in again.');
 
@@ -123,32 +140,99 @@
         else if (d.user) showErr('This account is not an administrator. Use the user portal instead.');
       }).catch(() => { });
 
+      async function finish(role) {
+        if (role !== 'admin') {
+          showErr('This account is not an administrator. Use the user portal instead.');
+          try { await api.post('/api/auth/logout', {}); } catch (_) { }
+          document.getElementById('codeForm').style.display = 'none';
+          document.getElementById('adminForm').style.display = 'block';
+          return;
+        }
+        location.href = '/admin';
+      }
+
       document.getElementById('adminForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         errBox.classList.remove('show');
         const btn = document.getElementById('signBtn');
         btn.disabled = true;
         try {
-          const r = await api.post('/api/auth/login', {
-            username: document.getElementById('fUser').value.trim(),
+          const r = await api.post('/api/auth/signin/start', {
+            identifier: document.getElementById('fUser').value.trim(),
             password: document.getElementById('fPass').value,
           });
-          if (r.user && r.user.role !== 'admin') {
-            showErr('This account is not an administrator. Use the user portal instead.');
-            // log them back out of the admin surface
-            try { await api.post('/api/auth/logout', {}); } catch (_) { }
+          if (r.status === 'bind_required') {
+            showErr('This account must first confirm an e-mail address in the '
+              + 'user portal (/login).');
             btn.disabled = false;
             return;
           }
-          location.href = '/admin';
+          state.challenge = r.challenge_id;
+          document.getElementById('otpEmail').textContent = r.email_masked;
+          document.getElementById('adminForm').style.display = 'none';
+          document.getElementById('codeForm').style.display = 'block';
+          document.getElementById('fCode').focus();
+          startCooldown();
+          if (r.debug_code) document.getElementById('fCode').value = r.debug_code;
         } catch (ex) {
-          if (ex.status === 0) {
-            showErr('Cannot reach the server. Check your connection, VPN or '
-              + 'firewall, then reload this page and try again.');
-          } else {
-            showErr(ex.message);
-          }
+          showErr(ex.status === 0
+            ? 'Cannot reach the server. Check your connection and try again.'
+            : ex.message);
+        } finally {
           btn.disabled = false;
+        }
+      });
+
+      document.getElementById('codeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.classList.remove('show');
+        const btn = document.getElementById('codeBtn');
+        btn.disabled = true;
+        try {
+          const r = await api.post('/api/auth/signin/verify', {
+            challenge_id: state.challenge,
+            code: document.getElementById('fCode').value.trim(),
+          });
+          await finish(r.user ? r.user.role : '');
+        } catch (ex) {
+          showErr(ex.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      let timer = null;
+      function startCooldown() {
+        const btn = document.getElementById('resendBtn');
+        let left = 60;
+        btn.disabled = true;
+        btn.textContent = 'Send a new code (60s)';
+        clearInterval(timer);
+        timer = setInterval(() => {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = 'Send a new code';
+          } else {
+            btn.textContent = 'Send a new code (' + left + 's)';
+          }
+        }, 1000);
+      }
+
+      document.getElementById('resendBtn').addEventListener('click', async () => {
+        if (!state.challenge) return;
+        errBox.classList.remove('show');
+        try {
+          const r = await api.post('/api/auth/otp/resend', {
+            challenge_id: state.challenge,
+          });
+          if (r.challenge_id) state.challenge = r.challenge_id;
+          document.getElementById('otpEmail').textContent = r.email_masked;
+          startCooldown();
+          if (r.debug_code) document.getElementById('fCode').value = r.debug_code;
+        } catch (ex) {
+          showErr(ex.message);
         }
       });
     })();

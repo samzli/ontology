@@ -127,7 +127,12 @@ another.
 
 Core tables (selection):
 
-* `users` — accounts, PBKDF2 hashes, roles
+* `users` — accounts, PBKDF2 hashes, roles, e-mail address + verified flag,
+  `password_changed_at` (rotation clock)
+* `password_history` — one row per password ever set, kept 24 months;
+  reuse is rejected by hash comparison
+* `email_otp` — mail challenges: purpose, address, `SHA-256(id:code)`,
+  payload for the verify step, TTL, attempts, `consumed_at`
 * `sessions` — session tokens (signed + stored)
 * `revoked_sessions` — tokens revoked by logout (checked before use)
 * `ontology_packs` — one row per ontology (see origin note below)
@@ -819,6 +824,43 @@ tables through Data centre, or use the pack's own Dashboard metrics.
 
 ## 8. Security, deployment and performance
 
+* **Two-factor authentication.** `modules/auth.py` owns the credential and
+  password policy, `modules/otp.py` the challenges, `modules/mailer.py` the
+  transport. `POST /api/auth/signup/start` validates the address and the
+  password, hashes the password into the challenge payload and mails a code
+  — no `users` row exists yet. `/signup/verify` consumes the code and calls
+  `auth.register_hashed`, which derives the username from the address
+  (`alice@example.com` → `alice`, `-2` on collision) and writes the account
+  plus its first `password_history` row in one transaction.
+  `POST /api/auth/signin/start` checks the password only and returns
+  `otp_required`; `/signin/verify` consumes the code and only then calls
+  `auth.start_session`, so no cookie exists between the two steps. Legacy
+  accounts without an address get `bind_required` and a 15-minute
+  HMAC-signed token; `/api/auth/bind/start|verify` attach and confirm the
+  address before the session is issued.
+* **Password policy and rotation.** `auth.validate_password_policy` enforces
+  length ≥ 10, at least three of four character classes, and
+  `auth.password_reused` compares against `password_history` inside a
+  24-month window. `auth.password_state` exposes
+  `password_days_left`, `password_warning` (≤ 14 days) and
+  `password_expired`; `/api/auth/me` returns it, the portal renders a banner
+  and `/account/password` performs the rotation. Administrators resetting a
+  password go through the same validation.
+* **Verification challenges.** `modules/otp.py` stores
+  `SHA-256(challenge_id:code)` (never the code), enforces a 10-minute TTL, a
+  60-second resend cooldown, five attempts and single use. A resend retires
+  the previous challenge first, so an older e-mail stops working. Because
+  the instance that sends a code may not be the one that verifies it, each
+  challenge is mirrored to `shared/otp/<sha256-of-challenge>.json` in the
+  same durable store as accounts; `snapshot.delete_otp` removes the mirror
+  on success or supersede. Attempts are committed before the 400 is raised,
+  so a retry cannot reset the budget (the request wrapper would otherwise
+  roll the increment back).
+* **Mail transport.** `modules/mailer.py` prefers `RESEND_API_KEY`, falls
+  back to `SMTP_HOST` (+ `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
+  `SMTP_SECURITY`), and answers 503 when neither is configured — never a
+  silent success. `ONTI_MAIL_ECHO=1` prints the code and returns
+  `debug_code` for local development only.
 * Sessions are HttpOnly cookies whose value is an HMAC-signed JSON
   payload (`auth.issue_session_token`). The payload holds the user id,
   the expiry and a random nonce (so two logins in the same second never
@@ -850,13 +892,14 @@ tables through Data centre, or use the pack's own Dashboard metrics.
   password it re-reads the stored record (`_refresh_login_row`): an
   administrator who reset a password or disabled an account on another
   instance is therefore honoured at the next sign-in.
-* `/api/auth/status` publishes `ephemeral`, `snapshot_sync` and
+* `/api/auth/status` publishes `ephemeral`, `snapshot_sync`,
   `accounts_persist` (true when the host is persistent *or* a durable
-  account store is configured). `POST /api/auth/register` returns
-  `{"user": {...}}`; on an ephemeral host without a store it answers
-  `503` with an actionable message instead of creating a phantom
-  account, and the sign-in page hides the registration switch.
-  Unknown usernames return the stable
+  account store is configured), `mail_configured` and the password policy.
+  `POST /api/auth/signup/start` returns the challenge shape
+  (`challenge_id`, `email_masked`, `expires_in`, `provider`); on an
+  ephemeral host without a store it answers `503` with an actionable
+  message instead of creating a phantom account, and the sign-in page hides
+  the registration switch. Unknown usernames return the stable
   `Invalid username or password.` message; the per-instance demo hint was
   removed now that accounts are durable.
 * `/api/admin/*` requires the admin role; the admin UI is a separate page
@@ -931,7 +974,8 @@ python tests\verify_t9.py                   :: lapse pack end to end
 python tests\verify_giteam.py               :: regular team account vs admin routes
 python tests\verify_permissions.py          :: registration everywhere + ontology
                                             :: creation rights & admin visibility
-python tests\verify_login.py                :: 30 checks — auth flows
+python tests\verify_login.py                :: 30 checks — sign-in gate + 2FA contract
+python tests\verify_auth2fa.py              :: 83 checks — offline, throwaway DB
 python tests\verify_model_endpoints.py      :: 65 checks — model CRUD + diagnostics
 python tests\verify_ontology_value.py       :: 14 scenarios; writes the value report
 ```
@@ -1079,7 +1123,8 @@ grounded in the full ontology, once grounded in raw uploaded tables):
    to outcomes, and rule templates that compose them into answers.
 
 **Regression suites after all changes:**
-`tests/verify_login.py`24/24 ✅ ·`tests/verify_model_endpoints.py`
+`tests/verify_login.py` 30/30 ✅ · `tests/verify_auth2fa.py` 83/83 ✅ ·
+`tests/verify_model_endpoints.py`
 
 65/65 ✅. No pre-existing regressions introduced.
 

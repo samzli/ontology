@@ -32,13 +32,15 @@ XLSX = (
     / "Lapse_mockdata_v3 - Scenario Demo.xlsx"
 )
 
+import _auth_client as auth_client  # noqa: E402
+
 from modules.db import get_conn  # noqa: E402
 
 
 def ensure_synthetic_pack(base: str = BASE) -> tuple[int, bool]:
     """Return ``(pack_id, created)`` — creating the pack when missing."""
     with httpx.Client(base_url=base, timeout=120) as c:
-        c.post("/api/auth/login", json=ADMIN).raise_for_status()
+        auth_client.login(c, ADMIN["username"], ADMIN["password"])
         packs = c.get("/api/admin/packs").json().get("packs", [])
         pk = next((p for p in packs if p["slug"] == PACK_SLUG), None)
         if pk:
@@ -97,5 +99,5 @@ def ensure_synthetic_pack(base: str = BASE) -> tuple[int, bool]:
 def delete_pack(base: str = BASE, pack_id: int = 0) -> None:
     """Remove a helper-created pack (admin API, cascades its content)."""
     with httpx.Client(base_url=base, timeout=60) as c:
-        c.post("/api/auth/login", json=ADMIN).raise_for_status()
+        auth_client.login(c, ADMIN["username"], ADMIN["password"])
         c.delete(f"/api/admin/packs/{pack_id}").raise_for_status()

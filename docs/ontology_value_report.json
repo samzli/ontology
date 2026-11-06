@@ -13,8 +13,8 @@
       "identity": 0
     },
     "without": {
-      "chars": 103,
-      "numbers": 4,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 0,
@@ -36,21 +36,21 @@
     },
     "with_source": "rules",
     "with_chars": 374,
-    "without_chars": 103,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "## VNB in Apr 2025\n\n| Metric | Apr 2025 | Mar 2025 | Delta |\n|---|---: | ---:|---: |\n| Total APE | $6.87M | $6.40M | +0.48 $M |\n| **Total VNB** | **$1.32M** | $1.22M | **+0.10 $M** |\n| VNB margin | 19.2% | 19.1% | +0.12 pp |\n| Agency VNB | $0.59M | $0.51M | +0.07 $M |\n| Agency share | 45% | 42% | — |\n\nMoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity",
-    "without_answer": "Total **VNB** in April 2025 was **$1.32M** (from the `vnb_monthly` table: 2025-04 total VNB = 1.32055)."
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Level",
     "question": "What was the APE in January 2025?",
     "with": {
-      "chars": 122,
-      "numbers": 4,
+      "chars": 126,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 0,
@@ -59,10 +59,10 @@
       "identity": 0
     },
     "without": {
-      "chars": 176,
-      "numbers": 4,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
-      "rows_in_tables": 2,
+      "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
       "reconciled": 0,
@@ -80,16 +80,16 @@
       "data_linkage": 0,
       "explainability": 0
     },
-    "with_source": "ai",
-    "with_chars": 122,
-    "without_chars": 176,
+    "with_source": "none",
+    "with_chars": 126,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
-    "with_answer": "The **Total APE** in January 2025 was **$6.31M**.\n\nSource: `vnb_monthly` table, month `2025-01`, `total_ape` = 6.30719 $M.",
-    "without_answer": "The total APE in **January 2025** was **$6.31M**.\n\n| Month | Total APE |\n|---|---|\n| 2025-01 | $6.31M |\n\nThis comes directly from the `vnb_monthly` table (Total APE = 6.30719)."
+    "with_answer": "No ontology rule matched, and no AI model is configured to answer with the ontology. Try one of the suggested questions below.",
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Level",
@@ -105,10 +105,10 @@
       "identity": 0
     },
     "without": {
-      "chars": 832,
-      "numbers": 13,
-      "tables": true,
-      "rows_in_tables": 7,
+      "chars": 235,
+      "numbers": 0,
+      "tables": false,
+      "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
       "reconciled": 0,
@@ -121,21 +121,21 @@
       "explainability": 0
     },
     "without_score": {
-      "business_depth": 3,
+      "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 4,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 97,
-    "without_chars": 832,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "Overall **VNB margin** is **19.5%**. However the **mix-implied margin is 19.5%** → a $-0.00M gap.",
-    "without_answer": "The company's overall VNB margin as of the latest month (**June 2025**) is **19.51%**.\n\nHere's how it has moved month by month across the available data (from the `vnb_monthly` table):\n\n| Month | Overall VNB Margin | MoM Change (pp) |\n|---|---|---|\n| Jan 2025 | 19.14% | — |\n| Feb 2025 | 19.19% | +0.05 |\n| Mar 2025 | 19.09% | -0.10 |\n| Apr 2025 | 19.21% | +0.12 |\n| May 2025 | 19.12% | -0.09 |\n| Jun 2025 | 19.51% | +0.39 |\n\n**Key observations:**\n- The margin fluctuated within a narrow band (19.09%–19.51%) across the six months.\n- It hit its low point in **March (19.09%)** and its high point in **June (19.51%)**.\n- Net movement from January to June: **+0.37 percentage points**, driven primarily by the strong June increase (+0.39pp vs May), which aligns with the June narrative of higher Agency active agents and productivity."
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Movement",
@@ -151,10 +151,10 @@
       "identity": 0
     },
     "without": {
-      "chars": 401,
-      "numbers": 7,
-      "tables": true,
-      "rows_in_tables": 3,
+      "chars": 235,
+      "numbers": 0,
+      "tables": false,
+      "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
       "reconciled": 0,
@@ -169,19 +169,19 @@
     "without_score": {
       "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 2,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 78,
-    "without_chars": 401,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "Only one month (Jan 2025) is available — no previous month to compare against.",
-    "without_answer": "Based on the uploaded data, here is how the **VNB margin** compares between **June 2025** and **May 2025**:\n\n| Month | VNB Margin |\n|---|---|\n| 2025-05 | 19.12% |\n| **2025-06** | **19.51%** |\n\n**Change:** +0.39 percentage points (up from 19.12% to 19.51%).\n\nThis is the largest monthly margin in the six-month window (Jan–Jun 2025). The margin range across the period was 19.09% (Mar) to 19.51% (Jun)."
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Movement",
@@ -197,14 +197,14 @@
       "identity": 1
     },
     "without": {
-      "chars": 2026,
-      "numbers": 40,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 2,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
-      "identity": 1
+      "identity": 0
     },
     "with_score": {
       "business_depth": 2,
@@ -213,21 +213,21 @@
       "explainability": 1
     },
     "without_score": {
-      "business_depth": 1,
+      "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 2,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 729,
-    "without_chars": 2026,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "## Jun 2025 VNB change vs May 2025\nTotal VNB moved $1.28M → $1.45M (+13.0%, +0.167 $M).\n\nUsing the identity **VNB = Active agents × Avg productivity × Weighted margin**, the change splits with no residual:\n\n| Driver | Effect on VNB ($M) |\n| --- | ---: |\n| Active-agent effect | +0.056 |\n| Productivity effect | +0.074 |\n| Mix / margin effect | +0.037 |\n| **Total** | **+0.167** |\n\nPer channel:\n- **Agency** +0.153 $M = agents +0.047 + productivity +0.069 + mix/margin +0.037\n- **Banca** +0.010 $M = agents +0.006 + productivity +0.004 + mix/margin +0.000\n- **Brokerage** +0.004 $M = agents +0.003 + productivity +0.001 + mix/margin +0.000\nVNB up strongly: more active Agency agents, higher productivity and richer Unit-Linked mix",
-    "without_answer": "The VNB margin has moved upward overall. Let me trace the movement using the data you uploaded.\n\n**Movement in overall VNB margin (from `vnb_monthly`):**\n- 2025-01: 19.14%\n- 2025-02: 19.19%\n- 2025-03: 19.09% (low point)\n- 2025-04: 19.21%\n- 2025-05: 19.12%\n- 2025-06: 19.51% (current/high point)\n\nFrom the **previous month (May → June)**, margin rose from **19.12% to 19.51%**, a +0.39 percentage-point increase.\n\n**Why the movement occurred (from the raw data):**\n\n1. **Agency channel margin improved.** Agency's blended VNB margin rose from **17.6%** in January (`channel_monthly` row for CH001/2025-01) to **18.7%** in June (`channels` table, Agency blended margin; also confirmed by 0.714 / 3.822 in June `vnb_monthly`). Banca stayed flat (~21.8%) and Brokerage stayed flat (~17.8%).\n\n2. **Product mix shifted toward higher-margin products within Agency.** In `mix_monthly`, the Agency's weighted margin component (product mix × product margin) rose from **4.41%** in January 2025 to **4.67%** in June 2025. This reflects a shift toward Unit-Linked (25% margin) and Participating Life (18%) and away from lower-margin Term Life (10%).\n\n   - January mix sample: Term Life 14%, Participating 68%, Un"
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Movement",
@@ -243,13 +243,13 @@
       "identity": 0
     },
     "without": {
-      "chars": 1663,
-      "numbers": 24,
-      "tables": true,
-      "rows_in_tables": 5,
-      "causal": 2,
+      "chars": 235,
+      "numbers": 0,
+      "tables": false,
+      "rows_in_tables": 0,
+      "causal": 0,
       "stats": 0,
-      "reconciled": 1,
+      "reconciled": 0,
       "identity": 0
     },
     "with_score": {
@@ -259,21 +259,21 @@
       "explainability": 1
     },
     "without_score": {
-      "business_depth": 3,
-      "logical_rigour": 2,
-      "data_linkage": 4,
-      "explainability": 1
+      "business_depth": 0,
+      "logical_rigour": 0,
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 414,
-    "without_chars": 1663,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "## VNB in Jun 2025\n\n| Metric | Jun 2025 | May 2025 | Delta |\n|---|---: | ---:|---: |\n| Total APE | $7.42M | $6.70M | +0.72 $M |\n| **Total VNB** | **$1.45M** | $1.28M | **+0.17 $M** |\n| VNB margin | 19.5% | 19.1% | +0.39 pp |\n| Agency VNB | $0.71M | $0.56M | +0.15 $M |\n| Agency share | 49% | 44% | — |\n\nMoM VNB: **+13.0%**. VNB up strongly: more active Agency agents, higher productivity and richer Unit-Linked mix",
-    "without_answer": "## Agency VNB growth in June 2025\n\nAgency VNB rose **+27.3%** (+$0.153M) from $0.561M in May to $0.714M in June. The narrative driver in the data confirms the cause: **\"VNB up: higher Agency active count and productivity\"** — but the data also shows a third contributing factor: an improved blended VNB margin.\n\nThe change decomposes exactly (no residual):\n\n| Driver | Contribution to VNB | Explanation |\n|---|---|---|\n| **Active agents** | **+$0.061M** | Active count rose ~352 → 390 (from ~70% to ~78% of registered). More selling capacity. |\n| **Productivity** | **+$0.055M** | Avg productivity per active agent improved ~$9.0K → $9.8K (+8.9%). Higher output per head. |\n| **Margin / product mix** | **+$0.037M** | Agency blended VNB margin improved 17.71% → 18.68% (+0.97 pp), likely from richer Unit-Linked mix (see `mix_monthly`). |\n| **Total** | **+$0.153M** | Matches the June Agency VNB increase. |\n\n### Why did these change?\n- **Active agents**: Agency activation improved (June active ratio 78% vs 68% in Jan, and up from May). The `agent_monthly` data shows a clear ramp in overall productivity and active participation toward June.\n- **Productivity**: The `channels` table shows June Age"
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Mix",
@@ -289,14 +289,14 @@
       "identity": 0
     },
     "without": {
-      "chars": 819,
-      "numbers": 21,
-      "tables": true,
-      "rows_in_tables": 5,
-      "causal": 1,
+      "chars": 235,
+      "numbers": 0,
+      "tables": false,
+      "rows_in_tables": 0,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
-      "identity": 1
+      "identity": 0
     },
     "with_score": {
       "business_depth": 0,
@@ -305,21 +305,21 @@
       "explainability": 1
     },
     "without_score": {
-      "business_depth": 3,
+      "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 4,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 318,
-    "without_chars": 819,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "Product mix per channel:\n\n- **Agency**: Term Life: 8.0%, Participating Life: 66.0%, Unit-Linked: 21.0%, Universal Life: 5.0%- **Banca**: Term Life: 0.0%, Participating Life: 0.0%, Unit-Linked: 0.0%, Universal Life: 0.0%- **Brokerage**: Term Life: 0.0%, Participating Life: 0.0%, Unit-Linked: 0.0%, Universal Life: 0.0%",
-    "without_answer": "Agency VNB margin is a **product-mix-weighted average**: each product’s VNB margin × its share of Agency APE.\n\nFrom the uploaded `mix_monthly` data (Agency / CH001):\n\n| Product | VNB Margin | Typical Mix | Contribution to Agency Margin |\n|---|---:|---:|---:|\n| Participating Life | 18% | ~66–68% | **~12.2 pp** — dominant driver |\n| Unit-Linked | 25% | ~13–21% | ~3.2–5.3 pp — high-margin lever |\n| Term Life | 10% | ~8–14% | ~0.8–1.4 pp |\n| Universal Life | 15% | ~5% | ~0.75 pp |\n\nSumming these weighted components gives the Agency blended margin:\n- **Jan 2025: ~17.6%**\n- **Jun 2025: ~18.7%**\n\nSo the Agency VNB margin is driven mainly by **Participating Life** (large mix, mid-high margin), with **Unit-Linked** as the key upside driver — its richer mix in June is what lifted the Agency margin from 17.6% to 18.7%."
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Mix",
@@ -335,11 +335,11 @@
       "identity": 0
     },
     "without": {
-      "chars": 279,
-      "numbers": 5,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 1,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
       "identity": 0
@@ -354,35 +354,35 @@
       "business_depth": 0,
       "logical_rigour": 0,
       "data_linkage": 0,
-      "explainability": 1
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 309,
-    "without_chars": 279,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "The highest-margin product is **Unit-Linked** at **25.0%** (commission 25.0%).\n\n| Product | Margin | Commission | Expense |\n|---|---|---|---|\n| Term Life | 10.0% | 15.0% | 10.0% |\n| Participating Life | 18.0% | 20.0% | 12.0% |\n| Unit-Linked | 25.0% | 25.0% | 15.0% |\n| Universal Life | 15.0% | 22.0% | 14.0% |",
-    "without_answer": "The product with the most VNB weight is **Participating Life**:\n\n- **Mix weight (Agency):** 66.0%\n- **VNB margin:** 18.0%\n\nIt contributes the largest weighted margin component (~11.9 pp of the blended margin). Unit-Linked has a higher margin (25.0%) but a smaller weight (21.0%)."
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Cohort",
     "question": "Which agent cohort is dragging VNB down?",
     "with": {
-      "chars": 555,
-      "numbers": 5,
+      "chars": 126,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 1,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
       "identity": 0
     },
     "without": {
-      "chars": 550,
-      "numbers": 4,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 0,
@@ -394,7 +394,7 @@
       "business_depth": 0,
       "logical_rigour": 0,
       "data_linkage": 0,
-      "explainability": 1
+      "explainability": 0
     },
     "without_score": {
       "business_depth": 0,
@@ -402,16 +402,16 @@
       "data_linkage": 0,
       "explainability": 0
     },
-    "with_source": "ai",
-    "with_chars": 555,
-    "without_chars": 550,
+    "with_source": "none",
+    "with_chars": 126,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
-    "with_answer": "The **Inactive agent cohort** is the drag. In the latest month, inactive agents have **average productivity of $0** vs **$9.8K** for active agents (agents table, `status` = Inactive). They contribute no APE, hence no VNB.\n\nThis matches the monthly narrative: VNB softened in Mar-2025 due to *fewer active agents and lower productivity* (`vnb_monthly.narrative`), and Jun-2025 growth came from *higher Agency active count and productivity*.\n\n**Reasoning path:** Agent Status → Active Agent Count → Agency APE → Agency VNB → Total VNB (KPI Linkage E12–E19).",
-    "without_answer": "Based on the uploaded data, the **Inactive agent cohort** is the one dragging VNB down:\n\n- **Active agents**: average productivity **$9.8K** per agent\n- **Inactive agents**: average productivity **$0** (they generate no APE/VNB)\n\nInactive agents also account for **4,853 tenure-months** vs **17,543** for active agents, meaning a meaningful portion of the salesforce is not producing.\n\nThe data does **not** include a productivity/VNB breakdown by churn-risk or certification cohort, so I cannot quantify those cohorts' drag from the uploaded tables."
+    "with_answer": "No ontology rule matched, and no AI model is configured to answer with the ontology. Try one of the suggested questions below.",
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Cohort",
@@ -427,8 +427,8 @@
       "identity": 0
     },
     "without": {
-      "chars": 868,
-      "numbers": 7,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
       "causal": 0,
@@ -446,18 +446,18 @@
       "business_depth": 0,
       "logical_rigour": 0,
       "data_linkage": 0,
-      "explainability": 1
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 1874,
-    "without_chars": 868,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "Agents at **High churn risk**: **Agent:AG0002 (Agency), Agent:AG0012 (Agency), Agent:AG0016 (Agency), Agent:AG0024 (Agency), Agent:AG0027 (Agency), Agent:AG0031 (Agency), Agent:AG0035 (Agency), Agent:AG0037 (Agency), Agent:AG0048 (Agency), Agent:AG0049 (Agency), Agent:AG0054 (Agency), Agent:AG0056 (Agency), Agent:AG0059 (Agency), Agent:AG0063 (Agency), Agent:AG0080 (Agency), Agent:AG0084 (Agency), Agent:AG0085 (Agency), Agent:AG0086 (Agency), Agent:AG0087 (Agency), Agent:AG0091 (Agency), Agent:AG0096 (Agency), Agent:AG0098 (Agency), Agent:AG0103 (Agency), Agent:AG0113 (Agency), Agent:AG0114 (Agency), Agent:AG0117 (Agency), Agent:AG0118 (Agency), Agent:AG0131 (Agency), Agent:AG0145 (Agency), Agent:AG0153 (Agency), Agent:AG0166 (Agency), Agent:AG0167 (Agency), Agent:AG0177 (Agency), Agent:AG0191 (Agency), Agent:AG0199 (Agency), Agent:AG0206 (Agency), Agent:AG0210 (Agency), Agent:AG0228 (Agency), Agent:AG0235 (Agency), Agent:AG0239 (Agency), Agent:AG0243 (Agency), Agent:AG0246 (Agency), Agent:AG0247 (Agency), Agent:AG0255 (Agency), Agent:AG0264 (Agency), Agent:AG0272 (Agency), Agent:AG0288 (Agency), Agent:AG0303 (Agency), Agent:AG0312 (Agency), Agent:AG0317 (Agency), Agent:AG0318 (Age",
-    "without_answer": "The uploaded data does **not** include a pre-aggregated comparison of high vs. low churn-risk agents. The `agents`, `agent_master`, and `agent_monthly` tables all contain a `churn_risk` field (High / Low / Medium), but no group-level statistics (e.g., average productivity, tenure, active ratio, VNB contribution) are provided by churn-risk cohort in the raw data.\n\nFrom the sample rows only:\n- **High churn-risk** example: AG0002 — tenure 15 months, productivity $12K, All Products, Active.\n- **Low churn-risk** example: AG0003 — tenure 13 months, productivity $10K, All Products, Active.\n\nThese are illustrative rows, not cohort aggregates, so they cannot be used to draw a reliable conclusion. To compare the cohorts properly, we would need to group the full 500-agent table by `churn_risk` and compute averages — that breakdown is not present in the uploaded data."
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Trend",
@@ -473,11 +473,11 @@
       "identity": 0
     },
     "without": {
-      "chars": 1892,
-      "numbers": 40,
-      "tables": true,
-      "rows_in_tables": 7,
-      "causal": 1,
+      "chars": 235,
+      "numbers": 0,
+      "tables": false,
+      "rows_in_tables": 0,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
       "identity": 0
@@ -489,113 +489,113 @@
       "explainability": 1
     },
     "without_score": {
-      "business_depth": 3,
+      "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 4,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 613,
-    "without_chars": 1892,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
     "with_answer": "## VNB monthly trend (Jan 2025 – Jun 2025)\n| Month | Total APE ($M) | Total VNB ($M) | MoM VNB | Agency VNB ($M) | Agency share |\n| --- | ---: | ---: | ---: | ---: | ---: |\n| Jan 2025 | 6.31 | 1.21 | +0.0% | 0.50 | 42% |\n| Feb 2025 | 6.53 | 1.25 | +3.8% | 0.54 | 43% |\n| Mar 2025 | 6.40 | 1.22 | -2.5% | 0.51 | 42% |\n| Apr 2025 | 6.87 | 1.32 | +8.1% | 0.59 | 45% |\n| May 2025 | 6.70 | 1.28 | -3.0% | 0.56 | 44% |\n| Jun 2025 | 7.42 | 1.45 | +13.0% | 0.71 | 49% |\nLatest: VNB up strongly: more active Agency agents, higher productivity and richer Unit-Linked mix\nTotal VNB moved from $1.21M to $1.45M over 6 months.",
-    "without_answer": "The six-month VNB trend (Jan–Jun 2025) is driven primarily by the **Agency channel**, through a combination of **more active agents**, **higher productivity**, and a **slightly richer product mix**.\n\n### Overall VNB trend\n| Month | Total VNB | MoM change |\n|---|---|---|\n| 2025-01 | $1.21M | — |\n| 2025-02 | $1.25M | +3.8% |\n| 2025-03 | $1.22M | -2.5% |\n| 2025-04 | $1.32M | +8.1% |\n| 2025-05 | $1.28M | -3.0% |\n| 2025-06 | $1.45M | +13.0% |\n\nNet change: **+$0.24M** (+20%).\n\n### Main driver: Agency channel\n- Agency VNB grew from **$0.50M** in Jan to **$0.71M** in Jun, a **+42%** increase.\n- Agency share of total VNB rose from **41.7%** to **49.3%**.\n- Agency contributed **~$0.21M** of the **$0.24M** total VNB increase — i.e. nearly all net growth came from Agency.\n\n### Underlying levers\n1. **More active agents**  \n   Agency active agents rose from **340** in Jan to **390** in Jun (+15%).\n\n2. **Higher productivity per active agent**  \n   Implied Agency productivity rose from **~$8.4K** to **~$9.8K** APE per active agent (+17%).\n\n3. **Improved Agency VNB margin / product mix**  \n   Agency weighted VNB margin improved from **17.6%** in Jan to **18.7%** in Jun, helped by a richer mix towar"
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Trend",
     "question": "Is the VNB growth sustainable?",
     "with": {
-      "chars": 1167,
-      "numbers": 25,
+      "chars": 126,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 1,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
       "identity": 0
     },
     "without": {
-      "chars": 1852,
-      "numbers": 14,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 1,
+      "causal": 0,
       "stats": 0,
-      "reconciled": 1,
+      "reconciled": 0,
       "identity": 0
     },
     "with_score": {
       "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 1,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "without_score": {
-      "business_depth": 1,
-      "logical_rigour": 2,
-      "data_linkage": 2,
-      "explainability": 1
+      "business_depth": 0,
+      "logical_rigour": 0,
+      "data_linkage": 0,
+      "explainability": 0
     },
-    "with_source": "ai",
-    "with_chars": 1167,
-    "without_chars": 1852,
+    "with_source": "none",
+    "with_chars": 126,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
-    "with_answer": "Based on the knowledge base, the recent VNB growth is **not guaranteed to be sustainable** — it depends on Agency operational levers that have been volatile.\n\n**What drove the trend (Jun 2025 vs Jan 2025):**\n- Total VNB: $1.21M → $1.45M (+20%)\n- Agency VNB: $0.50M → $0.71M (+42%); Agency share rose from 42% to 49%\n- Drivers: more active Agency agents (340 → 390), higher productivity ($8K → $10K), and a richer Unit-Linked mix (13% → 21%, margin 25%)\n\n**Sustainability risks:**\n- **Agency churn is 12.6%** — the highest of all channels (Banca/Brokerage 0%)\n- 110 of 500 Agency agents are **Inactive**; inactive agents have **$0 productivity** (agents table)\n- Monthly VNB already dipped in Mar (-2.5%) and May (-3.0%) when active agents/productivity eased (`vnb_monthly.narrative`)\n\n**Reasoning path:** Agent Status → Active Agent Count → Agency APE → Agency VNB → Total VNB (KPI Linkage E12–E19).\n\nSo growth is **volume/productivity-driven, not structural** — it can reverse if churn rises or productivity/mix reverts. The scenario analysis confirms that reaching higher VNB targets requires explicit levers: e.g., active agents 420 vs 390 and productivity uplift.",
-    "without_answer": "Based on the uploaded data, the recent VNB growth is **real but not guaranteed to be sustainable**. Here’s what the numbers show:\n\n**What is driving growth (supporting sustainability):**\n- Total VNB rose from **$1.21M** (Jan-2025) to **$1.45M** (Jun-2025), with the strongest jump in June (**+13.0% MoM**).\n- The June surge was driven by the **Agency channel**:\n  - Active agents increased to **390** (from 340 in Jan).\n  - Average productivity improved to **~$10K** per active agent (from ~$8K in Jan).\n  - Product mix shifted toward higher-margin **Unit-Linked** (narrative: “richer Unit-Linked mix”).\n- These are operational levers (active headcount, productivity, product mix) that management can influence.\n\n**What threatens sustainability:**\n- **Concentration risk:** Agency’s share of VNB rose from **41.7%** (Jan) to **49.3%** (Jun). Banca and Brokerage were essentially flat, so growth is increasingly dependent on one channel.\n- **Churn/attrition risk:** Agency has a **12.6% churn rate**, and the data contains agents labeled **High churn risk** (though the exact count is not provided in the uploaded tables). Inactive agents produce **$0** productivity, so any attrition directly reduces"
+    "with_answer": "No ontology rule matched, and no AI model is configured to answer with the ontology. Try one of the suggested questions below.",
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Coverage",
     "question": "Do the channel numbers add up to the company total?",
     "with": {
-      "chars": 874,
-      "numbers": 19,
-      "tables": true,
-      "rows_in_tables": 4,
+      "chars": 126,
+      "numbers": 0,
+      "tables": false,
+      "rows_in_tables": 0,
       "causal": 0,
       "stats": 0,
-      "reconciled": 1,
+      "reconciled": 0,
       "identity": 0
     },
     "without": {
-      "chars": 850,
-      "numbers": 15,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 1,
+      "causal": 0,
       "stats": 0,
-      "reconciled": 2,
+      "reconciled": 0,
       "identity": 0
     },
     "with_score": {
-      "business_depth": 2,
-      "logical_rigour": 2,
-      "data_linkage": 2,
-      "explainability": 1
+      "business_depth": 0,
+      "logical_rigour": 0,
+      "data_linkage": 0,
+      "explainability": 0
     },
     "without_score": {
-      "business_depth": 1,
-      "logical_rigour": 2,
-      "data_linkage": 2,
-      "explainability": 1
+      "business_depth": 0,
+      "logical_rigour": 0,
+      "data_linkage": 0,
+      "explainability": 0
     },
-    "with_source": "ai",
-    "with_chars": 874,
-    "without_chars": 850,
+    "with_source": "none",
+    "with_chars": 126,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
-    "with_answer": "Yes, they reconcile exactly. The gap is **$0.00M (0.0pp)**.\n\n**Channel sums (from `channels` table) vs Company totals:**\n\n| Metric | Agency | Banca | Brokerage | Channel Σ | Company KPI | Gap |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n| APE ($M) | 3.82 | 2.33 | 1.27 | **7.42** | 7.42 | 0.00 |\n| VNB ($M) | 0.71 | 0.51 | 0.23 | **1.45** | 1.45 | 0.00 |\n| Margin (%) | 18.7% | 21.8% | 17.8% | **19.5%**¹ | 19.5% | 0.0pp |\n\n¹ Derived margin = Total VNB ÷ Total APE = 1.45 / 7.42 = 19.5%.\n\n**Reasoning path:** Channel APE/VNB roll up via edges [E34]/[E33] and E1/E2 → TotalAPE/TotalVNB → KPI (`kpi` table). The computed metrics `derived_ape`, `derived_vnb`, `gap_vnb`, and `gap_margin` confirm no reconciliation gap.\n\nThis matches the monthly aggregation logic (`channel_monthly_aggregates_vnb_monthly`): summing channels per month equals the company VNB Monthly rows.",
-    "without_answer": "Yes, they do. The channel-level figures for the latest month (June 2025) reconcile perfectly with the company totals.\n\n**Channel totals (`channels` table):**\n- **Channel APE sum**: $3.82M (Agency) + $2.33M (Banca) + $1.27M (Brokerage) = **$7.42M**\n- **Channel VNB sum**: $0.71M (Agency) + $0.51M (Banca) + $0.23M (Brokerage) = **$1.45M**\n\n**Company totals (`kpi` table, 2025-06):**\n- **Total APE**: $7.423M\n- **Total VNB**: $1.44801M\n\nThe slight difference (e.g., $1.45M vs $1.44801M, or $7.42M vs $7.423M) is purely due to how the displayed sample rows round the decimals. The authoritative sum aggregates in the `channels` table are 7.423 for APE and 1.448 for VNB, which exactly match the company KPI and the June row in `vnb_monthly` (Total APE 7.423, Total VNB 1.44801). \n\nSo, the channel numbers fully add up to the company total for June 2025."
+    "with_answer": "No ontology rule matched, and no AI model is configured to answer with the ontology. Try one of the suggested questions below.",
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   },
   {
     "dimension": "Coverage",
@@ -611,14 +611,14 @@
       "identity": 0
     },
     "without": {
-      "chars": 2852,
-      "numbers": 12,
+      "chars": 235,
+      "numbers": 0,
       "tables": false,
       "rows_in_tables": 0,
-      "causal": 1,
+      "causal": 0,
       "stats": 0,
       "reconciled": 0,
-      "identity": 1
+      "identity": 0
     },
     "with_score": {
       "business_depth": 0,
@@ -627,20 +627,20 @@
       "explainability": 0
     },
     "without_score": {
-      "business_depth": 1,
+      "business_depth": 0,
       "logical_rigour": 0,
-      "data_linkage": 2,
-      "explainability": 1
+      "data_linkage": 0,
+      "explainability": 0
     },
     "with_source": "rules",
     "with_chars": 197,
-    "without_chars": 2852,
+    "without_chars": 235,
     "reasoning_steps": 0,
     "findings": 0,
     "tables_joined": 0,
     "reconciled": false,
     "narrative": "",
-    "with_answer": "The ontology is a **graph, not a strict tree** — it links financial KPIs (VNB) to operational drivers (channels, agents, mix) via 53 edges across 4 types (STRUCTURAL, OPERATIONAL, MIX, CROSS_LINK).",
-    "without_answer": "Based on the raw uploaded data, the ontology covers the following areas (I'm interpreting the table structures and the `kpi_linkage` table literally, without inventing additional entities):\n\n## 1. Company-level KPIs\n- **Table `kpi`**: Year, Month, Total APE, Total VNB, Overall VNB Margin\n- **Table `vnb_monthly`**: Monthly company totals — Total APE, Total VNB, VNB Margin, Agency APE/VNB, Agency share, MoM changes, narrative drivers\n\n## 2. Products\n- **Table `products`**: 4 products (Term Life, Participating Life, Unit-Linked, Universal Life) with VNB Margin, Commission Rate, Expense Ratio, Risk Discount Rate\n\n## 3. Distribution Channels\n- **Table `channels`**: 3 channels (Agency, Banca, Brokerage) with Agent Count, Churn Rate, Avg Productivity, Channel APE, Blended VNB Margin, Channel VNB\n- **Table `channel_monthly`**: Monthly per-channel KPIs — Registered/Active agents, Active ratio, Avg productivity, APE, Weighted VNB margin, VNB, MoM change\n\n## 4. Agents (Agency channel only)\n- **Table `agents`**: 500 agents with Tenure, Productivity, Certification, Churn Risk, Status\n- **Table `agent_master`**: Join date, Tenure at Jun-2025, Certification, Churn risk, Base productivity index\n- "
+    "with_answer": "The ontology is a **graph, not a strict tree** — it links financial KPIs (VNB) to operational drivers (channels, agents, mix) via 54 edges across 4 types (STRUCTURAL, OPERATIONAL, MIX, CROSS_LINK).",
+    "without_answer": "No enabled AI model is configured, so the non-ontology answer cannot be generated. The ontology-grounded answer above still works — the rules engine needs no model. Ask an administrator to add a model in Model centre to run both sides."
   }
 ]

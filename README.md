@@ -30,8 +30,8 @@ uploaded tables in Graph studio
 * **Backend:** Python 3.10+ · FastAPI · SQLite (zero external services)
 * **Frontend:** server-rendered Jinja2 pages + vanilla HTML/CSS/JS — no
   build step, no CDN
-* **Auth:** local accounts, PBKDF2 hashes, signed HttpOnly session cookies,
-  role-based portals
+* **Auth:** e-mail accounts, PBKDF2 hashes, two-factor sign-in (password +
+  e-mailed code), signed HttpOnly session cookies, role-based portals
 * **Default URL:** <http://localhost:8010> — or `http://onti.local:8010`
   after the one-line hosts mapping below
 
@@ -54,6 +54,35 @@ python main.py
 `start_server.bat` installs missing dependencies, then starts the
 server. On first launch the database is created automatically under
 `data/onti.db` and the built-in sample pack is seeded.
+
+### E-mail delivery (verification codes)
+
+Sign-up and sign-in both require a six-digit code. Configure **one** of the
+following before starting the server:
+
+```bat
+:: A. Resend (HTTPS API — simplest on Vercel)
+set RESEND_API_KEY=re_...
+set ONTI_MAIL_FROM=Onti <no-reply@your-domain.com>
+
+:: B. Any SMTP relay
+set SMTP_HOST=smtp.example.com
+set SMTP_PORT=587
+set SMTP_USER=...
+set SMTP_PASSWORD=...
+set SMTP_SECURITY=starttls
+set ONTI_MAIL_FROM=no-reply@your-domain.com
+
+:: C. Local debugging only — prints the code to the console and returns
+::    it as `debug_code` in the API response. Never enable this in
+::    production.
+set ONTI_MAIL_ECHO=1
+```
+
+`start_server.bat` sets `ONTI_MAIL_ECHO=1` so a laptop works out of the
+box. With neither Resend nor SMTP configured the API answers **503** and
+the sign-in page says so instead of pretending a code was sent.
+`GET /api/auth/status` reports `mail_configured`.
 
 Open one of the two portals (the root URL `/` forwards to the user
 portal):
@@ -93,6 +122,19 @@ in the local server console and recorded here for the operator:
 | -------- | ----------- |
 | `admin`  | `Onti@2026` |
 
+> **Every account needs an e-mail address.** Accounts created before the
+> e-mail sign-in upgrade (including the shipped `admin`) have none, so the
+> first password entry asks you to attach an address and confirm it with a
+> code; the session is issued only after that. This requires a working mail
+> transport — see [E-mail delivery](#e-mail-delivery-verification-codes)
+> above (or `ONTI_MAIL_ECHO=1` on a laptop, which shows the code in the
+> server window).
+>
+> **Passwords are policed, not suggested.** At least 10 characters, at least
+> three of {lowercase, uppercase, digit, symbol}, and no reuse of a password
+> used in the last 24 months. The app also reminds you to rotate every 90
+> days and offers a dedicated page at `/account/password`.
+>
 > **Change the default password after first login** (Admin console →
 > Users & audit → reset password). You can also create additional
 > accounts from there or enable self-registration.
@@ -203,11 +245,14 @@ studio get a pack that is private to them by default (`is_active = 0`);
 no other account can see or select it until an admin activates it.
 
 The two sign-in pages are visually distinct (light user page vs. dark
-navy admin page). Visiting `/admin` while signed out redirects to
-`/admin/login` ; a regular (non-admin) account is redirected back to
-`/app?forbidden=1`. The default administrator (`admin`/`Onti@2026` )
-can enter either portal; self-registered users only see the user
-portal.
+navy admin page) and both demand two factors: password **and** a six-digit
+code mailed to the address on the account. Registration has its own page at
+`/signup` (never mixed into the sign-in form), and the password rotation page
+lives at `/account/password`, linked from the user portal sidebar. Visiting
+`/admin` while signed out redirects to `/admin/login`; a regular (non-admin)
+account is redirected back to `/app?forbidden=1`. The default administrator
+(`admin`/`Onti@2026` ) can enter either portal; self-registered users only
+see the user portal.
 
 ### User portal — `/app` (use & build)
 
@@ -1188,6 +1233,23 @@ encrypted model configuration (the same bootstrap also accepts
 `LLM_VERIFY_SSL=false`/`SKIP_SSL_VERIFY=1` ). AI features stay optional —
 the rules engine, graph, imports and reports work without a model.
 
+**E-mail delivery is mandatory on a public deployment.** Sign-up and sign-in
+both send a code, so set one transport:
+
+* `RESEND_API_KEY` (+ optional `ONTI_MAIL_FROM`, default
+  `Onti <onboarding@resend.dev>`) — HTTPS API, no SMTP egress required;
+* or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
+  `SMTP_SECURITY` (`starttls` default, `ssl`, `none`).
+
+Without either, `/api/auth/status` reports `mail_configured: false`,
+every code request answers **503**, and the pages say delivery is not
+configured instead of silently failing. `ONTI_MAIL_ECHO=1` returns the
+code in the response and is **for local debugging only** — never set it on
+Vercel. Because a code may be sent by one instance and verified by
+another, challenges are mirrored to the same durable store as accounts
+(`onti/shared/otp/<sha256-of-challenge>.json`); with Blob connected this
+works across cold starts without extra configuration.
+
 Account persistence uses separate variables: `BLOB_READ_WRITE_TOKEN`
 (set automatically when a Vercel Blob store is connected) or
 `ONTI_SNAPSHOT_URL` + `ONTI_SNAPSHOT_TOKEN` for your own endpoint, and
@@ -1227,8 +1289,21 @@ All endpoints except `/health`,`/login`and`/api/auth/*` require the
 `onti_session`cookie;`/api/admin/*` additionally requires the admin
 role.
 
-* **POST** `/api/auth/register`,          `/login`,  `/logout` — accounts &
-  sessions.
+* **GET** `/api/auth/status` — first-run flag, registration availability,
+  storage mode, `mail_configured` and the password policy.
+* **POST** `/api/auth/signup/start` → `/signup/verify` — create an account
+  with an e-mail address, a password and the mailed code. Nothing is stored
+  until the code verifies, so a failed sign-up cannot leave a half-created
+  account behind.
+* **POST** `/api/auth/signin/start` → `/signin/verify` — password first, then
+  the mailed code; no session cookie exists between the two steps. Legacy
+  accounts get `bind_required` and a short-lived token instead (then
+  `/api/auth/bind/start` → `/bind/verify`).
+* **POST** `/api/auth/otp/resend` — new code for the same challenge (60 s
+  cooldown; the previous code stops working).
+* **POST** `/api/auth/password/change` — self-service rotation with policy
+  and 24-month history checks; **GET** `/api/auth/me` — account plus the
+  90-day reminder state; **POST** `/api/auth/logout` — revoke the session.
 * **GET** `/api/config`,          `/api/questions`,          `/api/graph`,
 `/api/class-graph`,`/api/library`,`/api/search?q=` ,
 `/api/search/insight?q=` (chips + affected sub-graph + written
@@ -1319,8 +1394,12 @@ python tests\verify_t5.py
 python tests\verify_t6.py
 
 :: authentication & account flows (freshly re-seeded DB recommended)
-:: 24 checks — login, register, session, lockout
+:: 30 checks — sign-in gate, 2FA contract, lockout, status
 python tests\verify_login.py
+
+:: two-factor account system — offline, throwaway DB, ONTI_MAIL_ECHO=1
+:: 83 checks — sign-up, code lifecycle, sign-in, rotation, legacy binding
+python tests\verify_auth2fa.py
 
 :: model endpoint contract (needs the live provider configured)
 :: 65 checks — create/test/edit/default/delete, self-signed diagnostics,
@@ -1398,12 +1477,19 @@ prints `SKIP v1 parity` and runs the behavioural checks instead.
 
 Coverage:
 
-* `verify_login.py` exercises the full auth matrix — admin login, wrong
-  password, unknown user, empty/short/invalid username, short/long
-  password, disabled-account 403, freshbot lifecycle, register →
-  session-cookie → /me → logout → 401, and verifies that login failures
-  surface the real error text ("Invalid username or password") rather
-  than the session-expiry wording.
+* `verify_login.py` exercises the live HTTP auth matrix — status contract,
+  wrong password, unknown user, empty/long password, legacy-account
+  `bind_required`, disabled-account 403, anonymous `/me` 401, sign-up
+  validation before any mail is sent, and the explicit 503 contract when
+  the server has no mail transport.
+* `verify_auth2fa.py` runs in-process on a temporary database with
+  `ONTI_MAIL_ECHO=1` and covers the delivered-code journey: sign-up
+  verify-before-create, duplicate address, masked address, username
+  derivation and collisions, 60 s resend cooldown, superseded codes,
+  expiry, five-attempt budget, sign-in with/without the second factor,
+  the 24-month password history, unauthenticated password change, the
+  90-day reminder thresholds (fresh / 14-day warning / expired), legacy
+  address binding, and the administrator registration toggle.
 * `verify_model_endpoints.py` drives every model CRUD path on both
   system-wide and per-user scopes, probes a live working gateway, an
   unreachable endpoint, a self-signed certificate, and the
@@ -1457,8 +1543,8 @@ Code/
 │  └─ values.py          # Dependency-free value helpers (is_num, month_label)
 ├─ routes/              # one APIRouter module per feature area
 │  ├─ common.py         # shared helpers: user pack, model prefs, errors, SSE
-│  ├─ pages.py          # /, /login, /app, /admin pages + health
-│  ├─ auth.py           # register / login / logout / me
+│  ├─ pages.py          # /, /login, /signup, /account/password, /app, /admin
+│  ├─ auth.py           # signup / signin / bind / password / me / logout
 │  ├─ packs.py          # pack selection, dashboard payloads
 │  ├─ config.py         # config, questions, library, data rows, my questions
 │  ├─ graph.py          # graph, path/impact/cycles, search + insight

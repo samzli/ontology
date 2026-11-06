@@ -1,15 +1,26 @@
-"""Login flow regression — covers all reported and edge-case scenarios."""
+"""Sign-in regression — validation, 2FA gate and token semantics.
+
+Runs against the server started by ``python main.py`` (default port 8010).
+The full happy path needs a mail transport; when the server has none (the
+normal local case) those steps assert the explicit 503 contract instead of
+silently passing, and ``verify_auth2fa.py`` covers the delivered-code journey
+in-process with ``ONTI_MAIL_ECHO=1``.
+"""
 
 from __future__ import annotations
 
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+from modules import auth  # noqa: E402
+from modules.db import get_conn  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 PASS = 0
@@ -27,215 +38,193 @@ def ok(cond, label, detail=""):
 
 
 def main() -> int:
-    print("=== Backend login regression ===")
+    print("=== Backend sign-in regression ===")
     c = httpx.Client(base_url=BASE, timeout=15, follow_redirects=False)
+    status = httpx.get(f"{BASE}/api/auth/status", timeout=15).json()
+    mail_on = bool(status.get("mail_configured"))
 
-    # [1] normal admin login
-    r = c.post("/api/auth/login", json={"username": "admin", "password": "Onti@2026"})
-    body = r.json()
-    ok(r.status_code == 200, "[1] admin login -> 200", r.status_code)
-    ok(body.get("user", {}).get("role") == "admin", "[1] role preserved", body)
+    # [1] status advertises the new contract
+    ok("mail_configured" in status, "[1] status exposes mail_configured", status)
+    policy = status.get("password_policy") or {}
+    ok(
+        policy.get("min_length") == auth.PASSWORD_MIN_LENGTH
+        and policy.get("min_categories") == auth.PASSWORD_MIN_CATEGORIES,
+        "[1] status exposes the password policy",
+        policy,
+    )
 
-    # [2] wrong password -> 401 + REAL message (not session expiry)
-    r = c.post("/api/auth/login", json={"username": "admin", "password": "wrongpass"})
+    # [2] wrong password -> 401 with the real message
+    r = c.post(
+        "/api/auth/signin/start",
+        json={"identifier": "admin", "password": "wrongpass"},
+    )
     body = r.json()
     ok(r.status_code == 401, "[2] wrong password -> 401", r.status_code)
     ok("Invalid username or password" in str(body), "[2] correct error text", body)
 
-    # [3] unknown user -> 401 + same message
+    # [3] unknown account -> 401 + identical message (no user enumeration)
     r = c.post(
-        "/api/auth/login", json={"username": "nobody999", "password": "Onti@2026"}
+        "/api/auth/signin/start",
+        json={"identifier": "nobody999@example.com", "password": "Onti@2026"},
     )
-    body = r.json()
-    ok(r.status_code == 401, "[3] unknown user -> 401", r.status_code)
-    ok("Invalid username or password" in str(body), "[3] correct error text", body)
+    ok(r.status_code == 401, "[3] unknown account -> 401", r.status_code)
+    ok("Invalid username or password" in str(r.json()), "[3] same error text", r.text)
 
-    # [4] empty username -> 422 (Pydantic)
-    r = c.post("/api/auth/login", json={"username": "", "password": "Onti@2026"})
-    ok(r.status_code == 422, "[4] empty username -> 422", r.status_code)
+    # [4] empty identifier -> 422
+    r = c.post("/api/auth/signin/start", json={"identifier": "", "password": "x"})
+    ok(r.status_code == 422, "[4] empty identifier -> 422", r.status_code)
 
-    # [5] username too short (<3) -> 422
-    r = c.post("/api/auth/login", json={"username": "ab", "password": "Onti@2026"})
-    ok(r.status_code == 422, "[5] short username -> 422", r.status_code)
-
-    # [6] invalid username chars (space) -> 422
+    # [5] over-long password -> 422
     r = c.post(
-        "/api/auth/login", json={"username": "bad user", "password": "Onti@2026"}
+        "/api/auth/signin/start", json={"identifier": "admin", "password": "x" * 300}
     )
-    ok(r.status_code == 422, "[6] invalid username chars -> 422", r.status_code)
+    ok(r.status_code == 422, "[5] long password -> 422", r.status_code)
 
-    # [7] password too short (<8) -> 422
-    r = c.post("/api/auth/login", json={"username": "admin", "password": "short"})
-    ok(r.status_code == 422, "[7] short password -> 422", r.status_code)
+    # [6] legacy account without an address -> one-time binding step
+    with get_conn() as conn:
+        row = conn.execute("SELECT email FROM users WHERE username='admin'").fetchone()
+    if row is not None and not row["email"]:
+        r = c.post(
+            "/api/auth/signin/start",
+            json={"identifier": "admin", "password": "Onti@2026"},
+        )
+        body = r.json()
+        ok(
+            r.status_code == 200 and body.get("status") == "bind_required",
+            "[6] legacy account asks to bind an e-mail",
+            body,
+        )
+        ok(bool(body.get("bind_token")), "[6] a short-lived bind token is issued")
 
-    # [8] password too long (>256) -> 422
-    r = c.post("/api/auth/login", json={"username": "admin", "password": "x" * 300})
-    ok(r.status_code == 422, "[8] long password -> 422", r.status_code)
-
-    # [9] disabled account -> 403 + specific message
-    # Use edgebot which is already registered by prior tests; the test is
-    # responsible for restoring enabled afterwards even if registration was
-    # what originally created it.
+    # [7] disabled account -> 403 + specific message
     conn = sqlite3.connect("data/onti.db")
     pre = conn.execute("SELECT id FROM users WHERE username='edgebot'").fetchone()
     if pre is None:
-        # Safety fallback — register the account first so the test is real.
-        r_reg = httpx.Client(base_url=BASE, timeout=15).post(
-            "/api/auth/register",
-            json={
-                "username": "edgebot",
-                "password": "Edge@2026x",
-                "display_name": "Edge",
-            },
-        )
-        ok(r_reg.status_code == 200, "[9] ensure edgebot exists", r_reg.status_code)
+        with get_conn() as live:
+            auth.register_account(live, "edgebot", "Edge@2026x", "Edge")
     conn.execute("UPDATE users SET enabled=0 WHERE username='edgebot'")
     conn.commit()
     r = c.post(
-        "/api/auth/login", json={"username": "edgebot", "password": "Edge@2026x"}
+        "/api/auth/signin/start",
+        json={"identifier": "edgebot", "password": "Edge@2026x"},
     )
     body = r.json()
-    ok(r.status_code == 403, "[9] disabled account -> 403", r.status_code)
-    ok("disabled" in str(body).lower(), "[9] account-disabled message", body)
+    ok(r.status_code == 403, "[7] disabled account -> 403", r.status_code)
+    ok("disabled" in str(body).lower(), "[7] account-disabled message", body)
     conn.execute("UPDATE users SET enabled=1 WHERE username='edgebot'")
     conn.commit()
     conn.close()
 
-    # [10] anonymous /api/auth/me -> 401 (this SHOULD be session-expiry territory)
-    c4 = httpx.Client(base_url=BASE, timeout=15)
-    r = c4.get("/api/auth/me")
-    ok(
-        r.status_code == 401,
-        "[10] anonymous /me -> 401 (session-expiry path)",
-        r.status_code,
-    )
+    # [8] anonymous /api/auth/me -> 401 (session-expiry path)
+    r = httpx.Client(base_url=BASE, timeout=15).get("/api/auth/me")
+    ok(r.status_code == 401, "[8] anonymous /me -> 401", r.status_code)
 
-    # [11] register new user — pick a username that definitely does not
-    # collide with an earlier run; the app forbids duplicates with 409.
-    import time as _t
+    # [9] sign-up validation happens before any mail is sent
+    cases = [
+        ("short", "bad@example.com", "short", 422),
+        ("two classes", "weak@example.com", "abcdefghij", 422),
+        ("bad address", "not-an-email", "Strong@2026x", 422),
+    ]
+    for label, email, pw, want in cases:
+        r = c.post("/api/auth/signup/start", json={"email": email, "password": pw})
+        ok(
+            r.status_code == want,
+            f"[9] {label} -> {want}",
+            f"{r.status_code} {r.text[:120]}",
+        )
 
-    suffix = str(int(_t.time() * 1000))[-6:]
-    new_user = f"freshbot_{suffix}"
-    c5 = httpx.Client(base_url=BASE, timeout=15)
-    r = c5.post(
-        "/api/auth/register",
-        json={
-            "username": new_user,
-            "password": "Fresh@2026q",
-            "display_name": "Fresh",
-        },
+    # [10] duplicate address -> 409 (checked before the code is issued)
+    suffix = str(int(time.time() * 1000))[-6:]
+    email = f"dupebot_{suffix}@example.com"
+    with get_conn() as live:
+        auth.register_account(live, email, "Dupe@2026xx")
+    r = c.post(
+        "/api/auth/signup/start", json={"email": email, "password": "Dupe@2026xx"}
     )
-    ok(r.status_code == 200, "[11] register -> 200", f"{r.status_code} {r.json()}")
-    ok(
-        r.json().get("user", {}).get("role") == "user",
-        "[11] role=user for non-first-run registration",
-        r.json(),
-    )
+    ok(r.status_code == 409, "[10] duplicate address -> 409", r.status_code)
 
-    # [12] register -> immediately logged in (cookie set)
-    ok(
-        "onti_session" in (r.headers.get("set-cookie") or ""),
-        "[12] register sets session cookie",
-        r.headers.get("set-cookie", "")[:80],
-    )
-
-    # [13] login -> /me works
-    c6 = httpx.Client(base_url=BASE, timeout=15)
-    r = c6.post(
-        "/api/auth/login", json={"username": new_user, "password": "Fresh@2026q"}
-    )
-    ok(r.status_code == 200, "[13] freshbot login -> 200", r.status_code)
-    # carry cookie jar
-    c6 = httpx.Client(base_url=BASE, timeout=15, cookies=r.cookies)
-    r = c6.get("/api/auth/me")
-    ok(
-        r.status_code == 200 and r.json().get("user", {}).get("username") == new_user,
-        "[13] /me returns the user",
-        r.json(),
-    )
-
-    # [14] logout -> 200 + cookie cleared
-    r = c6.post("/api/auth/logout")
-    ok(r.status_code == 200, "[14] logout -> 200", r.status_code)
-    c6b = httpx.Client(base_url=BASE, timeout=15)
-    r = c6b.get("/api/auth/me")
-    ok(r.status_code == 401, "[14] after logout /me -> 401", r.status_code)
-
-    # [15] session-expiry path still correct for non-auth endpoints (this is
-    # the old "Please sign in again" behaviour, which must NOT be affected)
-    c7 = httpx.Client(base_url=BASE, timeout=15)
-    r = c7.get("/api/auth/me")  # session-expiry path (401, non-auth endpoint)
-    body = r.json()
-    ok(r.status_code == 401, "[15] /me 401 is still session-expiry path", r.status_code)
-    # Also: login endpoint 401 must NOT look like a session-expiry
-    c8 = httpx.Client(base_url=BASE, timeout=15, follow_redirects=False)
-    r = c8.post(
-        "/api/auth/login", json={"username": "admin", "password": "wrongpassword123"}
+    # [11] sign-in for an account with an address asks for the mailed code,
+    # or reports the missing transport explicitly — never a silent success.
+    r = c.post(
+        "/api/auth/signin/start", json={"identifier": email, "password": "Dupe@2026xx"}
     )
     body = r.json()
-    msg = str(body.get("error", "")).lower()
-    ok(
-        "please sign in" not in msg,
-        "[15] login failure message is NOT session-expiry wording",
-        body,
-    )
-    ok(
-        "invalid username" in msg,
-        "[15] login failure IS the real error",
-        body,
-    )
+    if mail_on:
+        ok(
+            r.status_code == 200 and body.get("status") == "otp_required",
+            "[11] sign-in requests the second factor",
+            body,
+        )
+        ok(
+            "debug_code" in body or body.get("provider") in ("resend", "smtp", "echo"),
+            "[11] transport reported",
+            body,
+        )
+    else:
+        ok(
+            r.status_code == 503 and "not configured" in str(body).lower(),
+            "[11] no transport -> explicit 503",
+            f"{r.status_code} {body}",
+        )
 
-    # [16] status exposes the account-storage contract: accounts persist when
-    # the host is persistent OR a snapshot backend carries them across
-    # instances.
-    s = httpx.get(f"{BASE}/api/auth/status", timeout=15).json()
-    ok("accounts_persist" in s, "[16] status exposes accounts_persist", s)
-    ok("snapshot_sync" in s, "[16] status exposes snapshot_sync", s)
-    ok(
-        s["accounts_persist"] == ((not s["ephemeral"]) or s["snapshot_sync"]),
-        "[16] accounts_persist = persistent host or snapshot sync",
-        s,
+    # [12] logout clears the cookie even without a session
+    r = c.post("/api/auth/logout")
+    ok(r.status_code == 200, "[12] logout -> 200", r.status_code)
+
+    # [13] unauthenticated password change is rejected
+    r = httpx.Client(base_url=BASE, timeout=15).post(
+        "/api/auth/password/change",
+        json={"current_password": "x", "new_password": "Strong@2026x"},
     )
+    ok(r.status_code == 401, "[13] anonymous password change -> 401", r.status_code)
 
-    # [17] cross-instance sessions: a token whose account exists only in the
-    # durable account store is adopted; a token for an account nobody knows is
-    # rejected rather than forged from its claims.
-    from modules import auth as auth_mod
-    from modules.db import get_conn
+    # [14] password policy units
+    ok(auth.password_categories("Abcdef1234!") == 4, "[14] four classes detected")
+    ok(auth.password_categories("abcdefghij") == 1, "[14] one class detected")
+    for bad in ("Short1!", "alllowercase", "ALLUPPERCASE", "1234567890"):
+        try:
+            auth.validate_password_policy(bad)
+        except auth.AuthError as exc:
+            ok(exc.status_code == 422, f"[14] rejects {bad!r}", exc.message)
+        else:
+            ok(False, f"[14] rejects {bad!r}", "accepted")
+    auth.validate_password_policy("Good@Password1")
+    ok(True, "[14] accepts a compliant password")
 
-    token = auth_mod.issue_session_token(
+    # [15] cross-instance session semantics
+    token = auth.issue_session_token(
         999999,
         "2099-01-01T00:00:00+00:00",
         username="ghost",
         display_name="Ghost",
         role="user",
     )
-    claims = auth_mod.verify_session_claims(token) or {}
-    ok(claims.get("un") == "ghost", "[17] token carries identity claims", claims)
+    claims = auth.verify_session_claims(token) or {}
+    ok(claims.get("un") == "ghost", "[15] token carries identity claims", claims)
     with get_conn() as conn:
         ok(
-            auth_mod.user_by_token(conn, token) is None,
-            "[17] persistent host rejects an unknown user",
+            auth.user_by_token(conn, token) is None,
+            "[15] persistent host rejects an unknown user",
         )
-        saved = auth_mod.EPHEMERAL_STORAGE
-        auth_mod.EPHEMERAL_STORAGE = True
-        rebuilt = auth_mod.user_by_token(conn, token)
-        auth_mod.EPHEMERAL_STORAGE = saved
+        saved = auth.EPHEMERAL_STORAGE
+        auth.EPHEMERAL_STORAGE = True
+        rebuilt = auth.user_by_token(conn, token)
+        auth.EPHEMERAL_STORAGE = saved
+    ok(rebuilt is None, "[15] token claims alone do not forge an account", rebuilt)
+
+    # [16] status storage contract
+    ok("accounts_persist" in status, "[16] status exposes accounts_persist")
     ok(
-        rebuilt is None,
-        "[17] unknown user is not forged from token claims",
-        rebuilt,
+        status["accounts_persist"]
+        == ((not status["ephemeral"]) or status["snapshot_sync"]),
+        "[16] accounts_persist = persistent host or snapshot sync",
+        status,
     )
 
     # ------------------------------------------------------------- clean-up ---
-    # Test hygiene: [9] may have registered edgebot and [11]/[13] registered
-    # freshbot_*, so remove both plus their sessions. Without this the
-    # bundled database slowly fills with synthetic accounts that would then
-    # be visible in the deployed admin console.
     with sqlite3.connect("data/onti.db") as conn:
-        conn.execute(
-            "DELETE FROM users WHERE username IN (?, ?)", (new_user, "edgebot")
-        )
+        conn.execute("DELETE FROM users WHERE username='edgebot'")
+        conn.execute("DELETE FROM users WHERE email=?", (email,))
         conn.execute("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)")
 
     print()

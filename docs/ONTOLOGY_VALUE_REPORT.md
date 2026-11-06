@@ -23,11 +23,11 @@ engine, deterministic analysis, impact graph).
 
 | Axis | With ontology | Plain LLM | Delta |
 | --- | --- | --- | --- |
-| Business Depth | 0.86 / 5 | 1.14 / 5 | +-0.29 |
-| Logical Rigour | 0.36 / 5 | 0.43 / 5 | +-0.07 |
-| Data Linkage | 1.00 / 5 | 1.86 / 5 | +-0.86 |
-| Explainability | 0.71 / 5 | 0.79 / 5 | +-0.07 |
-| **Total** | **2.93 / 20** | **4.21 / 20** | **+-1.29** |
+| Business Depth | 0.71 / 5 | 0.00 / 5 | +0.71 |
+| Logical Rigour | 0.21 / 5 | 0.00 / 5 | +0.21 |
+| Data Linkage | 0.79 / 5 | 0.00 / 5 | +0.79 |
+| Explainability | 0.50 / 5 | 0.00 / 5 | +0.50 |
+| **Total** | **2.21 / 20** | **0.00 / 20** | **+2.21** |
 
 ## Per-scenario results
 
@@ -35,18 +35,18 @@ engine, deterministic analysis, impact graph).
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Level | 5 | 0 | 0 | 0 | 0 | no |
 | 2 | Level | 0 | 0 | 0 | 0 | 0 | no |
-| 3 | Level | 0 | 8 | 0 | 0 | 0 | no |
-| 4 | Movement | 0 | 3 | 0 | 0 | 0 | no |
-| 5 | Movement | 8 | 4 | 0 | 0 | 0 | no |
-| 6 | Movement | 5 | 10 | 0 | 0 | 0 | no |
-| 7 | Mix | 1 | 8 | 0 | 0 | 0 | no |
-| 8 | Mix | 5 | 1 | 0 | 0 | 0 | no |
-| 9 | Cohort | 1 | 0 | 0 | 0 | 0 | no |
-| 10 | Cohort | 2 | 1 | 0 | 0 | 0 | no |
-| 11 | Trend | 5 | 8 | 0 | 0 | 0 | no |
-| 12 | Trend | 2 | 6 | 0 | 0 | 0 | no |
-| 13 | Coverage | 7 | 6 | 0 | 0 | 0 | no |
-| 14 | Coverage | 0 | 4 | 0 | 0 | 0 | no |
+| 3 | Level | 0 | 0 | 0 | 0 | 0 | no |
+| 4 | Movement | 0 | 0 | 0 | 0 | 0 | no |
+| 5 | Movement | 8 | 0 | 0 | 0 | 0 | no |
+| 6 | Movement | 5 | 0 | 0 | 0 | 0 | no |
+| 7 | Mix | 1 | 0 | 0 | 0 | 0 | no |
+| 8 | Mix | 5 | 0 | 0 | 0 | 0 | no |
+| 9 | Cohort | 0 | 0 | 0 | 0 | 0 | no |
+| 10 | Cohort | 2 | 0 | 0 | 0 | 0 | no |
+| 11 | Trend | 5 | 0 | 0 | 0 | 0 | no |
+| 12 | Trend | 0 | 0 | 0 | 0 | 0 | no |
+| 13 | Coverage | 0 | 0 | 0 | 0 | 0 | no |
+| 14 | Coverage | 0 | 0 | 0 | 0 | 0 | no |
 
 ### Scenario questions
 
@@ -112,8 +112,10 @@ MoM VNB: **+8.1%**. VNB up: higher Agency active count and productivity
 **Plain LLM** (same model, same raw data, no ontology — full):
 
 ```text
-Total **VNB** in April 2025 was **$1.32M** (from the `vnb_monthly` table:
-2025-04 total VNB = 1.32055).
+No enabled AI model is configured, so the non-ontology answer cannot be
+generated. The ontology-grounded answer above still works — the rules engine
+needs no model. Ask an administrator to add a model in Model centre to run
+both sides.
 ```
 
 ## Reproduce

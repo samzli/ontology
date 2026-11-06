@@ -1919,3 +1919,57 @@ td.wrap {
         padding: 8px 12px;
     }
 }
+/* ---- Two-factor auth helpers (sign-up / sign-in / password pages) ---- */
+.otp-target {
+    background: #f4f7fb;
+    border: 1px solid #e3e9f2;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: #445064;
+    margin-bottom: 14px;
+    line-height: 1.5;
+}
+
+.pw-rules {
+    margin: -4px 0 12px;
+    padding: 10px 12px;
+    background: #f7f9fc;
+    border: 1px dashed #dde4ee;
+    border-radius: 10px;
+}
+
+.pw-rule {
+    font-size: 12px;
+    color: #7a8496;
+    line-height: 1.9;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pw-rule .tick {
+    width: 14px;
+    display: inline-block;
+    text-align: center;
+    font-weight: 700;
+}
+
+.pw-rule.ok {
+    color: #157347;
+}
+
+.auth-ok {
+    background: #e8f6ee;
+    border: 1px solid #b9e2c8;
+    color: #14663f;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    margin-bottom: 12px;
+}
+
+a.btn-link {
+    text-decoration: none;
+}
+

@@ -37,7 +37,10 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import _auth_client as auth_client  # noqa: E402
 
 from modules import auth  # noqa: E402
 from modules.db import get_conn, now  # noqa: E402
@@ -95,9 +98,8 @@ def main() -> int:
 
     try:
         print("[1] Administrator sign-in")
-        r = admin.post(
-            "/api/auth/login", json={"username": ADMIN_USER, "password": ADMIN_PW}
-        )
+        auth_client.login(admin, ADMIN_USER, ADMIN_PW)
+        r = admin.get("/api/auth/me")
         ok(r.status_code == 200, "admin login -> 200", r.text[:200])
         if r.status_code != 200:
             print("\nCannot continue without an admin session.")
@@ -362,10 +364,11 @@ def main() -> int:
         cleanup_temp_user()
         with get_conn() as conn:
             auth.create_user(conn, TEMP_USER, TEMP_PW, "Endpoint Test User", "user")
-        r = user.post(
-            "/api/auth/login", json={"username": TEMP_USER, "password": TEMP_PW}
+        auth_client.login(user, TEMP_USER, TEMP_PW)
+        ok(
+            user.get("/api/auth/me").status_code == 200,
+            "temp user login -> 200",
         )
-        ok(r.status_code == 200, "temp user login -> 200", r.status_code)
 
         r = user.get("/api/my/models")
         ok(
@@ -426,11 +429,11 @@ def main() -> int:
             auth.create_user(conn, TEMP_USER_B, TEMP_PW, "Other User", "user")
         other = httpx.Client(base_url=BASE, timeout=60)
         try:
-            r = other.post(
-                "/api/auth/login",
-                json={"username": TEMP_USER_B, "password": TEMP_PW},
+            auth_client.login(other, TEMP_USER_B, TEMP_PW)
+            ok(
+                other.get("/api/auth/me").status_code == 200,
+                "second user login -> 200",
             )
-            ok(r.status_code == 200, "second user login -> 200", r.status_code)
             ok(
                 other.get("/api/my/models").json()["models"] == [],
                 "second user does not see the first user's model",

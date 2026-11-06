@@ -33,6 +33,16 @@ pause
 exit /b 1
 
 :run
+REM ---- E-mail: use the real transport when configured, otherwise fall back
+REM ---- to console echo so a laptop can sign up without a mail account.
+REM ---- Same application code path as Vercel; only the transport differs.
+if defined RESEND_API_KEY goto :runserver
+if defined SMTP_HOST goto :runserver
+set ONTI_MAIL_ECHO=1
+echo   [local] No RESEND_API_KEY / SMTP_HOST found - verification codes
+echo           are printed in this window (ONTI_MAIL_ECHO=1).
+echo.
+:runserver
 echo ============================================================
 echo   Onti is starting on http://localhost:8010
 echo.

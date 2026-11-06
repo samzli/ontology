@@ -47,10 +47,56 @@ order:
   server instance and after a restart. If **Create account** is hidden,
   this deployment cannot keep new accounts — ask an administrator for a
   pre-provisioned one instead.
+* **The code never arrives.** Check the spam folder, then wait for the
+  60-second cooldown and press **Resend code**. If the page says e-mail
+  delivery is not configured, the deployment has no mail transport and only
+  an administrator can fix it.
 
 If the browser shows a network error when you press **Sign in**, the app
 now says so explicitly: check your connection, VPN or firewall, reload
 the page and try again.
+
+### 1.2 Create an account (sign up)
+
+Registration is a separate page — `/signup`, linked from the sign-in form.
+
+1. Enter your **e-mail address**. This becomes your sign-in identity; the
+   username is taken from the part before `@` automatically
+   (`alice@example.com` → `alice`, `alice-2` if `alice` already exists).
+2. Choose a password. The rule list updates as you type:
+   * at least **10 characters**;
+   * at least **3 of 4** classes — lowercase, uppercase, digit, symbol;
+   * not one of your last **24 months** of passwords.
+3. Press **Create account**. A six-digit code is mailed to you.
+4. Enter the code. The account is created **only** after the code verifies,
+   so an abandoned form never blocks the address, and you are signed in
+   straight away.
+
+### 1.3 Sign in (two factors)
+
+Sign-in always needs the password **and** a mailed code:
+
+1. Enter your e-mail (or, for older accounts, your username) and password.
+2. Enter the six-digit code from the e-mail. Until then no session exists —
+   closing the tab simply cancels the attempt.
+3. Forgot it or it expired? Press **Resend code** after the cooldown; the
+   previous code stops working.
+
+If your account predates e-mail sign-in, the first successful password
+entry asks you to attach an address and confirms it with a code; the
+session starts only afterwards.
+
+### 1.4 Password rules and the 90-day reminder
+
+Every account is expected to rotate its password **every 3 months**. The
+portal shows a banner in the last 14 days and after the window has
+closed. Open **Account & password** in the sidebar (`/account/password`) to
+change it: enter the current password, choose a new one that satisfies the
+same rules and differs from the last 24 months, and confirm. The new
+window starts immediately.
+
+Administrators can reset a password from **Admin → Users & audit**, subject
+to the same rules.
 
 ---
 

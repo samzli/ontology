@@ -558,6 +558,17 @@ hosts mapping in the README, otherwise `http://localhost:8010/app` .
 Never share a `localhost` or `onti.local` address with a colleague: those
 names only resolve on the machine running the server. For remote access
 use the deployment domain ( `https://…/app` ).
+
+Every account is now an **e-mail account**, and sign-in is two-factor:
+the colleague needs the password *and* a code delivered to that address,
+so the deployment must have `RESEND_API_KEY` or `SMTP_HOST` set. When
+creating an account in **Users & audit** you supply the address; the
+username is derived from it automatically. The same password policy as
+self-registration applies (≥ 10 characters, 3 of 4 character classes, no
+reuse in 24 months), and the account is prompted to rotate every 90 days.
+Legacy accounts without an address are asked to bind one on first
+sign-in — the session is not issued until the code comes back.
+
 Self-registration works on every host. On Vercel the function filesystem
 is per-instance ( `/api/auth/status`→`ephemeral: true` ), so configure a
 durable store — `BLOB_READ_WRITE_TOKEN` (Vercel Blob) or

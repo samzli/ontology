@@ -34,7 +34,10 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import _auth_client as auth_client  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -82,10 +85,8 @@ def main() -> int:
 
     pid = None
     with httpx.Client(base_url=BASE, timeout=120) as c:
-        r = c.post(
-            "/api/auth/login", json={"username": "admin", "password": "Onti@2026"}
-        )
-        ok(r.status_code == 200, "admin login", r.status_code)
+        auth_client.login(c, "admin", "Onti@2026")
+        ok(c.get("/api/auth/me").status_code == 200, "admin login")
 
         # The pack that was active before the round-trip — restored at the end.
         packs0 = js(c.get("/api/admin/packs")).get("packs", [])
@@ -244,7 +245,7 @@ def main() -> int:
 
     # ------------------------------------------------------------- 6. cleanup
     with httpx.Client(base_url=BASE, timeout=60) as c:
-        c.post("/api/auth/login", json={"username": "admin", "password": "Onti@2026"})
+        auth_client.login(c, "admin", "Onti@2026")
         if prev_active:
             c.post(f"/api/admin/packs/{prev_active['id']}/activate")
         if pid:

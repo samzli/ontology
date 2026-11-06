@@ -24,12 +24,14 @@ class UserIn(BaseModel):
         password (str): Initial password.
         display_name (str): Optional human-readable name.
         role (str): ``user`` (default) or ``admin``.
+        email (str): Optional address; the user confirms it at first sign-in.
     """
 
     username: str
     password: str
     display_name: str = ""
     role: str = "user"
+    email: str = ""
 
 
 @router.get("/api/admin/user-settings")
@@ -114,8 +116,15 @@ async def admin_user_create(
         dict: ``{"id": int}`` of the new account.
     """
     with get_conn() as conn:
+        auth.validate_password_policy(data.password)
+        email = auth.normalize_email(data.email) if data.email.strip() else ""
         uid = auth.create_user(
-            conn, data.username, data.password, data.display_name, data.role
+            conn,
+            data.username,
+            data.password,
+            data.display_name,
+            data.role,
+            email=email,
         )
         # Mirror the row before the transaction commits so the account exists
         # on every instance, not just the one that served this request.

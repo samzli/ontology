@@ -31,7 +31,7 @@ os.environ["ONTI_DATA_DIR"] = _TMP
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
-from modules import induction  # noqa: E402
+from modules import auth, induction  # noqa: E402
 from modules import ontology_service as svc  # noqa: E402
 from modules import self_iterate as si  # noqa: E402
 from modules.db import get_conn, init_db  # noqa: E402
@@ -48,8 +48,10 @@ def _seed() -> int:
 
 
 def _register(client: TestClient, username: str) -> None:
-    r = client.post("/api/auth/register", json={"username": username, "password": PASS})
-    assert r.status_code in (200, 201), r.text
+    with get_conn() as conn:
+        auth.register_account(conn, username, PASS)
+        token = auth.authenticate(conn, username, PASS)["token"]
+    client.cookies.set(auth.COOKIE_NAME, token)
 
 
 # ---------------------------------------------------------------------------

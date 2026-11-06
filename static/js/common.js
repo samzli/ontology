@@ -33,7 +33,11 @@
       // or password.") reaches the user, instead of being masked as
       // "Please sign in again." which was very confusing.
       const authEndpoints = new Set([
-        '/api/auth/login', '/api/auth/register', '/api/auth/logout',
+        '/api/auth/signup/start', '/api/auth/signup/verify',
+        '/api/auth/signin/start', '/api/auth/signin/verify',
+        '/api/auth/bind/start', '/api/auth/bind/verify',
+        '/api/auth/otp/resend', '/api/auth/password/change',
+        '/api/auth/logout',
       ]);
       if (authEndpoints.has(path)) {
         // fall through — let the !resp.ok handler produce the real message
@@ -44,7 +48,8 @@
         // reload loop on /admin/login (the page probes /api/auth/me,
         // which answers 401 when signed out).
         const pagePath = location.pathname;
-        const onLoginPage = pagePath === '/login' || pagePath === '/admin/login';
+        const onLoginPage = pagePath === '/login' || pagePath === '/signup'
+          || pagePath === '/admin/login';
         if (!onLoginPage) {
           const onAdmin = pagePath.startsWith('/admin');
           location.href = onAdmin ? '/admin/login?expired=1' : '/login?expired=1';

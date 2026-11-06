@@ -16,8 +16,15 @@ serverless deployments start with it (see README → Deploying to Vercel).
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import httpx
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _auth_client as auth_client  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
 USERNAME = "giteam"
@@ -51,9 +58,9 @@ def main() -> int:
         int: ``0`` when every check passed, ``1`` otherwise.
     """
     with httpx.Client(base_url=BASE, timeout=60) as c:
-        r = c.post("/api/auth/login", json={"username": USERNAME, "password": PASSWORD})
-        if r.status_code != 200:
-            print(f"  FAIL giteam login :: {r.status_code} {r.text[:200]}")
+        auth_client.login(c, USERNAME, PASSWORD)
+        if c.get("/api/auth/me").status_code != 200:
+            print("  FAIL giteam login :: session not established")
             print("\n  0 passed, 1 failed")
             return 1
         print("  OK  giteam login")

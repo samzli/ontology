@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign in · {{ system_name }}</title>
-    <link rel="stylesheet" href="/static/css/app.css?v=18">
+    <link rel="stylesheet" href="/static/css/app.css?v=19">
     <link rel="icon"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ED1B2E'/><text x='16' y='22' font-size='17' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'>O</text></svg>">
   </head>
@@ -17,9 +17,8 @@
         <div class="hero">
           <h2>Your insurance ontology,<br>ready to answer.</h2>
           <p>Ask business questions in plain language. Every answer is traced to
-            an
-            auditable impact chain across metrics, drivers and data — and can be
-            exported as a board-ready analytics report.</p>
+            an auditable impact chain across metrics, drivers and data — and can
+            be exported as a board-ready analytics report.</p>
           <ul>
             <li>Deterministic rules engine plus any OpenAI-compatible model</li>
             <li>Import your own data and question lists to grow the knowledge
@@ -32,36 +31,71 @@
       <main class="auth-main">
         <div class="auth-card">
           <h1 id="authTitle">Welcome back</h1>
-          <div class="sub" id="authSub">Sign in to your workspace.</div>
+          <div class="sub" id="authSub">Sign in with your e-mail and password.
+            We then send a verification code to your inbox.</div>
           <div class="firstrun-banner" id="firstRun" style="display:none">
-            First-time setup: the account you create now becomes the platform
-            administrator.
+            First-time setup: create the administrator account to initialise
+            this
+            workspace.
           </div>
           <div class="auth-error" id="authError"></div>
-          <form id="authForm" autocomplete="off">
-            <label class="fld" id="fNameWrap" style="display:none">
-              <span>Display name</span>
-              <input type="text" id="fName" placeholder="e.g. Alex Lee">
-            </label>
+
+          <!-- Step 1 — password factor -->
+          <form id="stepCreds" autocomplete="off">
             <label class="fld">
-              <span>Username</span>
-              <input type="text" id="fUser" required minlength="3"
-                maxlength="64"
-                placeholder="3–64 chars: letters, digits, _ . -" autofocus>
+              <span>E-mail address</span>
+              <input type="text" id="fUser" required maxlength="254"
+                placeholder="you@company.com" autofocus
+                autocomplete="username">
+              <small class="hint" id="legacyHint" style="display:none">Accounts
+                created before e-mail sign-in can still enter their
+                username.</small>
             </label>
             <label class="fld">
               <span>Password</span>
-              <input type="password" id="fPass" required minlength="8"
-                maxlength="256"
-                placeholder="At least 8 characters">
+              <input type="password" id="fPass" required maxlength="256"
+                placeholder="Your password" autocomplete="current-password">
             </label>
             <button type="submit" class="btn btn-primary" style="width:100%"
-              id="authBtn">Sign in</button>
+              id="credBtn">Continue</button>
           </form>
+
+          <!-- Step 2 — one-time code -->
+          <form id="stepCode" autocomplete="off" style="display:none">
+            <div class="otp-target">We sent a 6-digit code to
+              <b id="otpEmail">your inbox</b>.</div>
+            <label class="fld">
+              <span>Verification code</span>
+              <input type="text" id="fCode" inputmode="numeric" required
+                minlength="6" maxlength="6" pattern="[0-9]{6}"
+                placeholder="123456" autocomplete="one-time-code">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="codeBtn">Verify &amp; sign in</button>
+            <div class="auth-switch" style="margin-top:12px">
+              <button class="btn-link" id="resendBtn" type="button">Send a new
+                code</button>
+              <button class="btn-link" id="backBtn" type="button">Back</button>
+            </div>
+          </form>
+
+          <!-- Step 3 — legacy account binds an address once -->
+          <form id="stepBind" autocomplete="off" style="display:none">
+            <div class="otp-target">This account was created before e-mail
+              sign-in. Confirm an address once to enable two-factor
+              sign-in.</div>
+            <label class="fld">
+              <span>E-mail address</span>
+              <input type="email" id="fBindEmail" required maxlength="254"
+                placeholder="you@company.com">
+            </label>
+            <button type="submit" class="btn btn-primary" style="width:100%"
+              id="bindBtn">Send code</button>
+          </form>
+
           <div class="auth-switch">
-            <span id="switchText">No account yet?</span>
-            <button class="btn-link" id="switchBtn" type="button">Create
-              one</button>
+            <span>No account yet?</span>
+            <a class="btn-link" href="/signup">Create one</a>
           </div>
           <div
             style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid #eef0f4;font-size:12.5px;color:#7a8496">
@@ -72,84 +106,194 @@
         </div>
       </main>
     </div>
-    <script src="/static/js/common.js?v=18"></script>
+    <script src="/static/js/common.js?v=19"></script>
     <script>
     (function () {
-      const { api, toast } = Onti;
-      let mode = 'login';
+      const { api } = Onti;
       const errBox = document.getElementById('authError');
-      const showErr = (m) => { errBox.textContent = m; errBox.classList.add('show'); };
+      const forms = {
+        creds: document.getElementById('stepCreds'),
+        code: document.getElementById('stepCode'),
+        bind: document.getElementById('stepBind'),
+      };
+      const state = { challenge: '', verifyPath: '/api/auth/signin/verify' };
 
-      // A 401 from any user-portal API call bounces here with ?expired=1.
+      function show(step) {
+        Object.entries(forms).forEach(([k, f]) => {
+          f.style.display = k === step ? 'block' : 'none';
+        });
+        errBox.classList.remove('show');
+      }
+      function showErr(msg) {
+        errBox.textContent = msg;
+        errBox.classList.add('show');
+      }
+      function reset(sub) {
+        document.getElementById('authTitle').textContent = 'Welcome back';
+        document.getElementById('authSub').textContent = sub ||
+          'Sign in with your e-mail and password. We then send a verification code to your inbox.';
+        show('creds');
+      }
+
       if (new URLSearchParams(location.search).get('expired')) {
         document.getElementById('authSub').textContent =
           'Your session ended. Please sign in again.';
       }
 
       api.get('/api/auth/status').then((s) => {
-        // Account creation needs a store that outlives this instance; the
-        // backend refuses with 503 otherwise, so do not invite the attempt.
-        const canRegister = s.allow_registration && s.accounts_persist !== false;
-        if (s.first_run && canRegister) {
-          mode = 'register';
+        if (s.first_run && s.allow_registration) {
           document.getElementById('firstRun').style.display = 'block';
-          document.getElementById('fNameWrap').style.display = 'block';
-          document.getElementById('authTitle').textContent = 'Create the administrator account';
-          document.getElementById('authSub').textContent = 'Initialise your Onti workspace.';
-          document.getElementById('authBtn').textContent = 'Create admin & continue';
-          document.getElementById('switchText').textContent = 'You are setting up a new workspace.';
-          document.getElementById('switchBtn').style.display = 'none';
-        } else if (!canRegister) {
-          document.getElementById('switchBtn').style.display = 'none';
-          document.getElementById('switchText').textContent = s.allow_registration
-            ? 'Account creation is unavailable on this deployment — ask an administrator for an account.'
-            : 'Self-registration is closed — please contact an administrator.';
+          document.getElementById('firstRun').innerHTML =
+            'First-time setup: <a href="/signup" style="font-weight:600">create the administrator account</a> to initialise this workspace.';
+        }
+        if (!s.allow_registration) {
+          const link = document.querySelector('.auth-switch a[href="/signup"]');
+          if (link) {
+            link.removeAttribute('href');
+            link.textContent = 'registration closed';
+            link.style.opacity = '.6';
+          }
+        }
+        if (!s.mail_configured) {
+          showErr('Verification e-mail is not configured on this deployment. '
+            + 'An administrator must set RESEND_API_KEY or SMTP_HOST.');
+        }
+        const policy = s.password_policy || {};
+        if (policy.min_length) {
+          document.getElementById('fPass').placeholder =
+            'Your password (min ' + policy.min_length + ' characters)';
         }
       }).catch(() => { });
 
-      document.getElementById('switchBtn').addEventListener('click', () => {
+      /* Step 1 — check the password and ask for the second factor. */
+      forms.creds.addEventListener('submit', async (e) => {
+        e.preventDefault();
         errBox.classList.remove('show');
-        if (mode === 'login') {
-          mode = 'register';
-          document.getElementById('fNameWrap').style.display = 'block';
-          document.getElementById('authTitle').textContent = 'Create your account';
-          document.getElementById('authSub').textContent = 'Join the Onti workspace.';
-          document.getElementById('authBtn').textContent = 'Create account';
-          document.getElementById('switchText').textContent = 'Already have an account?';
-          document.getElementById('switchBtn').textContent = 'Sign in';
-        } else {
-          mode = 'login';
-          document.getElementById('fNameWrap').style.display = 'none';
-          document.getElementById('authTitle').textContent = 'Welcome back';
-          document.getElementById('authSub').textContent = 'Sign in to your workspace.';
-          document.getElementById('authBtn').textContent = 'Sign in';
-          document.getElementById('switchText').textContent = 'No account yet?';
-          document.getElementById('switchBtn').textContent = 'Create one';
+        const btn = document.getElementById('credBtn');
+        btn.disabled = true;
+        try {
+          const r = await api.post('/api/auth/signin/start', {
+            identifier: document.getElementById('fUser').value.trim(),
+            password: document.getElementById('fPass').value,
+          });
+          if (r.status === 'bind_required') {
+            state.bindToken = r.bind_token;
+            document.getElementById('authTitle').textContent = 'Confirm your e-mail';
+            document.getElementById('authSub').textContent =
+              'One-time step for an account created before e-mail sign-in.';
+            show('bind');
+          } else {
+            state.challenge = r.challenge_id;
+            state.verifyPath = '/api/auth/signin/verify';
+            document.getElementById('otpEmail').textContent = r.email_masked;
+            document.getElementById('authTitle').textContent = 'Check your inbox';
+            document.getElementById('authSub').textContent =
+              'Enter the 6-digit code to finish signing in.';
+            show('code');
+            document.getElementById('fCode').focus();
+            startCooldown();
+            if (r.debug_code) {
+              document.getElementById('fCode').value = r.debug_code;
+            }
+          }
+        } catch (ex) {
+          showErr(ex.status === 0
+            ? 'Cannot reach the server. Check your connection and try again.'
+            : ex.message);
+        } finally {
+          btn.disabled = false;
         }
       });
 
-      document.getElementById('authForm').addEventListener('submit', async (e) => {
+      /* Legacy account — send a code to the address being bound. */
+      forms.bind.addEventListener('submit', async (e) => {
         e.preventDefault();
         errBox.classList.remove('show');
-        const btn = document.getElementById('authBtn');
-        const body = {
-          username: document.getElementById('fUser').value.trim(),
-          password: document.getElementById('fPass').value,
-          display_name: document.getElementById('fName').value.trim(),
-        };
+        const btn = document.getElementById('bindBtn');
         btn.disabled = true;
         try {
-          await api.post(mode === 'login' ? '/api/auth/login' : '/api/auth/register', body);
-          location.href = '/app';
+          const r = await api.post('/api/auth/bind/start', {
+            bind_token: state.bindToken,
+            email: document.getElementById('fBindEmail').value.trim(),
+          });
+          state.challenge = r.challenge_id;
+          state.verifyPath = '/api/auth/bind/verify';
+          document.getElementById('otpEmail').textContent = r.email_masked;
+          document.getElementById('authTitle').textContent = 'Check your inbox';
+          document.getElementById('authSub').textContent =
+            'Confirm the code to attach this address.';
+          show('code');
+          document.getElementById('fCode').focus();
+          startCooldown();
+          if (r.debug_code) document.getElementById('fCode').value = r.debug_code;
         } catch (ex) {
-          if (ex.status === 0) {
-            showErr('Cannot reach the server. Check your connection, VPN or '
-              + 'firewall, then reload this page and try again.');
-          } else {
-            showErr(ex.message);
+          showErr(ex.message);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      /* Step 2 — verify the code and sign in. */
+      forms.code.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.classList.remove('show');
+        const btn = document.getElementById('codeBtn');
+        btn.disabled = true;
+        try {
+          await api.post(state.verifyPath, {
+            challenge_id: state.challenge,
+            code: document.getElementById('fCode').value.trim(),
+          });
+          location.replace('/app');
+        } catch (ex) {
+          showErr(ex.message);
+          if (ex.extra && ex.extra.restart) {
+            state.challenge = '';
+            reset('That code expired. Sign in again to request a new one.');
           }
           btn.disabled = false;
         }
+      });
+
+      let timer = null;
+      function startCooldown() {
+        const btn = document.getElementById('resendBtn');
+        let left = 60;
+        btn.disabled = true;
+        btn.textContent = 'Send a new code (60s)';
+        clearInterval(timer);
+        timer = setInterval(() => {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = 'Send a new code';
+          } else {
+            btn.textContent = 'Send a new code (' + left + 's)';
+          }
+        }, 1000);
+      }
+
+      document.getElementById('resendBtn').addEventListener('click', async () => {
+        if (!state.challenge) return;
+        errBox.classList.remove('show');
+        try {
+          const r = await api.post('/api/auth/otp/resend', {
+            challenge_id: state.challenge,
+          });
+          if (r.challenge_id) state.challenge = r.challenge_id;
+          document.getElementById('otpEmail').textContent = r.email_masked;
+          startCooldown();
+          if (r.debug_code) document.getElementById('fCode').value = r.debug_code;
+        } catch (ex) {
+          showErr(ex.message);
+        }
+      });
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        state.challenge = '';
+        clearInterval(timer);
+        reset();
       });
     })();
   </script>

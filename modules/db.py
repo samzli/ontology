@@ -576,8 +576,46 @@ CREATE TABLE IF NOT EXISTS users (
     enabled       INTEGER NOT NULL DEFAULT 1,
     created_at    TEXT NOT NULL,
     last_login    TEXT,
-    login_count   INTEGER NOT NULL DEFAULT 0
+    login_count   INTEGER NOT NULL DEFAULT 0,
+    -- Sign-in identity. Empty for accounts created before the e-mail
+    -- requirement; they must bind an address on their next sign-in.
+    email         TEXT NOT NULL DEFAULT '',
+    email_verified INTEGER NOT NULL DEFAULT 0,
+    -- Start of the current password's 90-day validity window.
+    password_changed_at TEXT NOT NULL DEFAULT ''
 );
+
+-- Only verified, non-empty addresses are unique: legacy rows share ''.
+-- The unique index is created by ``init_db`` after the column migration.
+
+CREATE TABLE IF NOT EXISTS password_history (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    password_hash TEXT NOT NULL,
+    changed_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_history_user
+    ON password_history(user_id, changed_at);
+
+-- One row per e-mail verification challenge. ``challenge_id`` is the opaque
+-- handle returned to the browser; the six-digit code itself is never stored.
+CREATE TABLE IF NOT EXISTS email_otp (
+    challenge_id TEXT PRIMARY KEY,
+    purpose      TEXT NOT NULL,                 -- signup | signin | bind | change
+    email        TEXT NOT NULL,
+    username     TEXT NOT NULL DEFAULT '',
+    code_hash    TEXT NOT NULL,
+    payload      TEXT NOT NULL DEFAULT '{}',
+    created_at   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,
+    attempts     INTEGER NOT NULL DEFAULT 0,
+    consumed_at  TEXT,
+    request_ip   TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_otp_email
+    ON email_otp(email, purpose, created_at);
 
 CREATE TABLE IF NOT EXISTS sessions (
     token      TEXT PRIMARY KEY,
@@ -1003,6 +1041,23 @@ def init_db(seed: bool = True) -> None:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0"
             )
+        # E-mail sign-in + period password rotation added in 2.2.0. Existing
+        # rows keep an empty address and are forced to bind one at sign-in.
+        if "email" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+        if "email_verified" not in cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"
+            )
+        if "password_changed_at" not in cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN password_changed_at "
+                "TEXT NOT NULL DEFAULT ''"
+            )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email "
+            "ON users(email) WHERE email <> ''"
+        )
         cols = {
             r[1] for r in conn.execute("PRAGMA table_info(ontology_packs)").fetchall()
         }

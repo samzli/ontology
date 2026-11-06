@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules import admin_service as adm
-from modules import auth, snapshot
+from modules import auth, otp, snapshot
 from modules import config as cfg
 from modules import db as db_mod
 from modules import importer as imp
@@ -81,6 +81,22 @@ async def _auth_error(request: Request, exc: auth.AuthError) -> JSONResponse:
         JSONResponse: JSON body ``{"error": ...}`` with the error's status code.
     """
     return common._err(exc, exc.status_code)
+
+
+@app.exception_handler(otp.OtpError)
+async def _otp_error(request: Request, exc: otp.OtpError) -> JSONResponse:
+    """Map a verification failure to JSON with its diagnostic fields.
+
+    Args:
+        request (Request): The incoming request (unused, provided by FastAPI).
+        exc (otp.OtpError): The raised challenge error.
+
+    Returns:
+        JSONResponse: ``{"error": ..., **extra}`` with the error's status.
+    """
+    body: Dict[str, Any] = {"error": exc.message}
+    body.update(exc.extra)
+    return JSONResponse(status_code=exc.status_code, content=body)
 
 
 @app.exception_handler(adm.AdminValueError)

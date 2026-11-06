@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 sys.path.insert(0, str(ROOT))  # noqa: E402  (twice on purpose; ROOT is root of this project)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _auth_client as auth_client  # noqa: E402
+
 from modules.seed import _env_value  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
@@ -201,8 +204,8 @@ def http_api_tests():
     section("Section 2 — HTTP API: admin login + model CRUD")
     c = httpx.Client(base_url=BASE, timeout=60, follow_redirects=True)
 
-    r = c.post("/api/auth/login", json={"username": ADMIN_USER, "password": ADMIN_PW})
-    ok(r.status_code == 200, f"admin login → {r.status_code}")
+    auth_client.login(c, ADMIN_USER, ADMIN_PW)
+    ok(c.get("/api/auth/me").status_code == 200, "admin session established")
 
     # -- CREATE: Nova model --
     print("\n  Creating Nova model via admin API...")

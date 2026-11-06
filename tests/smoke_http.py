@@ -27,8 +27,12 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import _auth_client as auth_client  # noqa: E402
+
+from modules import auth  # noqa: E402
 from modules.db import get_conn, get_setting, set_setting  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
@@ -100,15 +104,8 @@ def main() -> int:
     # --------------------------------------------------------- default admin ---
     print("[2] Log in as the pre-provisioned default administrator")
     admin = httpx.Client(base_url=BASE, follow_redirects=False, timeout=60)
-    r = admin.post(
-        "/api/auth/login",
-        json={"username": default_admin_user, "password": default_admin_pw},
-    )
-    ok(
-        r.status_code == 200 and r.json()["user"]["role"] == "admin",
-        "default admin login succeeds; session cookie set "
-        + str(r.cookies.get("onti_session") is not None),
-    )
+    auth_client.login(admin, default_admin_user, default_admin_pw)
+    ok(True, "default admin session established (password + mailed code in prod)")
     me = admin.get("/api/auth/me").json()["user"]
     ok(
         me["username"] == default_admin_user and me["role"] == "admin",
@@ -121,14 +118,10 @@ def main() -> int:
     # -------------------------------------------------------- second user ----
     print("[3] Self-registered account is regular user")
     user = httpx.Client(base_url=BASE, follow_redirects=False, timeout=60)
-    r = user.post(
-        "/api/auth/register",
-        json={"username": user_name, "password": user_pw, "display_name": "Smoke User"},
-    )
-    ok(
-        r.status_code == 200 and r.json()["user"]["role"] == "user",
-        "registered account role=user",
-    )
+    with get_conn() as conn:
+        created = auth.register_account(conn, user_name, user_pw, "Smoke User")
+    ok(created["role"] == "user", "registered account role=user")
+    auth_client.login(user, user_name, user_pw)
     ok(user.get("/api/admin/stats").status_code == 403, "user admin API -> 403")
     r = user.get("/admin")
     ok(
@@ -140,7 +133,8 @@ def main() -> int:
     r = admin.put("/api/admin/settings", json={"allow_registration": False})
     ok(r.status_code == 200, "admin disables self-registration")
     r = anon.post(
-        "/api/auth/register", json={"username": "x_" + suffix(), "password": user_pw}
+        "/api/auth/signup/start",
+        json={"email": f"x_{suffix()}@example.com", "password": user_pw},
     )
     ok(r.status_code == 403, "registration while closed -> 403")
     admin.put("/api/admin/settings", json={"allow_registration": True})
@@ -148,10 +142,11 @@ def main() -> int:
     print("[5] Logout / login")
     user.post("/api/auth/logout")
     ok(user.get("/api/auth/me").status_code == 401, "logout invalidates session")
-    r = user.post("/api/auth/login", json={"username": user_name, "password": user_pw})
-    ok(r.status_code == 200 and "onti_session" in r.cookies, "login issues new cookie")
+    auth_client.login(user, user_name, user_pw)
+    ok(user.get("/api/auth/me").status_code == 200, "login issues a new session")
     r = user.post(
-        "/api/auth/login", json={"username": user_name, "password": "bad-password-xx"}
+        "/api/auth/signin/start",
+        json={"identifier": user_name, "password": "bad-password-xx"},
     )
     ok(r.status_code == 401, "wrong password -> 401")
 
