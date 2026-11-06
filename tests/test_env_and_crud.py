@@ -21,9 +21,7 @@ import httpx
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-sys.path.insert(
-    0, str(ROOT)
-)  # noqa: E402  (twice on purpose; ROOT is root of this project)
+sys.path.insert(0, str(ROOT))  # noqa: E402  (twice on purpose; ROOT is root of this project)
 from modules.seed import _env_value  # noqa: E402
 
 BASE = "http://127.0.0.1:8010"
@@ -120,18 +118,18 @@ def test_env_mutations():
 
     # Test A — ADD Nova vars alongside SF
     env_a = """# SiliconFlow
-SILICONFLOW_API_KEY=REDACTED-LEAKED-CREDENTIAL
+SILICONFLOW_API_KEY=sk-test-siliconflow-not-a-real-key-000
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 SILICONFLOW_MODEL_NAME=deepseek-ai/DeepSeek-V4-Flash
 # Added Nova vars
-NOVA_API_KEY='REDACTED-LEAKED-CREDENTIAL'
+NOVA_API_KEY='ak-test-nova-not-a-real-key-0000000'
 NOVA_BASE_URL="https://nova.deloitte.com.cn/v1"
 NOVA_MODEL_NAME="DeepSeek-V4-Flash"
 NOVA_VERIFY_SSL=false
 """
     r = parse_env_lines(env_a)
     ok(
-        r["api_key"] == "REDACTED-LEAKED-CREDENTIAL",
+        r["api_key"] == "sk-test-siliconflow-not-a-real-key-000",
         "Nova vars added → SILICONFLOW_* still default for migration",
     )
     ok(
@@ -159,14 +157,14 @@ NOVA_VERIFY_SSL=0
     )
 
     # Test C — MODIFY: switch entirely to Nova as default
-    env_c = """LLM_API_KEY='REDACTED-LEAKED-CREDENTIAL'
+    env_c = """LLM_API_KEY='ak-test-nova-not-a-real-key-0000000'
 LLM_BASE_URL="https://nova.deloitte.com.cn/v1"
 LLM_MODEL_NAME="DeepSeek-V4-Flash"
 LLM_VERIFY_SSL=false
 """
     r = parse_env_lines(env_c)
     ok(
-        r["api_key"] == "REDACTED-LEAKED-CREDENTIAL",
+        r["api_key"] == "ak-test-nova-not-a-real-key-0000000",
         "Nova key with quotes → clean",
     )
     ok(r["base_url"] == NOVA_BASE_URL, "base_url = Nova")
@@ -213,7 +211,7 @@ def http_api_tests():
         json={
             "name": "TempNova",
             "base_url": NOVA_BASE_URL,
-            "api_key": "REDACTED-LEAKED-CREDENTIAL",
+            "api_key": "ak-test-nova-not-a-real-key-0000000",
             "model": NOVA_MODEL,
             "verify_ssl": False,
             "enabled": True,
@@ -229,7 +227,7 @@ def http_api_tests():
         json={
             "name": "TempSiliconFlow",
             "base_url": SF_BASE_URL,
-            "api_key": "REDACTED-LEAKED-CREDENTIAL",
+            "api_key": "sk-test-siliconflow-not-a-real-key-000",
             "model": SF_MODEL,
             "verify_ssl": True,
             "enabled": True,
@@ -305,7 +303,7 @@ def http_api_tests():
         json={
             "base_url": NOVA_BASE_URL,
             "model": NOVA_MODEL,
-            "api_key": "REDACTED-LEAKED-CREDENTIAL",
+            "api_key": "ak-test-nova-not-a-real-key-0000000",
             "verify_ssl": True,
         },
     )

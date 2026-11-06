@@ -29,24 +29,28 @@ with get_conn() as conn:
     check("at least one configured model", len(configs) >= 1, str(len(configs)))
     seed_cfg = next(c for c in configs if c["is_default"])
     check("seed config is default", seed_cfg["is_default"])
-    check(
-        "key is masked in public view",
-        seed_cfg["api_key_masked"].startswith("sk-")
-        and "*" in seed_cfg["api_key_masked"],
-        seed_cfg["api_key_masked"],
-    )
-
     raw_row = conn.execute(
         "SELECT api_key_enc FROM model_configs WHERE id=?", (seed_cfg["id"],)
     ).fetchone()["api_key_enc"]
     from modules.db import decrypt_secret
 
-    plain_key = decrypt_secret(raw_row)
-    check(
-        "plaintext key never stored in DB",
-        plain_key and plain_key != raw_row and plain_key not in raw_row,
-        raw_row[:30],
-    )
+    if raw_row:
+        check(
+            "key is masked in public view",
+            seed_cfg["api_key_masked"].startswith("sk-")
+            and "*" in seed_cfg["api_key_masked"],
+            seed_cfg["api_key_masked"],
+        )
+        plain_key = decrypt_secret(raw_row)
+        check(
+            "plaintext key never stored in DB",
+            plain_key and plain_key != raw_row and plain_key not in raw_row,
+            raw_row[:30],
+        )
+    else:
+        # The repository must not ship a provider key (SECURITY.md §1). The
+        # masking and encryption invariants are proven on the config below.
+        print("  OK  seed model ships no bundled key")
 
     # Create second (generic, non-SF) model — platform is provider agnostic.
     cid2 = ml.create_config(
@@ -67,6 +71,22 @@ with get_conn() as conn:
             "SELECT base_url FROM model_configs WHERE id=?", (cid2,)
         ).fetchone()["base_url"]
         == "http://127.0.0.1:8000/v1",
+    )
+
+    local_cfg = next(c for c in ml.list_configs(conn) if c["id"] == cid2)
+    check(
+        "key is masked in public view",
+        local_cfg["api_key_masked"] == "not-****cret",
+        local_cfg["api_key_masked"],
+    )
+    raw_local = conn.execute(
+        "SELECT api_key_enc FROM model_configs WHERE id=?", (cid2,)
+    ).fetchone()["api_key_enc"]
+    plain_local = decrypt_secret(raw_local)
+    check(
+        "plaintext key never stored in DB",
+        plain_local == "not-a-secret" and "not-a-secret" not in raw_local,
+        raw_local[:30],
     )
 
     try:

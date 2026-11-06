@@ -119,9 +119,21 @@ def main() -> int:
             original_default = next(
                 (m["id"] for m in models if m.get("is_default")), None
             )
+            seed_has_key = next(
+                (
+                    m.get("has_api_key")
+                    for m in models
+                    if m.get("id") == original_default
+                ),
+                False,
+            )
 
         print("[3] A working endpoint answers 200 with ok:true")
-        if original_default is not None:
+        if original_default is not None and not seed_has_key:
+            # The shipped database carries no provider key (SECURITY.md §1), so
+            # there is nothing to probe until an operator enters one.
+            print("        default model ships without a key — live probe skipped")
+        elif original_default is not None:
             # The default model is a live gateway: it occasionally queues
             # past the 30 s probe ceiling. A retryable verdict is inconclusive,
             # so retry before drawing a conclusion (same policy the admin

@@ -22,6 +22,11 @@ ROOT = Path(__file__).resolve().parent.parent
 TESTS = ROOT / "tests"
 TIMEOUT_S = 900
 
+# Scripts that assert properties of the shipped repository rather than of the
+# running application. They must run before the other scripts, which leave test
+# accounts, packs and sessions in the database they inspect.
+_GUARD_SCRIPTS = frozenset({"verify_secrets.py"})
+
 sys.path.insert(0, str(ROOT))
 
 from modules import run_log  # noqa: E402  (path setup must come first)
@@ -37,16 +42,21 @@ def _scripts(filters: Sequence[str]) -> List[Path]:
             imported by tests rather than executed on their own.
 
     Returns:
-        List[Path]: Sorted script paths.
+        List[Path]: Sorted script paths, with the static guards first.
 
     Example:
         >>> [p.name for p in _scripts(["t1"])]
         ['verify_t1.py']
     """
     scripts = sorted(
-        p
-        for p in TESTS.glob("*.py")
-        if p.name != Path(__file__).name and not p.name.startswith("_")
+        (
+            p
+            for p in TESTS.glob("*.py")
+            if p.name != Path(__file__).name and not p.name.startswith("_")
+        ),
+        # The static guards inspect the shipped database, so they must run
+        # before any other script writes test sessions or scratch packs into it.
+        key=lambda p: (p.name not in _GUARD_SCRIPTS, p.name),
     )
     if filters:
         scripts = [
@@ -84,6 +94,74 @@ _TEST_PACK_PREFIXES = (
 # flag, because older databases were seeded before that flag existed.
 _SAMPLE_PACK_SLUG = "vnb-ape-sample"
 
+# Everything that references a pack, in an order where each row goes before the
+# row it points at. ``ON DELETE CASCADE`` alone is not enough: ``datasets`` is
+# reached by two cascade paths (pack and table), and SQLite aborts the whole
+# delete with "FOREIGN KEY constraint failed" instead of resolving them. The
+# tables below have no declared foreign key, so they are cleared explicitly.
+_PACK_DEPENDENTS = (
+    ("pack_rows", "dataset_id IN (SELECT id FROM datasets WHERE pack_id IN ({}))"),
+    ("pack_columns", "table_id IN (SELECT id FROM pack_tables WHERE pack_id IN ({}))"),
+    ("datasets", "pack_id IN ({})"),
+    ("pack_tables", "pack_id IN ({})"),
+    ("graph_edges", "pack_id IN ({})"),
+    ("graph_nodes", "pack_id IN ({})"),
+    ("attributes", "pack_id IN ({})"),
+    ("relations", "pack_id IN ({})"),
+    ("entities", "pack_id IN ({})"),
+    ("metric_formulas", "pack_id IN ({})"),
+    ("question_rules", "pack_id IN ({})"),
+    ("question_bank", "pack_id IN ({})"),
+    ("pack_versions", "pack_id IN ({})"),
+    ("self_iter_findings", "pack_id IN ({})"),
+    ("self_iter_sessions", "pack_id IN ({})"),
+    ("ontology_proposals", "pack_id IN ({})"),
+    ("studio_history", "pack_id IN ({})"),
+    ("user_questions", "pack_id IN ({})"),
+    ("ask_history", "pack_id IN ({})"),
+    ("ontology_packs", "id IN ({})"),
+)
+
+# Rows whose parent was deleted without cascading (an interrupted run, or an
+# older schema without the constraint). They would otherwise make the next
+# pack delete fail on the very same foreign key.
+_ORPHAN_DELETES = (
+    ("pack_rows", "dataset_id NOT IN (SELECT id FROM datasets)"),
+    ("pack_columns", "table_id NOT IN (SELECT id FROM pack_tables)"),
+    ("datasets", "table_id NOT IN (SELECT id FROM pack_tables)"),
+    ("pack_tables", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("graph_edges", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("attributes", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("entities", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("relations", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("metric_formulas", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("question_rules", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("question_bank", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("pack_versions", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("self_iter_findings", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("self_iter_sessions", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("ontology_proposals", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("studio_history", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("user_questions", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("ask_history", "pack_id NOT IN (SELECT id FROM ontology_packs)"),
+    ("reports", "owner_id NOT IN (SELECT id FROM users)"),
+    ("sessions", "user_id NOT IN (SELECT id FROM users)"),
+)
+
+
+def _sweep_orphans(conn) -> None:
+    """Delete rows whose parent row no longer exists.
+
+    Args:
+        conn: Open connection to the application database. The caller owns the
+            transaction.
+
+    Example:
+        >>> _sweep_orphans(conn)  # doctest: +SKIP
+    """
+    for table, where in _ORPHAN_DELETES:
+        conn.execute(f"DELETE FROM {table} WHERE {where}")
+
 
 def _clean_test_accounts() -> int:
     """Delete throw-away accounts created by the test scripts.
@@ -111,18 +189,22 @@ def _clean_test_accounts() -> int:
         if drop:
             marks = ",".join("?" * len(drop))
             conn.execute(f"DELETE FROM users WHERE id IN ({marks})", drop)
-            conn.execute(
-                "DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)"
-            )
+        # The bundled database ships in the repository, so it must never carry
+        # a live session: whoever held the cookie would inherit that account.
+        # Sessions are cheap to recreate — every user simply signs in again.
+        conn.execute("DELETE FROM sessions")
+        conn.execute("DELETE FROM revoked_sessions")
+        _sweep_orphans(conn)
     return len(drop)
 
 
 def _clean_test_packs() -> int:
     """Delete scratch packs left behind by the test scripts.
 
-    Deleting a pack cascades to its graph, tables, columns and datasets
-    (``ON DELETE CASCADE``), so the admin console and the shipped database
-    contain only real ontologies after a run.
+    Children are removed explicitly in dependency order rather than relying on
+    ``ON DELETE CASCADE``, which fails here because ``datasets`` is reachable
+    through two cascade paths at once. The admin console and the shipped
+    database then contain only real ontologies after a run.
 
     Returns:
         int: Number of packs deleted.
@@ -134,6 +216,7 @@ def _clean_test_packs() -> int:
     from modules.db import get_conn
 
     with get_conn() as conn:
+        _sweep_orphans(conn)
         rows = conn.execute(
             "SELECT id, slug, is_active FROM ontology_packs ORDER BY id"
         ).fetchall()
@@ -158,9 +241,10 @@ def _clean_test_packs() -> int:
                 (str(builtin["id"]),),
             )
         marks = ",".join("?" * len(drop))
-        conn.execute(f"DELETE FROM ontology_packs WHERE id IN ({marks})", drop)
+        for table, where in _PACK_DEPENDENTS:
+            conn.execute(f"DELETE FROM {table} WHERE {where.format(marks)}", drop)
         conn.execute(
-            f"DELETE FROM app_settings WHERE key IN " f"({','.join('?' * len(drop))})",
+            f"DELETE FROM app_settings WHERE key IN ({','.join('?' * len(drop))})",
             [f"analysis:{pid}" for pid in drop],
         )
     return len(drop)
@@ -191,7 +275,7 @@ def _restore_seed_datasets() -> int:
             slug,
         ).fetchone()["n"]
         conn.execute(
-            "DELETE FROM datasets WHERE kind <> 'seed' " f"AND pack_id IN ({sample})",
+            f"DELETE FROM datasets WHERE kind <> 'seed' AND pack_id IN ({sample})",
             slug,
         )
         conn.execute(

@@ -2,6 +2,12 @@
 .env
 .env.local
 
+# Machine master key: signs session cookies and encrypts model API keys.
+# Use ONTI_SECRET_KEY (environment variable) on deployed hosts instead of
+# shipping this file. It is generated on first start when absent.
+data/.onti.key
+*.onti.key
+
 # Python bytecode and caches (regenerated on every run)
 __pycache__/
 *.py[cod]
