@@ -371,7 +371,8 @@ def _ephemeral_seed() -> str:
     registered is bounced straight back to the sign-in page. When
     ``ONTI_SECRET_KEY`` is absent, derive the key from the storage credential
     the deployment already shares — it is identical on every instance and never
-    leaves the host.
+    leaves the host. The Vercel Database Blob backend injects no token, only
+    ``BLOB_STORE_ID`` (same value on every instance), so it is accepted too.
 
     Returns:
         str: The storage credential, or ``""`` when no backend is configured.
@@ -379,8 +380,12 @@ def _ephemeral_seed() -> str:
     from modules import config as cfg
 
     snapshot_cfg = cfg.SNAPSHOT
-    for key in ("blob_token_env", "http_token_env"):
-        name = str(snapshot_cfg.get(key, "")).strip()
+    candidates = [
+        str(snapshot_cfg.get("blob_token_env", "")).strip(),
+        str(snapshot_cfg.get("http_token_env", "")).strip(),
+        str(snapshot_cfg.get("blob_store_id_env", "")).strip() or "BLOB_STORE_ID",
+    ]
+    for name in candidates:
         if not name:
             continue
         value = os.environ.get(name, "").strip()
