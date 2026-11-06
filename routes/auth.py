@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from modules import auth, mailer, otp, snapshot
+from modules import auth, mailer, mfa, otp, snapshot
 from modules import config as cfg
 from modules.db import EPHEMERAL_STORAGE, get_conn, get_setting
 
@@ -102,6 +102,43 @@ class PasswordChangeIn(BaseModel):
     new_password: str = Field(min_length=1, max_length=256)
 
 
+class MfaSigninIn(BaseModel):
+    """Payload for the TOTP step after a successful password check.
+
+    Attributes:
+        mfa_token (str): Short-lived proof returned by ``signin/start`` when
+            the account has MFA enabled.
+        code (str): Six-digit TOTP code from the Authenticator app.
+    """
+
+    mfa_token: str = Field(min_length=8, max_length=512)
+    code: str = Field(min_length=4, max_length=12)
+
+
+class MfaBindVerifyIn(BaseModel):
+    """Payload to confirm an MFA binding.
+
+    Attributes:
+        mfa_token (str): Proof that the caller is signed in and has a
+            freshly generated MFA secret pending.
+        code (str): Six-digit TOTP code proving the app was registered.
+    """
+
+    mfa_token: str = Field(min_length=8, max_length=512)
+    code: str = Field(min_length=4, max_length=12)
+
+
+class MfaUnbindIn(BaseModel):
+    """Payload to disable MFA on the signed-in account.
+
+    Attributes:
+        current_password (str): Confirmation that the caller controls the
+            account.
+    """
+
+    current_password: str = Field(min_length=1, max_length=256)
+
+
 def _ip(request: Request) -> str:
     """Best-effort client IP, honouring the Vercel proxy header."""
     forwarded = request.headers.get("x-forwarded-for", "")
@@ -149,6 +186,7 @@ async def auth_status():
             "snapshot_sync": synced,
             "accounts_persist": (not EPHEMERAL_STORAGE) or synced,
             "mail_configured": mailer.configured() or mailer.echo_enabled(),
+            "mfa_available": mfa.available(),
             "password_policy": {
                 "min_length": auth.PASSWORD_MIN_LENGTH,
                 "min_categories": auth.PASSWORD_MIN_CATEGORIES,
@@ -255,14 +293,16 @@ async def signup_verify(data: VerifyIn, request: Request):
 async def signin_start(data: SigninIn, request: Request):
     """Check the password and prepare the second factor.
 
+    The second factor depends on the account's MFA preference:
+
+    * **MFA enabled** → returns ``{"status": "mfa_required", "mfa_token": …}``
+      and the caller must submit a TOTP code via ``signin/mfa/verify``.
+    * **Otherwise** → issues an e-mail OTP as before
+      (``signin/verify``).
+
     Args:
         data (SigninIn): Address (or legacy username) and password.
         request (Request): Incoming request, used for the client IP.
-
-    Returns:
-        dict: ``{"status": "otp_required", ...challenge}`` for a normal
-        account, or ``{"status": "bind_required", "bind_token": ...}`` when
-        the account predates e-mail sign-in and must bind an address first.
 
     Raises:
         auth.AuthError: 401 for unknown credentials, 403 for a disabled
@@ -285,6 +325,20 @@ async def signin_start(data: SigninIn, request: Request):
                     "Confirm an address to continue."
                 ),
             }
+        # MFA replaces the e-mail OTP when enabled — one factor, not two.
+        if int(row["mfa_enabled"] or 0) == 1 and mfa.available():
+            return {
+                "status": "mfa_required",
+                "username": row["username"],
+                "mfa_token": auth.issue_pending_token(
+                    {
+                        "uid": int(row["id"]),
+                        "purpose": "mfa_signin",
+                        "un": row["username"],
+                    }
+                ),
+                "next": "/api/auth/signin/mfa/verify",
+            }
         result = otp.issue(
             conn,
             purpose="signin",
@@ -295,6 +349,61 @@ async def signin_start(data: SigninIn, request: Request):
     result["status"] = "otp_required"
     result["next"] = "/api/auth/signin/verify"
     return result
+
+
+@router.post("/api/auth/signin/mfa/verify")
+async def signin_mfa_verify(data: MfaSigninIn, request: Request):
+    """Consume the TOTP code and issue the session.
+
+    Args:
+        data (MfaSigninIn): MFA proof token plus the six-digit TOTP code.
+        request (Request): Incoming request, used for the user agent and IP.
+
+    Returns:
+        JSONResponse: ``{"user", "password"}`` plus the session cookie.
+
+    Raises:
+        auth.AuthError: 401 for a missing or stale proof token, 403 when the
+            account was disabled meanwhile.
+    """
+    claims = auth.verify_pending_token(data.mfa_token, "mfa_signin")
+    if claims is None:
+        raise auth.AuthError(
+            "This sign-in attempt expired. Enter your password again.", 401
+        )
+    if not mfa.available():
+        raise auth.AuthError(
+            "Authenticator codes are not supported on this host.", 501
+        )
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id=?", (int(claims["uid"]),)
+        ).fetchone()
+        if row is None:
+            raise auth.AuthError(
+                "The account is not available on this instance. Try again.", 409
+            )
+        if not row["enabled"]:
+            raise auth.AuthError(
+                "This account is disabled. Contact an administrator.", 403
+            )
+        if int(row["mfa_enabled"] or 0) != 1:
+            raise auth.AuthError(
+                "Authenticator verification is not enabled for this account.", 400
+            )
+        if not mfa.verify_code(str(row["mfa_secret"] or ""), data.code.strip()):
+            raise auth.AuthError(
+                "The verification code did not match. Check the app clock "
+                "or generate a fresh code and try again.",
+                400,
+            )
+        session = auth.start_session(
+            conn, row, user_agent=_agent(request), ip=_ip(request)
+        )
+    return _with_cookie(
+        {"user": session["user"], "password": session["password"]},
+        session["token"],
+    )
 
 
 @router.post("/api/auth/signin/verify")
@@ -457,11 +566,146 @@ async def me(user: Dict[str, Any] = Depends(auth.current_user)):
         user (Dict[str, Any]): Injected by the ``current_user`` dependency.
 
     Returns:
-        dict: ``{"user": ..., "password": ...}``.
+        dict: ``{"user": ..., "password": ..., "mfa": ...}``.
     """
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
-    return {"user": auth.public_user(row), "password": auth.password_state(row)}
+    return {
+        "user": auth.public_user(row),
+        "password": auth.password_state(row),
+        "mfa": {
+            "available": mfa.available(),
+            "enabled": bool(row["mfa_enabled"]) if row else False,
+            "secret_present": bool(row["mfa_secret"]) if row else False,
+        },
+    }
+
+
+@router.get("/api/auth/mfa/bind")
+async def mfa_bind_start(
+    user: Dict[str, Any] = Depends(auth.current_user),
+):
+    """Generate a fresh TOTP secret and QR image for the signed-in user.
+
+    The returned ``mfa_token`` must be posted back with the first verified
+    code to actually switch MFA on; this endpoint only prepares.
+
+    Args:
+        user (Dict[str, Any]): Injected by the ``current_user`` dependency.
+
+    Returns:
+        dict: ``{"secret", "uri", "qr_svg", "mfa_token"}``. The SVG is a
+            complete document, safe to drop into an ``<img>`` tag's
+            ``srcdoc`` attribute.
+
+    Raises:
+        auth.AuthError: 501 when the runtime dependencies are missing.
+    """
+    if not mfa.available():
+        raise auth.AuthError(
+            "Authenticator MFA is not supported on this host.", 501
+        )
+    username = str(user.get("username") or "")
+    email = str(user.get("email") or "")
+    secret = mfa.generate_secret()
+    uri = mfa.provisioning_uri(secret, username, label=email or username)
+    qr_svg = mfa.generate_qr_svg(uri)
+    # Keep the pending secret signed by the mfa_token so we don't have to
+    # touch the user row until the first code is confirmed.
+    mfa_token = auth.issue_pending_token(
+        {
+            "uid": int(user["id"]),
+            "purpose": "mfa_bind",
+            "un": username,
+            "secret": secret,
+        }
+    )
+    return {
+        "secret": secret,
+        "uri": uri,
+        "qr_svg": qr_svg,
+        "mfa_token": mfa_token,
+    }
+
+
+@router.post("/api/auth/mfa/bind/verify")
+async def mfa_bind_verify(
+    data: MfaBindVerifyIn,
+    request: Request,
+    user: Dict[str, Any] = Depends(auth.current_user),
+):
+    """Confirm an MFA binding by verifying one code from the app.
+
+    Args:
+        data (MfaBindVerifyIn): Pending-binding token plus one fresh TOTP.
+        request (Request): Incoming request, used for the client IP.
+        user (Dict[str, Any]): Injected by the ``current_user`` dependency.
+
+    Returns:
+        dict: ``{"ok": True, "mfa_enabled": true}``.
+
+    Raises:
+        auth.AuthError: 401 when the binding token is stale or belongs to
+            another account, 400 when the code does not match.
+    """
+    claims = auth.verify_pending_token(data.mfa_token, "mfa_bind")
+    if claims is None or int(claims.get("uid") or 0) != int(user["id"]):
+        raise auth.AuthError(
+            "This binding attempt expired. Generate a new QR code.", 401
+        )
+    secret = str(claims.get("secret") or "")
+    if not mfa.verify_code(secret, data.code.strip()):
+        raise auth.AuthError(
+            "The verification code did not match. Try again with a fresh "
+            "code from the app.",
+            400,
+        )
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET mfa_secret=?, mfa_enabled=1 WHERE id=?",
+            (secret, int(user["id"])),
+        )
+        conn.commit()
+    snapshot.request_sync()
+    return {"ok": True, "mfa_enabled": True}
+
+
+@router.post("/api/auth/mfa/unbind")
+async def mfa_unbind(
+    data: MfaUnbindIn,
+    request: Request,
+    user: Dict[str, Any] = Depends(auth.current_user),
+):
+    """Disable MFA for the signed-in account.
+
+    Requires a fresh password confirmation because this lowers the account's
+    second-factor posture.
+
+    Args:
+        data (MfaUnbindIn): Current password.
+        request (Request): Incoming request, used for the client IP.
+        user (Dict[str, Any]): Injected by the ``current_user`` dependency.
+
+    Returns:
+        dict: ``{"ok": True, "mfa_enabled": false}``.
+
+    Raises:
+        auth.AuthError: 401 when the password does not match.
+    """
+    with get_conn() as conn:
+        auth.verify_signin(
+            conn,
+            str(user.get("username") or ""),
+            data.current_password,
+            ip=_ip(request),
+        )
+        conn.execute(
+            "UPDATE users SET mfa_secret='', mfa_enabled=0 WHERE id=?",
+            (int(user["id"]),),
+        )
+        conn.commit()
+    snapshot.request_sync()
+    return {"ok": True, "mfa_enabled": False}
 
 
 @router.post("/api/auth/logout")

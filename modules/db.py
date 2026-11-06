@@ -582,7 +582,13 @@ CREATE TABLE IF NOT EXISTS users (
     email         TEXT NOT NULL DEFAULT '',
     email_verified INTEGER NOT NULL DEFAULT 0,
     -- Start of the current password's 90-day validity window.
-    password_changed_at TEXT NOT NULL DEFAULT ''
+    password_changed_at TEXT NOT NULL DEFAULT '',
+    -- Time-based one-time password (Authenticator app) second factor.
+    -- ``mfa_secret`` is the base32 TOTP key; ``mfa_enabled`` flips the gate
+    -- for sign-in. A row with a secret but enabled=0 means the user has
+    -- bound an app and can turn MFA back on from the account page.
+    mfa_secret  TEXT NOT NULL DEFAULT '',
+    mfa_enabled INTEGER NOT NULL DEFAULT 0
 );
 
 -- Only verified, non-empty addresses are unique: legacy rows share ''.
@@ -1053,6 +1059,15 @@ def init_db(seed: bool = True) -> None:
             conn.execute(
                 "ALTER TABLE users ADD COLUMN password_changed_at "
                 "TEXT NOT NULL DEFAULT ''"
+            )
+        # MFA (TOTP via Authenticator app) added in 2.3.0.
+        if "mfa_secret" not in cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN mfa_secret TEXT NOT NULL DEFAULT ''"
+            )
+        if "mfa_enabled" not in cols:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0"
             )
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email "

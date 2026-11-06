@@ -17,3 +17,7 @@ openpyxl>=3.1.2               # .xlsx support
 matplotlib>=3.8.0             # server-side report charts (Agg backend)
 reportlab>=4.0.0              # PDF report generation
 pillow>=10.0.0                # matplotlib image backend dependency
+
+# TOTP / Authenticator MFA
+pyotp>=2.9.0
+qrcode>=7.4

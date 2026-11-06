@@ -652,6 +652,12 @@ def public_user(row: sqlite3.Row) -> Dict[str, Any]:
         "email_verified": bool(row["email_verified"])
         if "email_verified" in keys
         else False,
+        "mfa_enabled": bool(row["mfa_enabled"])
+        if "mfa_enabled" in keys
+        else False,
+        "mfa_secret_present": bool(row["mfa_secret"])
+        if "mfa_secret" in keys
+        else False,
     }
 
 

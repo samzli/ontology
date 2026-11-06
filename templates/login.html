@@ -116,7 +116,11 @@
         code: document.getElementById('stepCode'),
         bind: document.getElementById('stepBind'),
       };
-      const state = { challenge: '', verifyPath: '/api/auth/signin/verify' };
+      const state = {
+        challenge: '',
+        mfaToken: '',
+        mode: '',  // 'otp' | 'mfa' | ''
+      };
 
       function show(step) {
         Object.entries(forms).forEach(([k, f]) => {
@@ -182,15 +186,28 @@
             document.getElementById('authSub').textContent =
               'One-time step for an account created before e-mail sign-in.';
             show('bind');
+          } else if (r.status === 'mfa_required') {
+            state.mode = 'mfa';
+            state.mfaToken = r.mfa_token;
+            document.getElementById('authTitle').textContent =
+              'Authenticator verification';
+            document.getElementById('authSub').textContent =
+              'Open your Authenticator app and enter the six-digit code.';
+            document.getElementById('otpEmail').textContent = r.username
+              || 'your account';
+            show('code');
+            document.getElementById('fCode').focus();
+            document.getElementById('resendBtn').style.display = 'none';
           } else {
+            state.mode = 'otp';
             state.challenge = r.challenge_id;
-            state.verifyPath = '/api/auth/signin/verify';
             document.getElementById('otpEmail').textContent = r.email_masked;
             document.getElementById('authTitle').textContent = 'Check your inbox';
             document.getElementById('authSub').textContent =
               'Enter the 6-digit code to finish signing in.';
             show('code');
             document.getElementById('fCode').focus();
+            document.getElementById('resendBtn').style.display = '';
             startCooldown();
             if (r.debug_code) {
               document.getElementById('fCode').value = r.debug_code;
@@ -216,12 +233,13 @@
             bind_token: state.bindToken,
             email: document.getElementById('fBindEmail').value.trim(),
           });
+          state.mode = 'otp';
           state.challenge = r.challenge_id;
-          state.verifyPath = '/api/auth/bind/verify';
           document.getElementById('otpEmail').textContent = r.email_masked;
           document.getElementById('authTitle').textContent = 'Check your inbox';
           document.getElementById('authSub').textContent =
             'Confirm the code to attach this address.';
+          document.getElementById('resendBtn').style.display = '';
           show('code');
           document.getElementById('fCode').focus();
           startCooldown();
@@ -240,15 +258,28 @@
         const btn = document.getElementById('codeBtn');
         btn.disabled = true;
         try {
-          await api.post(state.verifyPath, {
-            challenge_id: state.challenge,
-            code: document.getElementById('fCode').value.trim(),
-          });
+          let body;
+          let path;
+          if (state.mode === 'mfa') {
+            body = { mfa_token: state.mfaToken, code: document.getElementById('fCode').value.trim() };
+            path = '/api/auth/signin/mfa/verify';
+          } else if (state.bindToken) {
+            // Legacy account binding — path is distinct from signin/verify
+            // so the backend knows which purpose the code is checked for.
+            body = { challenge_id: state.challenge, code: document.getElementById('fCode').value.trim() };
+            path = '/api/auth/bind/verify';
+          } else {
+            body = { challenge_id: state.challenge, code: document.getElementById('fCode').value.trim() };
+            path = '/api/auth/signin/verify';
+          }
+          await api.post(path, body);
           location.replace('/app');
         } catch (ex) {
           showErr(ex.message);
           if (ex.extra && ex.extra.restart) {
             state.challenge = '';
+            state.mfaToken = '';
+            state.bindToken = '';
             reset('That code expired. Sign in again to request a new one.');
           }
           btn.disabled = false;
